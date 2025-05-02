@@ -19,7 +19,7 @@ from windows_wrapper import (
 from app_wide_properties import AppWideProperties
 from constants import (
     WINDOW_MIN_WIDTH,
-    WINDOW_MIN_HEIGHT
+    DEFAULT_FONT_NAME
 )
 
 
@@ -42,6 +42,9 @@ class WindowSelectionFrame(ctk.CTkFrame):
         '''
         super().__init__(master, **kwargs)
 
+        # フォントを生成
+        default_font = ctk.CTkFont(DEFAULT_FONT_NAME)
+
         # 参照を保存
         self.app_wide_properties = app_wide_properties
 
@@ -56,11 +59,20 @@ class WindowSelectionFrame(ctk.CTkFrame):
         self.window_list_box.bind("<<ListboxSelect>>", self.on_select)        
 
         # ウィンドウ一覧再読み込みボタン
-        self.reload_window_list_button = ctk.CTkButton(self, text="リロード", command=self.update_list)
+        self.reload_window_list_button = ctk.CTkButton(
+            self,
+            text="リロード",
+            command=self.update_list,
+            font=default_font
+        )
         self.reload_window_list_button.grid(row=1, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe")
 
         # プレビュー画像表示用ラベル
-        self.preview_label = ctk.CTkLabel(self, text="Preview")
+        self.preview_label = ctk.CTkLabel(
+            self,
+            text="Preview",
+            font=default_font
+        )
         self.preview_label.grid(row=0, column=1, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe")
 
         # ウィンドウサイズ変更イベントのバインド

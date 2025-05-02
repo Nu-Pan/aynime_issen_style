@@ -1,12 +1,12 @@
 
 import customtkinter as ctk
 
-from PIL import Image, ImageTk
+from PIL import ImageTk
 
 from app_wide_properties import AppWideProperties
 from constants import (
     WIDGET_PADDING,
-    WINDOW_MIN_WIDTH
+    DEFAULT_FONT_NAME
 )
 from windows_wrapper import (
     capture_window_image,
@@ -33,11 +33,18 @@ class CaptureFrame(ctk.CTkFrame):
         '''
         super().__init__(master, **kwargs)
 
+        # フォントを生成
+        default_font = ctk.CTkFont(DEFAULT_FONT_NAME)
+
         # 参照を保存
         self.app_wide_properties = app_wide_properties
 
         # プレビューラベル兼キャプチャボタン
-        self.preview_label = ctk.CTkLabel(self, text='クリックしてキャプチャ')
+        self.preview_label = ctk.CTkLabel(
+            self,
+            text='クリックしてキャプチャ',
+            font=default_font
+        )
         self.preview_label.pack(fill="both", expand=True, padx=WIDGET_PADDING, pady=WIDGET_PADDING)
         self.preview_label.bind("<Button-1>", self.on_capture_click)
 
@@ -123,7 +130,10 @@ class CaptureFrame(ctk.CTkFrame):
         :param duration_ms: 表示時間（ミリ秒）
         :return: None
         '''
-        # 通知ラベルを作成
+        # フォントを生成
+        default_font = ctk.CTkFont(DEFAULT_FONT_NAME)
+
+        # 通知ラベルを生成
         # NOTE
         #   ラベルの四隅の外側はテーマ色でフィルされてしまうので、角丸のないラベルを使用する(corner_radius=0)。
         status_label = ctk.CTkLabel(
@@ -132,7 +142,7 @@ class CaptureFrame(ctk.CTkFrame):
             fg_color='#3a8d3f',
             text_color="white",
             corner_radius=0,
-            font=ctk.CTkFont(size=14, weight="bold")
+            font=default_font
         )
         status_label.place(
             relx=0.5,
@@ -141,7 +151,7 @@ class CaptureFrame(ctk.CTkFrame):
         )
         status_label.configure(
             padx=WIDGET_PADDING,
-            pady=WIDGET_PADDING,
+            pady=WIDGET_PADDING
         )
 
         # 通知ラベルは一定時間後に自動破棄

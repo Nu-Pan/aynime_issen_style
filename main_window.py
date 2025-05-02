@@ -5,7 +5,8 @@ from window_selection_frame import WindowSelectionFrame
 from capture_frame import CaptureFrame
 from constants import (
     WINDOW_MIN_WIDTH,
-    WINDOW_MIN_HEIGHT
+    WINDOW_MIN_HEIGHT,
+    DEFAULT_FONT_NAME
 )
 
 
@@ -20,6 +21,10 @@ class MainWindow(ctk.CTk):
         コンストラクタ
         '''
         super().__init__()
+
+        # フォントを設定
+        default_font = ctk.CTkFont(DEFAULT_FONT_NAME)
+        self.configure(font=default_font)
 
         # タイトルを設定
         self.title("えぃにめ一閃流奥義　――キャプチャ――")
