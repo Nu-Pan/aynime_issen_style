@@ -45,7 +45,7 @@ class CaptureFrame(ctk.CTkFrame):
         # プレビューラベル兼キャプチャボタン
         self.preview_label = ctk.CTkLabel(
             self,
-            text='クリックしてキャプチャ',
+            text='クリック or Ctrl+Alt+P でキャプチャ',
             font=default_font
         )
         self.preview_label.pack(fill="both", expand=True, padx=WIDGET_PADDING, pady=WIDGET_PADDING)
