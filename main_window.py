@@ -1,19 +1,54 @@
 import customtkinter as ctk
-import win32gui
-from CTkListbox import CTkListbox
 
+from app_wide_properties import AppWideProperties
 from window_selection_frame import WindowSelectionFrame
+from capture_frame import CaptureFrame
+from constants import (
+    WINDOW_MIN_WIDTH,
+    WINDOW_MIN_HEIGHT
+)
 
 
-# メインアプリ
 class MainWindow(ctk.CTk):
+    '''
+    メインウィンドウクラス
+    '''
 
 
     def __init__(self):
+        '''
+        コンストラクタ
+        '''
         super().__init__()
-        self.title("えぃにめ一心流奥義　――スクショ――")
-        self.geometry("1280x720")
 
-        # フレーム作成・配置
-        self.current_frame = WindowSelectionFrame(self)
-        self.current_frame.pack(fill="both", expand=True)
+        # タイトルを設定
+        self.title("えぃにめ一閃流奥義　――キャプチャ――")
+
+        # 初期位置を設定
+        self.geometry(f"{WINDOW_MIN_WIDTH}x{WINDOW_MIN_HEIGHT}")
+
+        # アプリケーション全体で共有するプロパティ
+        self.app_wide_properties = AppWideProperties()
+
+        # タブビューを追加
+        self.tabview = ctk.CTkTabview(self)
+        self.tabview.pack(fill="both", expand=True, padx=10, pady=10)
+
+        # ウィンドウ選択タブを追加
+        self.tabview.add("構え")
+        self.select_frame = WindowSelectionFrame(
+            self.tabview.tab("構え"),
+            self.app_wide_properties
+        )
+        self.select_frame.pack(fill="both", expand=True)
+
+        # キャプチャタブを追加
+        self.tabview.add("キャプチャ")
+        self.capture_frame = CaptureFrame(
+            self.tabview.tab("キャプチャ"),
+            self.app_wide_properties
+        )
+        self.capture_frame.pack(fill="both", expand=True)
+
+        # 初期選択
+        self.tabview.set("構え")
