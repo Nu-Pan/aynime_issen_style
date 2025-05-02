@@ -60,6 +60,9 @@ class CaptureFrame(ctk.CTkFrame):
         # 結果をクリップボードに転送
         image_to_clipboard(self.original_capture_image)
 
+        # 完了を通知
+        self.notify_status('一閃\nクリップボード転送完了')
+
 
     def on_frame_resize(self, event) -> None:
         '''
@@ -107,3 +110,39 @@ class CaptureFrame(ctk.CTkFrame):
             image=tk_image,
             text=""
         )
+
+
+    def notify_status(
+        self,
+        message: str,
+        duration_ms: int = 2000
+    ) -> None:
+        '''
+        duration_ms の間、隅っこにメッセージを通知する。
+        :param message: メッセージ文字列
+        :param duration_ms: 表示時間（ミリ秒）
+        :return: None
+        '''
+        # 通知ラベルを作成
+        # NOTE
+        #   ラベルの四隅の外側はテーマ色でフィルされてしまうので、角丸のないラベルを使用する(corner_radius=0)。
+        status_label = ctk.CTkLabel(
+            self,
+            text=message,
+            fg_color='#3a8d3f',
+            text_color="white",
+            corner_radius=0,
+            font=ctk.CTkFont(size=14, weight="bold")
+        )
+        status_label.place(
+            relx=0.5,
+            rely=0.5,
+            anchor='center'
+        )
+        status_label.configure(
+            padx=WIDGET_PADDING,
+            pady=WIDGET_PADDING,
+        )
+
+        # 通知ラベルは一定時間後に自動破棄
+        self.after(duration_ms, status_label.destroy)
