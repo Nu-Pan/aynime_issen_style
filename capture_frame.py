@@ -1,7 +1,10 @@
 
-import customtkinter as ctk
+import threading
 
+import customtkinter as ctk
 from PIL import ImageTk
+import keyboard
+
 
 from app_wide_properties import AppWideProperties
 from constants import (
@@ -54,6 +57,12 @@ class CaptureFrame(ctk.CTkFrame):
         # リサイズ前のキャプチャ画像
         self.original_capture_image = None
 
+        # ホットキー用のバックグラウンドスレッドを開始
+        # NOTE
+        #   ホットキーのリスニングはメインスレッドで行うと、GUIがフリーズしてしまうので、バックグラウンドスレッドを使用する。
+        #   デーモンスレッドにすることで、メインスレッドが終了したときに自動的に終了する。
+        threading.Thread(target=self.listen_hotkey, daemon=True).start()
+
 
     def on_capture_click(self, event) -> None:
         '''
@@ -64,10 +73,15 @@ class CaptureFrame(ctk.CTkFrame):
         self.update_original_capture_image()
         self.update_preview_label()
 
+        # キャプチャ画像がない場合は何もしない
+        if self.original_capture_image is None:
+            self.preview_label.configure(text="キャプチャ失敗")
+            return
+
         # 結果をクリップボードに転送
         image_to_clipboard(self.original_capture_image)
 
-        # 完了を通知
+        # クリップボード転送完了通知
         self.notify_status('一閃\nクリップボード転送完了')
 
 
@@ -80,11 +94,27 @@ class CaptureFrame(ctk.CTkFrame):
         self.update_preview_label()
 
 
+    def listen_hotkey(self) -> None:
+        '''
+        ホットキーをリスニングする。
+        :return: None
+        '''
+        keyboard.add_hotkey('ctrl+alt+p', lambda: self.on_capture_click(None))
+        keyboard.wait()
+
+
     def update_original_capture_image(self) -> None:
         '''
         選択されたウィンドウのキャプチャを撮影し、その画像で内部状態を更新する。
         :return: None 
         '''
+        # ウィンドウタイトルが選択されていない場合は何もしない
+        if self.app_wide_properties.window_title_substring is None:
+            self.tk_image = None
+            self.preview_label.configure(text="ウィンドウを選択してください")
+            return
+
+        # キャプチャ画像を取得
         self.original_capture_image = capture_window_image(
             self.app_wide_properties.window_title_substring
         )
