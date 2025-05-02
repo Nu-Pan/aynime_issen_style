@@ -5,10 +5,17 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Python デバッガー: 現在のファイル",
+            "name": "App",
             "type": "debugpy",
             "request": "launch",
             "program": "main.py",
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "Build",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "build.py",
             "console": "integratedTerminal"
         }
     ]
