@@ -3,8 +3,9 @@ from typing import (
     List,
     Optional
 )
+import io
 
-import win32gui, win32ui, win32con
+import win32gui, win32ui, win32con, win32clipboard
 
 from PIL import Image
 
@@ -94,3 +95,27 @@ def isotropic_scale_image_in_rectangle(
     # 画像を縮小
     new_size = (int(image.width * scale), int(image.height * scale))
     return image.resize(new_size, Image.Resampling.BILINEAR)
+
+
+def image_to_clipboard(image: Image.Image) -> None:
+    '''
+    画像をクリップボードにコピーする
+    :param image: PILのImageオブジェクト
+    :return: None
+    '''
+    # 画像をRGBモードに変換
+    image = image.convert("RGB")
+    
+    # 画像をクリップボードにコピー
+    with io.BytesIO() as bmp_io:
+        image.save(bmp_io, format="BMP")
+        bmp_data = bmp_io.getvalue()
+
+    # BMPヘッダを除去
+    data = bmp_data[14:]
+
+    # クリップボードに CF_DIB 形式でデータをセット
+    win32clipboard.OpenClipboard()
+    win32clipboard.EmptyClipboard()
+    win32clipboard.SetClipboardData(win32con.CF_DIB, data)
+    win32clipboard.CloseClipboard()

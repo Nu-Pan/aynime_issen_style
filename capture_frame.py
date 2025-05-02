@@ -10,7 +10,8 @@ from constants import (
 )
 from windows_wrapper import (
     capture_window_image,
-    isotropic_scale_image_in_rectangle
+    isotropic_scale_image_in_rectangle,
+    image_to_clipboard
 )
 
 class CaptureFrame(ctk.CTkFrame):
@@ -52,8 +53,12 @@ class CaptureFrame(ctk.CTkFrame):
         キャプチャボタンがクリックされたときの処理
         :param event: イベントオブジェクト
         '''
+        # まずはキャプチャ＆プレビュー
         self.update_original_capture_image()
-        self.update_preview_label()        
+        self.update_preview_label()
+
+        # 結果をクリップボードに転送
+        image_to_clipboard(self.original_capture_image)
 
 
     def on_frame_resize(self, event) -> None:
