@@ -34,7 +34,10 @@ class AynimeIssenStyleApp(ctk.CTk):
         self.title("えぃにめ一閃流奥義　――キャプチャ――")
 
         # 初期位置を設定
-        self.geometry(f"{WINDOW_MIN_WIDTH}x{WINDOW_MIN_HEIGHT}")
+        self.geometry(f"{WINDOW_MIN_WIDTH*2}x{WINDOW_MIN_HEIGHT*2}")
+
+        # 最小サイズを設定
+        self.minsize(WINDOW_MIN_WIDTH, WINDOW_MIN_HEIGHT)
 
         # Model-View でいうところのモデル
         self.model = AynimeIssenStyleModel()
@@ -42,7 +45,7 @@ class AynimeIssenStyleApp(ctk.CTk):
 
         # タブビューを追加
         self.tabview = ctk.CTkTabview(self)
-        self.tabview.pack(fill="both", expand=True, padx=10, pady=10)
+        self.tabview.pack(fill="both", expand=True)
 
         # ウィンドウ選択タブを追加
         self.tabview.add("構え")
