@@ -6,18 +6,18 @@ from typing import (
 import customtkinter as ctk
 from CTkListbox import CTkListbox
 
-from PIL import Image, ImageTk
+from PIL import ImageTk
 
-from constants import (
-    WIDGET_PADDING
+from pil_wrapper import isotropic_scale_image_in_rectangle
+from capture_context import (
+    CaptureTargetInfo
 )
-from windows_wrapper import (
-    get_visible_window_titles,
-    capture_window_image,
-    isotropic_scale_image_in_rectangle
+from aynime_issen_style_model import (
+    CaptureMode,
+    AynimeIssenStyleModel
 )
-from app_wide_properties import AppWideProperties
 from constants import (
+    WIDGET_PADDING,
     WINDOW_MIN_WIDTH,
     DEFAULT_FONT_NAME
 )
@@ -32,7 +32,7 @@ class WindowSelectionFrame(ctk.CTkFrame):
     def __init__(
         self,
         master,
-        app_wide_properties: AppWideProperties,
+        model: AynimeIssenStyleModel,
         **kwargs
     ):
         '''
@@ -46,26 +46,100 @@ class WindowSelectionFrame(ctk.CTkFrame):
         default_font = ctk.CTkFont(DEFAULT_FONT_NAME)
 
         # 参照を保存
-        self.app_wide_properties = app_wide_properties
+        self.model = model
 
         # レイアウト設定
         self.rowconfigure(0, weight=1)
         self.columnconfigure(0, weight=1, minsize=WINDOW_MIN_WIDTH//2)
         self.columnconfigure(1, weight=1, minsize=WINDOW_MIN_WIDTH//2)
 
-        # Windows デスクトップ上に存在するウィンドウ一覧
-        self.window_list_box = CTkListbox(self, multiple_selection=False)
-        self.window_list_box.grid(row=0, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe")
-        self.window_list_box.bind("<<ListboxSelect>>", self.on_select)        
+        # 画面左側のいろいろまとめる用のフレーム
+        self.west_frame = ctk.CTkFrame(self)
+        self.west_frame.grid(
+            row=0,
+            column=0,
+            padx=WIDGET_PADDING,
+            pady=WIDGET_PADDING,
+            sticky="nswe"
+        )
+        self.west_frame.rowconfigure(0, weight=0)
+        self.west_frame.rowconfigure(1, weight=1)
+        self.west_frame.rowconfigure(2, weight=0)
+        self.west_frame.columnconfigure(0, weight=1)
+
+        # モード選択フレーム
+        self.capture_mode_frame = ctk.CTkFrame(self.west_frame)
+        self.capture_mode_frame.grid(
+            row=0,
+            column=0,
+            padx=WIDGET_PADDING,
+            pady=WIDGET_PADDING,
+            sticky="nwe"
+        )
+        self.capture_mode_frame.columnconfigure(0, weight=1)
+        self.capture_mode_frame.columnconfigure(1, weight=1)
+
+        # モード選択ラジオボタンの排他選択用変数
+        self.capture_mode_var = ctk.StringVar(value=CaptureMode.DXCAM.value)
+
+        # モード選択ラジオボタン（DXCAM）
+        self.capture_mode_dxcam_radio = ctk.CTkRadioButton(
+            self.capture_mode_frame,
+            text=CaptureMode.DXCAM.name,
+            variable=self.capture_mode_var,
+            value=CaptureMode.DXCAM.value,
+            command=self.on_capture_mode_radio_change
+        )
+        self.capture_mode_dxcam_radio.grid(
+            row=0,
+            column=0,
+            padx=WIDGET_PADDING,
+            pady=WIDGET_PADDING
+        )
+
+        # モード選択ラジオボタン（PYWIN32）
+        self.capture_mode_pywin32_radio = ctk.CTkRadioButton(
+            self.capture_mode_frame,
+            text=CaptureMode.PYWIN32.name,
+            variable=self.capture_mode_var,
+            value=CaptureMode.PYWIN32.value,
+            command=self.on_capture_mode_radio_change
+        )
+        self.capture_mode_pywin32_radio.grid(
+            row=0,
+            column=1,
+            padx=WIDGET_PADDING,
+            pady=WIDGET_PADDING
+        )
+
+        # キャプチャ対象リストボックス
+        self.capture_target_list_box = CTkListbox(
+            self.west_frame,
+            multiple_selection=False
+        )
+        self.capture_target_list_box.grid(
+            row=1,
+            column=0,
+            padx=WIDGET_PADDING,
+            pady=WIDGET_PADDING,
+            sticky="nswe"
+        )
+        self.capture_target_list_box.bind("<<ListboxSelect>>", self.on_capture_target_select)        
 
         # ウィンドウ一覧再読み込みボタン
         self.reload_window_list_button = ctk.CTkButton(
-            self,
+            self.west_frame,
             text="リロード",
             command=self.update_list,
             font=default_font
         )
-        self.reload_window_list_button.grid(row=1, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe")
+        self.reload_window_list_button.grid(
+            row=2,
+            column=0,
+            padx=WIDGET_PADDING,
+            pady=WIDGET_PADDING,
+            sticky="swe"
+        )
 
         # プレビュー画像表示用ラベル
         self.preview_label = ctk.CTkLabel(
@@ -73,7 +147,13 @@ class WindowSelectionFrame(ctk.CTkFrame):
             text="Preview",
             font=default_font
         )
-        self.preview_label.grid(row=0, column=1, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe")
+        self.preview_label.grid(
+            row=0,
+            column=1,
+            padx=WIDGET_PADDING,
+            pady=WIDGET_PADDING,
+            sticky="nswe"
+        )
 
         # ウィンドウサイズ変更イベントのバインド
         self.bind('<Configure>', self.on_frame_resize)
@@ -86,15 +166,27 @@ class WindowSelectionFrame(ctk.CTkFrame):
         self.update_window_preview()
 
 
-    def on_select(self, event) -> None:
+    def on_capture_mode_radio_change(self) -> None:
+        '''
+        キャプチャモードの選択イベントハンドラ
+        :return: None
+        '''
+        self.model.change_capture_mode(CaptureMode(self.capture_mode_var.get()))
+        self.update_list()
+
+
+    def on_capture_target_select(self, event) -> None:
         '''
         リストボックスの選択イベントハンドラ
         :param event: イベントオブジェクト
         :return: None
         '''
-        # 選択されたウィンドウタイトルをアプリケーション全体のプロパティに保存
-        selection = self.window_list_box.get(self.window_list_box.curselection())
-        self.app_wide_properties.window_title_substring = selection
+        # キャプチャ対象の変更をモデルに反映
+        selection = cast(
+            CaptureTargetInfo,
+            self.capture_target_list_box.get(self.capture_target_list_box.curselection())
+        )
+        self.model.change_capture_target(selection)
 
         # 描画更新
         self.update_original_capture_image()
@@ -116,9 +208,9 @@ class WindowSelectionFrame(ctk.CTkFrame):
         :return: None
         '''
         # リストボックスをクリアしてから、ウィンドウタイトルを取得して追加
-        self.window_list_box.delete(0, ctk.END)
-        for title in get_visible_window_titles():
-            self.window_list_box.insert(ctk.END, title)
+        self.capture_target_list_box.delete(0, ctk.END)
+        for capture_target_info in self.model.enumerate_capture_targets():
+            self.capture_target_list_box.insert(ctk.END, capture_target_info)
 
 
     def update_original_capture_image(self) -> None:
@@ -126,9 +218,9 @@ class WindowSelectionFrame(ctk.CTkFrame):
         選択されたウィンドウのキャプチャを撮影し、その画像で内部状態を更新する。
         :return: None 
         '''
-        self.original_capture_image = capture_window_image(
-            self.app_wide_properties.window_title_substring
-        )
+        self.original_capture_image = self.model.capture()
+        if self.original_capture_image is None:
+            self.preview_label.configure(text="キャプチャ失敗")
 
 
     def update_window_preview(self) -> None:

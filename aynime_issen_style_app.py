@@ -1,8 +1,11 @@
 import customtkinter as ctk
 
-from app_wide_properties import AppWideProperties
 from window_selection_frame import WindowSelectionFrame
 from capture_frame import CaptureFrame
+from aynime_issen_style_model import (
+    CaptureMode,
+    AynimeIssenStyleModel
+)
 from constants import (
     WINDOW_MIN_WIDTH,
     WINDOW_MIN_HEIGHT,
@@ -10,9 +13,10 @@ from constants import (
 )
 
 
-class MainWindow(ctk.CTk):
+class AynimeIssenStyleApp(ctk.CTk):
     '''
-    メインウィンドウクラス
+    えぃにめ一閃流奥義
+    アプリケーションクラス
     '''
 
 
@@ -32,8 +36,9 @@ class MainWindow(ctk.CTk):
         # 初期位置を設定
         self.geometry(f"{WINDOW_MIN_WIDTH}x{WINDOW_MIN_HEIGHT}")
 
-        # アプリケーション全体で共有するプロパティ
-        self.app_wide_properties = AppWideProperties()
+        # Model-View でいうところのモデル
+        self.model = AynimeIssenStyleModel()
+        self.model.change_capture_mode(CaptureMode.DXCAM)
 
         # タブビューを追加
         self.tabview = ctk.CTkTabview(self)
@@ -43,7 +48,7 @@ class MainWindow(ctk.CTk):
         self.tabview.add("構え")
         self.select_frame = WindowSelectionFrame(
             self.tabview.tab("構え"),
-            self.app_wide_properties
+            self.model
         )
         self.select_frame.pack(fill="both", expand=True)
 
@@ -51,7 +56,7 @@ class MainWindow(ctk.CTk):
         self.tabview.add("キャプチャ")
         self.capture_frame = CaptureFrame(
             self.tabview.tab("キャプチャ"),
-            self.app_wide_properties
+            self.model
         )
         self.capture_frame.pack(fill="both", expand=True)
 

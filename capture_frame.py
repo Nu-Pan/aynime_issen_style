@@ -6,27 +6,25 @@ from PIL import ImageTk
 import keyboard
 
 
-from app_wide_properties import AppWideProperties
+from aynime_issen_style_model import AynimeIssenStyleModel
 from constants import (
     WIDGET_PADDING,
     DEFAULT_FONT_NAME
 )
-from windows_wrapper import (
-    capture_window_image,
-    isotropic_scale_image_in_rectangle,
-    image_to_clipboard
-)
+from pil_wrapper import isotropic_scale_image_in_rectangle
+from windows_wrapper import image_to_clipboard
+
 
 class CaptureFrame(ctk.CTkFrame):
     '''
-    キャプチャ操作を行うフレームクラス
+    キャプチャ操作を行うフレーム
     '''
 
 
     def __init__(
         self,
         master,
-        app_wide_properties: AppWideProperties,
+        model: AynimeIssenStyleModel,
         **kwargs
     ):
         '''
@@ -40,7 +38,7 @@ class CaptureFrame(ctk.CTkFrame):
         default_font = ctk.CTkFont(DEFAULT_FONT_NAME)
 
         # 参照を保存
-        self.app_wide_properties = app_wide_properties
+        self.model = model
 
         # プレビューラベル兼キャプチャボタン
         self.preview_label = ctk.CTkLabel(
@@ -108,20 +106,11 @@ class CaptureFrame(ctk.CTkFrame):
         選択されたウィンドウのキャプチャを撮影し、その画像で内部状態を更新する。
         :return: None 
         '''
-        # ウィンドウタイトルが選択されていない場合は何もしない
-        if self.app_wide_properties.window_title_substring is None:
-            self.tk_image = None
-            self.preview_label.configure(text="ウィンドウを選択してください")
-            return
-
-        # キャプチャ画像を取得
-        self.original_capture_image = capture_window_image(
-            self.app_wide_properties.window_title_substring
-        )
-        if self.original_capture_image is None:
-            self.tk_image = None
-            self.preview_label.configure(text="キャプチャ失敗")
-            return
+        try:
+            self.original_capture_image = self.model.capture()
+        except Exception as e:
+            self.original_capture_image = None
+            self.preview_label.configure(text=f"キャプチャ失敗\n{e}")
 
 
     def update_preview_label(self) -> None:
