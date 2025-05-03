@@ -162,8 +162,8 @@ class WindowSelectionFrame(ctk.CTkFrame):
             font=default_font
         )
         self.capture_target_preview_label.pack(
-            fill='none',
-            expand=False,
+            fill='both',
+            expand=True,
             padx=WIDGET_PADDING,
             pady=WIDGET_PADDING
         )
@@ -260,9 +260,7 @@ class WindowSelectionFrame(ctk.CTkFrame):
             )
             self.capture_target_preview_label.configure(
                 image='',
-                text='Capture Target Preview',
-                width=self.east_frame.winfo_width(),
-                height=self.east_frame.winfo_height()
+                text='Capture Target Preview'
             )
 
 
@@ -295,7 +293,5 @@ class WindowSelectionFrame(ctk.CTkFrame):
             )
             self.capture_target_preview_label.configure(
                 image=tk_image,
-                text='',
-                width=image.width,
-                height=image.height
+                text=''
             )

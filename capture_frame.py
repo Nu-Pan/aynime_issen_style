@@ -43,14 +43,17 @@ class CaptureFrame(ctk.CTkFrame):
         # プレビューラベル兼キャプチャボタン
         self.preview_label = ctk.CTkLabel(
             self,
-            text='クリック or Ctrl+Alt+P でキャプチャ',
+            text='Click here or Ctrl+Alt+P',
             font=default_font
         )
-        self.preview_label.pack(fill="both", expand=True, padx=WIDGET_PADDING, pady=WIDGET_PADDING)
-        self.preview_label.bind("<Button-1>", self.on_capture_click)
-
-        # ウィンドウサイズ変更イベントのバインド
-        self.bind('<Configure>', self.on_frame_resize)
+        self.preview_label.pack(
+            fill="both",
+            expand=True,
+            padx=WIDGET_PADDING,
+            pady=WIDGET_PADDING
+        )
+        self.preview_label.bind("<Button-1>", self.on_preview_label_click)
+        self.preview_label.bind('<Configure>', self.on_preview_label_resize)
 
         # リサイズ前のキャプチャ画像
         self.original_capture_image = None
@@ -62,7 +65,7 @@ class CaptureFrame(ctk.CTkFrame):
         threading.Thread(target=self.listen_hotkey, daemon=True).start()
 
 
-    def on_capture_click(self, event) -> None:
+    def on_preview_label_click(self, event) -> None:
         '''
         キャプチャボタンがクリックされたときの処理
         :param event: イベントオブジェクト
@@ -83,7 +86,7 @@ class CaptureFrame(ctk.CTkFrame):
         self.notify_status('一閃\nクリップボード転送完了')
 
 
-    def on_frame_resize(self, event) -> None:
+    def on_preview_label_resize(self, event) -> None:
         '''
         フレームのリサイズイベントハンドラ
         :param event: イベントオブジェクト
@@ -97,7 +100,7 @@ class CaptureFrame(ctk.CTkFrame):
         ホットキーをリスニングする。
         :return: None
         '''
-        keyboard.add_hotkey('ctrl+alt+p', lambda: self.on_capture_click(None))
+        keyboard.add_hotkey('ctrl+alt+p', lambda: self.on_preview_label_click(None))
         keyboard.wait()
 
 
@@ -126,15 +129,15 @@ class CaptureFrame(ctk.CTkFrame):
         # 画像をリサイズ
         pil_image = isotropic_scale_image_in_rectangle(
             self.original_capture_image,
-            self.preview_label.winfo_width(),
-            self.preview_label.winfo_height()
+            self.preview_label.winfo_width() - 2 * WIDGET_PADDING,
+            self.preview_label.winfo_height() - 2 * WIDGET_PADDING
         )
 
         # 画像をラベルに表示
         tk_image = ImageTk.PhotoImage(pil_image)
         self.preview_label.configure(
             image=tk_image,
-            text=""
+            text=''
         )
 
 
