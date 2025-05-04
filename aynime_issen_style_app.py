@@ -1,4 +1,8 @@
+import os
+import sys
+
 import customtkinter as ctk
+from tkinter import PhotoImage
 
 from window_selection_frame import WindowSelectionFrame
 from capture_frame import CaptureFrame
@@ -12,6 +16,14 @@ from constants import (
     WINDOW_MIN_HEIGHT,
     DEFAULT_FONT_NAME
 )
+
+
+def resource_path(relative_path: str):
+    """PyInstaller 実行環境と通常環境の両方に対応したパス解決"""
+    if hasattr(sys, '_MEIPASS'):
+        # PyInstaller バンドル実行時
+        return os.path.join(sys._MEIPASS, relative_path)
+    return os.path.join(os.path.abspath("."), relative_path)
 
 
 class AynimeIssenStyleApp(ctk.CTk):
@@ -33,6 +45,9 @@ class AynimeIssenStyleApp(ctk.CTk):
 
         # タイトルを設定
         self.title("えぃにめ一閃流奥義　――キャプチャ――")
+
+        # アイコンを設定
+        self.iconbitmap(resource_path('app.ico'))
 
         # 初期位置を設定
         self.geometry(f"{WINDOW_MIN_WIDTH*2}x{WINDOW_MIN_HEIGHT*2}")

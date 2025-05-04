@@ -60,11 +60,11 @@ def run_pyinstaller():
         '--onefile',
         '--strip',
         '--noconsole',
-        #'--icon=app.ico',
+        '--icon=app.ico',
         '--log-level=WARN',
         '--collect-submodules=numpy',
         '--collect-data=numpy',
-        '--noconfirm'        
+        '--add-data', 'app.ico;.'
     ], check=True)
 
 
