@@ -79,7 +79,7 @@ class AynimeIssenStyleModel:
         キャプチャ対象を変更する
         :param capture_target_info: キャプチャ対象の情報
         '''
-        self.capture_target_info = capture_target_info
+        self._capture_target_info = capture_target_info
 
 
     def capture(self) -> Image.Image:
@@ -89,7 +89,7 @@ class AynimeIssenStyleModel:
         '''
         if self._capture_context is None:
             raise RuntimeError("Capture context is not initialized.")
-        elif self.capture_target_info is None:
+        elif self._capture_target_info is None:
             raise RuntimeError("Capture target info is not set.")
         else:
-            return self._capture_context.capture(self.capture_target_info)
+            return self._capture_context.capture(self._capture_target_info)

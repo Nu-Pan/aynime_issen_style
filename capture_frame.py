@@ -81,9 +81,7 @@ class CaptureFrame(ctk.CTkFrame):
 
         # キャプチャ画像がない場合は何もしない
         if self.original_capture_image is None:
-            self.preview_label.configure(text="キャプチャ失敗")
             return
-
 
         # 結果をクリップボードに転送
         # NOTE
@@ -129,7 +127,9 @@ class CaptureFrame(ctk.CTkFrame):
             self.original_capture_image = self.model.capture()
         except Exception as e:
             self.original_capture_image = None
-            self.preview_label.configure(text=f"キャプチャ失敗\n{e}")
+            self.preview_label.configure(
+                text=f'一閃失敗\n多分、キャプチャ対象のディスプレイ・ウィンドウの選択を忘れてるよ\n{e.args}'
+            )
 
 
     def update_preview_label(self) -> None:

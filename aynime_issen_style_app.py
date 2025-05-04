@@ -2,6 +2,7 @@ import customtkinter as ctk
 
 from window_selection_frame import WindowSelectionFrame
 from capture_frame import CaptureFrame
+from version_frame import VersionFrame
 from aynime_issen_style_model import (
     CaptureMode,
     AynimeIssenStyleModel
@@ -60,6 +61,13 @@ class AynimeIssenStyleApp(ctk.CTk):
         self.capture_frame = CaptureFrame(
             self.tabview.tab("キャプチャ"),
             self.model
+        )
+        self.capture_frame.pack(fill="both", expand=True)
+
+        # バージョン情報タブを追加
+        self.tabview.add("バージョン")
+        self.capture_frame = VersionFrame(
+            self.tabview.tab("バージョン")
         )
         self.capture_frame.pack(fill="both", expand=True)
 
