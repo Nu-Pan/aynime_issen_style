@@ -6,6 +6,7 @@ from PIL import ImageTk
 import keyboard
 from pathlib import Path
 from datetime import datetime
+import warnings
 
 from aynime_issen_style_model import AynimeIssenStyleModel
 from constants import (
@@ -150,10 +151,16 @@ class CaptureFrame(ctk.CTkFrame):
 
         # 画像をラベルに表示
         tk_image = ImageTk.PhotoImage(pil_image)
-        self.preview_label.configure(
-            image=tk_image,
-            text=''
-        )
+        with warnings.catch_warnings():
+            warnings.filterwarnings(
+                'ignore',
+                message='CTkLabel Warning: Given image is not CTkImage',
+                category=UserWarning
+            )
+            self.preview_label.configure(
+                image=tk_image,
+                text=''
+            )
 
 
     def notify_status(
