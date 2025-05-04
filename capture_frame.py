@@ -4,14 +4,18 @@ import threading
 import customtkinter as ctk
 from PIL import ImageTk
 import keyboard
-
+from pathlib import Path
+from datetime import datetime
 
 from aynime_issen_style_model import AynimeIssenStyleModel
 from constants import (
     WIDGET_PADDING,
     DEFAULT_FONT_NAME
 )
-from pil_wrapper import isotropic_scale_image_in_rectangle
+from pil_wrapper import (
+    isotropic_scale_image_in_rectangle,
+    save_pil_image_to_jpeg_file
+)
 from windows_wrapper import image_to_clipboard
 
 
@@ -79,11 +83,22 @@ class CaptureFrame(ctk.CTkFrame):
             self.preview_label.configure(text="キャプチャ失敗")
             return
 
+
         # 結果をクリップボードに転送
-        image_to_clipboard(self.original_capture_image)
+        # NOTE
+        #   discoard にはサイズ制限があって 4K だと弾かれる
+        #   よってこの段階でフル HD にダウンスケールする
+        downscale_image = isotropic_scale_image_in_rectangle(self.original_capture_image, 1920, 1080)
+        image_to_clipboard(downscale_image)
 
         # クリップボード転送完了通知
         self.notify_status('一閃\nクリップボード転送完了')
+
+        # キャプチャをローカルにファイル保存する
+        nime_dir_path = Path('.\\nime')
+        date_str = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+        jpeg_file_path = nime_dir_path / (date_str + '.jpg')
+        save_pil_image_to_jpeg_file(self.original_capture_image, jpeg_file_path)        
 
 
     def on_preview_label_resize(self, event) -> None:
