@@ -133,11 +133,24 @@ class CaptureFrame(ctk.CTkFrame):
         if self.original_capture_image is None:
             return
 
+        # 適切な画像サイズを計算
+        # NOTE
+        #   フレームが一度も表示されていない段階ではフレームサイズとして (1, 1) が報告される。
+        #   こういった特殊ケースで画像サイズが異常値になるのを防ぐため、最低保障値を付ける。
+        actual_image_width = max(
+            self.preview_label.winfo_width() - 2 * WIDGET_PADDING,
+            32
+        )
+        actual_image_height = max(
+            self.preview_label.winfo_height() - 2 * WIDGET_PADDING,
+            32
+        )
+
         # 画像をリサイズ
         pil_image = isotropic_scale_image_in_rectangle(
             self.original_capture_image,
-            self.preview_label.winfo_width() - 2 * WIDGET_PADDING,
-            self.preview_label.winfo_height() - 2 * WIDGET_PADDING
+            actual_image_width,
+            actual_image_height
         )
 
         # 画像をラベルに表示
