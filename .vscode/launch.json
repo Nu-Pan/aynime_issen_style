@@ -15,7 +15,7 @@
             "name": "Build",
             "type": "debugpy",
             "request": "launch",
-            "program": "src\\build\\build_package.py",
+            "program": "src\\build\\main.py",
             "console": "integratedTerminal"
         }
     ]
