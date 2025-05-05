@@ -11,6 +11,8 @@ from typing import (
 import re
 import threading
 import queue
+import warnings
+from inspect import cleandoc
 
 from PIL import Image
 
@@ -198,7 +200,15 @@ def register_global_hotkey_handler(
     def poll_ghk_event():
         if not ghk_event_queue.empty():
             ghk_event_queue.get()
-            handler(*args)
+            try:
+                handler(*args)
+            except Exception as e:
+                warnings.warn(cleandoc(f'''
+                Unexpected exception raised in poll_ghk_event.
+                Swallowing this and continue.
+                Exception detail:
+                {args}
+                '''))
         ctk_kind.after(10, poll_ghk_event)
 
     # ポーリング処理をキック
