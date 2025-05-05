@@ -17,7 +17,10 @@ from pil_wrapper import (
     isotropic_scale_image_in_rectangle,
     save_pil_image_to_jpeg_file
 )
-from windows_wrapper import image_to_clipboard
+from windows_wrapper import (
+    image_to_clipboard,
+    register_global_hotkey_handler
+)
 
 
 class CaptureFrame(ctk.CTkFrame):
@@ -63,11 +66,8 @@ class CaptureFrame(ctk.CTkFrame):
         # リサイズ前のキャプチャ画像
         self.original_capture_image = None
 
-        # ホットキー用のバックグラウンドスレッドを開始
-        # NOTE
-        #   ホットキーのリスニングはメインスレッドで行うと、GUIがフリーズしてしまうので、バックグラウンドスレッドを使用する。
-        #   デーモンスレッドにすることで、メインスレッドが終了したときに自動的に終了する。
-        threading.Thread(target=self.listen_hotkey, daemon=True).start()
+        # グローバルホットキーを登録
+        register_global_hotkey_handler(self, self.on_preview_label_click, None)
 
 
     def on_preview_label_click(self, event) -> None:
@@ -109,15 +109,6 @@ class CaptureFrame(ctk.CTkFrame):
         self.update_preview_label()
 
 
-    def listen_hotkey(self) -> None:
-        '''
-        ホットキーをリスニングする。
-        :return: None
-        '''
-        keyboard.add_hotkey('ctrl+alt+p', lambda: self.on_preview_label_click(None))
-        keyboard.wait()
-
-
     def update_original_capture_image(self) -> None:
         '''
         選択されたウィンドウのキャプチャを撮影し、その画像で内部状態を更新する。
@@ -142,11 +133,24 @@ class CaptureFrame(ctk.CTkFrame):
         if self.original_capture_image is None:
             return
 
+        # 適切な画像サイズを計算
+        # NOTE
+        #   フレームが一度も表示されていない段階ではフレームサイズとして (1, 1) が報告される。
+        #   こういった特殊ケースで画像サイズが異常値になるのを防ぐため、最低保障値を付ける。
+        actual_image_width = max(
+            self.preview_label.winfo_width() - 2 * WIDGET_PADDING,
+            32
+        )
+        actual_image_height = max(
+            self.preview_label.winfo_height() - 2 * WIDGET_PADDING,
+            32
+        )
+
         # 画像をリサイズ
         pil_image = isotropic_scale_image_in_rectangle(
             self.original_capture_image,
-            self.preview_label.winfo_width() - 2 * WIDGET_PADDING,
-            self.preview_label.winfo_height() - 2 * WIDGET_PADDING
+            actual_image_width,
+            actual_image_height
         )
 
         # 画像をラベルに表示
