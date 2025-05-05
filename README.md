@@ -1,83 +1,24 @@
 # えぃにめ一閃流奥義「一閃」
 
-> **ワンキー一閃、選んだウィンドウだけを瞬時にキャプチャしてクリップボードへ。**  
-> Discord や Slack に <kbd>Ctrl+V</kbd> で即ペースト。GUI もホットキーも軽快に動く、  
-> Python 製 “超” ミニマル・スクショツールです。
+## ユーザー向け TL;DR
+- アニメのスクショを撮って Discord に投げる営みを保証する Windows 用 GUI ツール
+- DL は [release](https://github.com/Nu-Pan/aynime_issen_style/releases) へ
+- 使い方は [wiki](https://github.com/Nu-Pan/aynime_issen_style/wiki/User's-Manual) へ
 
----
+## 開発者向け TL;DR
+- 開発環境は windows + vscode
+- python+ctk 製
 
-## ✨ 主な特徴
-| 機能 | 説明 |
-|------|------|
-| 🎯 **ピンポイント撮影** | GUI で対象ウィンドウを選択 → そのウィンドウだけをキャプチャ |
-| ⚡ **グローバルホットキー** | デフォルト <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>P</kbd>（変更可）でいつでも撮影 |
-| 🖼 **プレビュー兼ボタン** | クリックしてもキャプチャ。撮った画像は即座にプレビュー表示 |
-| 📋 **クリップボード直送 (CF\_DIB)** | 無圧縮 BMP 相当でコピー → Discord などにそのまま貼れる |
-| 🔔 **オンスクリーン通知** | コピー完了を画面中央にフェード表示（カスタム色・日本語フォント対応） |
-| 🛠 **Python だけで完結ビルド** | `build.py` 1発で PyInstaller ビルド & ZIP 圧縮 |
+## 開発環境セットアップ方法
++ vscode で aynime_issen_style.code-workspace を開く
++ 仮想環境を新規作成
+    - コマンドパレット（Ctrl+Shift+P）から「Python: Create New Environment」
+    - Venv を選択
+    - システムの python を選択 
+    - requirement.txt にチェックを入れる
 
----
+## 実行方法
+- 「App」構成でデバッグ実行（F5）
 
-## 🖥️ スクリーンショット
-<!-- ここに imgs フォルダを作って GUI の画像を貼れば README がさらに映えます -->
-> 選択・プレビュー・コピー通知が 1 画面に収まるミニマル UI
-
----
-
-## 🚀 クイックスタート
-
-### 1. 依存ライブラリのインストール
-```bash
-pip install -r requirements.txt
-```
-
-### 2. 実行
-```bash
-python main.py
-```
-1. **Window** タブで対象ウィンドウをクリック  
-2. **Capture** タブでプレビュー領域をクリック *または* <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>P</kbd>  
-3. 「クリップボードにコピーしました」通知が出たら、Discord などに <kbd>Ctrl+V</kbd>
-
----
-
-## 🏗️ ビルド (Windows)
-
-```bash
-python build.py      # dist/AynimeCapture.exe を生成し、release/ に ZIP を作成
-```
-
-- `main.spec` にアイコンやリソースを定義済み  
-- 出力された `AynimeCapture_yyyyMMdd.zip` を配布するだけで OK
-
----
-
-## ⌨️ ホットキー変更
-
-```python
-# capture_frame.py 付近
-keyboard.add_hotkey("ctrl+alt+p", lambda: self.on_capture(None))
-```
-
-任意のキーコンビネーションに変更し、再ビルドしてください。
-
----
-
-## 📁 ディレクトリ構成（抜粋）
-
-```
-.
-├─ main.py                # エントリポイント
-├─ window_selection_frame.py
-├─ capture_frame.py
-├─ build.py               # PyInstaller + ZIP 自動化スクリプト
-├─ main.spec              # PyInstaller 設定（Git 管理）
-└─ requirements.txt
-```
-
----
-
-## 🪪 License
-
-MIT License — © 2025 Nu‑Pan  
-詳細は `LICENSE` ファイルをご覧ください。
+## 実行可能ファイルビルド方法
+- 「Build」構成でデバッグ実行（F5）
