@@ -13,7 +13,7 @@ from pathlib import (
 
 # 設定
 APP_NAME = 'aynime_issen_style'
-VERSION_FILE_PATH = Path('version_constants.py')
+VERSION_FILE_PATH = Path('src\\utils\\version_constants.py')
 SPEC_FILE = 'main.spec'
 DIST_DIR = Path('dist')
 BUILD_DIR = Path('build')

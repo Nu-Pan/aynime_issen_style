@@ -9,7 +9,7 @@ from CTkListbox import CTkListbox
 
 from PIL import ImageTk
 
-from utils.pil_wrapper import isotropic_scale_image_in_rectangle
+from utils.pil import isotropic_scale_image_in_rectangle
 from utils.capture_context import (
     CaptureTargetInfo
 )

@@ -14,8 +14,9 @@ from utils.constants import (
     WINDOW_MIN_WIDTH,
     WINDOW_MIN_HEIGHT
 )
+
 try:
-    from version_constants import (
+    from utils.version_constants import (
         COMMIT_HASH,
         BUILD_DATE
     )
