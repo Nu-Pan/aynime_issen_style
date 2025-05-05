@@ -28,7 +28,7 @@ def resource_path(relative_path: str):
 
 class AynimeIssenStyleApp(ctk.CTk):
     '''
-    えぃにめ一閃流奥義
+    えぃにめ一閃流奥義「一閃」
     アプリケーションクラス
     '''
 
@@ -44,7 +44,7 @@ class AynimeIssenStyleApp(ctk.CTk):
         self.configure(font=default_font)
 
         # タイトルを設定
-        self.title("えぃにめ一閃流奥義　――キャプチャ――")
+        self.title("えぃにめ一閃流奥義「一閃」")
 
         # アイコンを設定
         self.iconbitmap(resource_path('app.ico'))
@@ -72,9 +72,9 @@ class AynimeIssenStyleApp(ctk.CTk):
         self.select_frame.pack(fill="both", expand=True)
 
         # キャプチャタブを追加
-        self.tabview.add("キャプチャ")
+        self.tabview.add("「一閃」")
         self.capture_frame = CaptureFrame(
-            self.tabview.tab("キャプチャ"),
+            self.tabview.tab("「一閃」"),
             self.model
         )
         self.capture_frame.pack(fill="both", expand=True)
