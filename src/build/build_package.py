@@ -55,7 +55,7 @@ def run_pyinstaller():
     print('🔧 PyInstaller ビルド中...')
     subprocess.run([
         'pyinstaller',
-        'main.py',
+        'src\\gui\\main.py',
         '--name=aynime_issen_style',
         '--onefile',
         '--strip',
