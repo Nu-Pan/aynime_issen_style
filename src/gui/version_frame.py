@@ -14,15 +14,10 @@ from utils.constants import (
     WINDOW_MIN_WIDTH,
     WINDOW_MIN_HEIGHT
 )
-
-try:
-    from utils.version_constants import (
-        COMMIT_HASH,
-        BUILD_DATE
-    )
-except:
-    COMMIT_HASH = '-'
-    BUILD_DATE = '----/--/-- --:--'
+from utils.version_constants import (
+    COMMIT_HASH,
+    BUILD_DATE
+)
 
 
 class VersionFrame(ctk.CTkFrame):
