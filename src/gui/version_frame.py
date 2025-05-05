@@ -14,6 +14,20 @@ from utils.constants import (
     WINDOW_MIN_WIDTH,
     WINDOW_MIN_HEIGHT
 )
+
+# バージョン情報のインポート
+# NOTE
+#   バージョン情報はビルド時の動的生成が絡むため、
+#   git のトラック対象外としている。
+#   つまり、ファイルが存在しない場合があるため、その場合は動的に生成する。
+from utils.constants import (
+    VERSION_FILE_PATH
+)
+if not VERSION_FILE_PATH.exists():
+    open(VERSION_FILE_PATH, 'w').write(cleandoc('''
+    COMMIT_HASH = '-'
+    BUILD_DATE = '----/--/-- --:--'
+    '''))
 from utils.version_constants import (
     COMMIT_HASH,
     BUILD_DATE

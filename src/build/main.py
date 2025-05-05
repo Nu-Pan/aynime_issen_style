@@ -89,9 +89,6 @@ def zip_executable():
 
 
 def cleanup_file():
-    if VERSION_FILE_PATH.exists():
-        VERSION_FILE_PATH.unlink()
-
     for p in Path('.').glob('*.spec'):
         p.unlink()
 

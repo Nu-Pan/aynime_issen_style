@@ -4,3 +4,4 @@ __pycache__
 /release/
 /nime/
 /*.spec
+/src/utils/version_constants.py
