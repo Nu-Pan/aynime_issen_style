@@ -126,7 +126,10 @@ def file_to_clipboard(file_path: Path) -> None:
             'Set-Clipboard',
             '-LiteralPath', str(file_path)
         ],
-        check=True
+        check=True,
+        creationflags=subprocess.CREATE_NO_WINDOW,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL
     )
 
 
