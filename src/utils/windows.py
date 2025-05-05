@@ -1,9 +1,6 @@
-import io
 from dataclasses import dataclass
 from typing import (
-    Optional,
     Generator,
-    List,
     Union,
     Callable,
     Any
@@ -16,11 +13,9 @@ from inspect import cleandoc
 from pathlib import Path
 import subprocess
 
-from PIL import Image
-
 import customtkinter as ctk
 
-import win32con, win32clipboard, win32gui, win32api
+import win32con, win32gui, win32api
 import dxcam_cpp as dxcam
 
 

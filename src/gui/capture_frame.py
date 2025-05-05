@@ -1,9 +1,6 @@
 
-import threading
-
 import customtkinter as ctk
 from PIL import ImageTk
-import keyboard
 from pathlib import Path
 from datetime import datetime
 import warnings

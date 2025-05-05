@@ -1,8 +1,6 @@
 from inspect import (
     cleandoc
 )
-import subprocess
-from datetime import datetime
 import re
 import webbrowser
 
@@ -10,9 +8,7 @@ import customtkinter as ctk
 
 from utils.constants import (
     WIDGET_PADDING,
-    DEFAULT_FONT_NAME,
-    WINDOW_MIN_WIDTH,
-    WINDOW_MIN_HEIGHT
+    DEFAULT_FONT_NAME
 )
 
 # バージョン情報のインポート
