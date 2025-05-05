@@ -20,7 +20,7 @@ import win32gui, win32ui, win32con
 from PIL import Image
 import dxcam_cpp as dxcam
 
-from windows_wrapper import enumerate_dxgi_outputs
+from utils.windows_wrapper import enumerate_dxgi_outputs
 
 
 @dataclass

@@ -1,6 +1,6 @@
 __pycache__
-build
-dist
-release
-nime
-*.spec
+/build/
+/dist/
+/release/
+/nime/
+/*.spec

@@ -9,15 +9,15 @@ from datetime import datetime
 import warnings
 
 from aynime_issen_style_model import AynimeIssenStyleModel
-from constants import (
+from utils.constants import (
     WIDGET_PADDING,
     DEFAULT_FONT_NAME
 )
-from pil_wrapper import (
+from utils.pil_wrapper import (
     isotropic_scale_image_in_rectangle,
     save_pil_image_to_jpeg_file
 )
-from windows_wrapper import (
+from utils.windows_wrapper import (
     file_to_clipboard,
     register_global_hotkey_handler
 )

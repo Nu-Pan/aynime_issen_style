@@ -8,7 +8,7 @@ import webbrowser
 
 import customtkinter as ctk
 
-from constants import (
+from utils.constants import (
     WIDGET_PADDING,
     DEFAULT_FONT_NAME,
     WINDOW_MIN_WIDTH,

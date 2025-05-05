@@ -11,7 +11,7 @@ from aynime_issen_style_model import (
     CaptureMode,
     AynimeIssenStyleModel
 )
-from constants import (
+from utils.constants import (
     WINDOW_MIN_WIDTH,
     WINDOW_MIN_HEIGHT,
     DEFAULT_FONT_NAME
