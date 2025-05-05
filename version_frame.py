@@ -3,12 +3,16 @@ from inspect import (
 )
 import subprocess
 from datetime import datetime
+import re
+import webbrowser
 
 import customtkinter as ctk
 
 from constants import (
     WIDGET_PADDING,
-    DEFAULT_FONT_NAME
+    DEFAULT_FONT_NAME,
+    WINDOW_MIN_WIDTH,
+    WINDOW_MIN_HEIGHT
 )
 try:
     from version_constants import (
@@ -43,26 +47,82 @@ class VersionFrame(ctk.CTkFrame):
 
         # 表示用バージョン文字列
         version_text = cleandoc(f'''
-        Author: NU-Pan
-                                
-        GitHub: https://github.com/Nu-Pan/aynime_issen_style
-                                
-        Commit Hash: {COMMIT_HASH}
+        Author
+        \tNU-Pan
 
-        Build Date: {BUILD_DATE}
+        GitHub
+        \thttps://github.com/Nu-Pan/aynime_issen_style
+
+        User's Manual
+        \thttps://github.com/Nu-Pan/aynime_issen_style/wiki/User's-Manual
+
+        Commit Hash
+        \t{COMMIT_HASH}
+
+        Build Date
+        \t{BUILD_DATE}
+
+        俺は星間国家の悪徳領主!
+        \thttps://seikankokka-anime.com/
         ''')
 
-        # プレビュー画像表示用ラベル
-        self.version_text_label = ctk.CTkLabel(
+        # プレビュー画像表示領域
+        self.version_text_box = ctk.CTkTextbox(
             self,
-            text=version_text,
             font=default_font,
-            anchor='w',
-            justify='left'
+            border_width=0,
+            fg_color='transparent',
+            wrap='word'
         )
-        self.version_text_label.pack(
-            fill='none',
+        # self.version_text_box.insert('1.0', version_text)
+        self.version_text_box.pack(
+            fill='both',
             expand=True,
             padx=WIDGET_PADDING,
             pady=WIDGET_PADDING
         )
+
+        # クリックで URL を開けるようにタグを仕込む
+        url_regex = re.compile(r"https?://\S+")
+        pos = 0
+        for m in url_regex.finditer(version_text):
+            # 前の区間（プレーンテキスト）
+            plain = version_text[pos:m.start()]
+            self.version_text_box.insert(ctk.END, plain)
+
+            # URL 区間
+            url = m.group()
+            start_index = self.version_text_box.index('end-1c')
+            self.version_text_box.insert(ctk.END, url)
+            end_index = self.version_text_box.index('end-1c')
+
+            # タグ設定
+            tag = f"url{start_index}"
+            self.version_text_box.tag_add(tag, start_index, end_index)
+            self.version_text_box.tag_config(
+                tag,
+                foreground="#4da3ff",
+                underline=True
+            )
+            self.version_text_box.tag_bind(
+                tag,
+                "<Enter>",
+                lambda e, t=tag: self.version_text_box.configure(cursor="hand2")
+            )
+            self.version_text_box.tag_bind(
+                tag,
+                "<Leave>",
+                lambda e: self.version_text_box.configure(cursor="arrow")
+            )
+            self.version_text_box.tag_bind(
+                tag,
+                "<Button-1>",
+                lambda e, u=url: webbrowser.open_new_tab(u)
+            )
+
+            pos = m.end()
+
+        # 残りのテキスト
+        self.version_text_box.insert(ctk.END, version_text[pos:])
+
+        self.version_text_box.configure(state='disabled')
