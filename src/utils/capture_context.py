@@ -11,16 +11,12 @@ from abc import (
 )
 from dataclasses import dataclass
 import time
-from threading import (
-    Lock
-)
-import gc
 
 import win32gui, win32ui, win32con
 from PIL import Image
 import dxcam_cpp as dxcam
 
-from windows_wrapper import enumerate_dxgi_outputs
+from utils.windows import enumerate_dxgi_outputs
 
 
 @dataclass
@@ -108,7 +104,6 @@ class CaptureContextDXCam(CaptureContext):
         self._dxcamera_adaper_idx = None
         self._dxcamera_output_idx = None
         self._latest_np_image = None
-        self._guard = Lock()
 
 
     def enumerate_capture_targets(self) -> Generator[CaptureTargetInfo, None, None]:

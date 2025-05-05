@@ -13,7 +13,7 @@ from pathlib import (
 
 # 設定
 APP_NAME = 'aynime_issen_style'
-VERSION_FILE_PATH = Path('version_constants.py')
+VERSION_FILE_PATH = Path('src\\utils\\version_constants.py')
 SPEC_FILE = 'main.spec'
 DIST_DIR = Path('dist')
 BUILD_DIR = Path('build')
@@ -55,7 +55,7 @@ def run_pyinstaller():
     print('🔧 PyInstaller ビルド中...')
     subprocess.run([
         'pyinstaller',
-        'main.py',
+        'src\\gui\\main.py',
         '--name=aynime_issen_style',
         '--onefile',
         '--strip',
@@ -89,9 +89,6 @@ def zip_executable():
 
 
 def cleanup_file():
-    if VERSION_FILE_PATH.exists():
-        VERSION_FILE_PATH.unlink()
-
     for p in Path('.').glob('*.spec'):
         p.unlink()
 

@@ -8,14 +8,14 @@
             "name": "App",
             "type": "debugpy",
             "request": "launch",
-            "program": "main.py",
+            "program": "src\\gui\\main.py",
             "console": "integratedTerminal"
         },
         {
             "name": "Build",
             "type": "debugpy",
             "request": "launch",
-            "program": "build_package.py",
+            "program": "src\\build\\main.py",
             "console": "integratedTerminal"
         }
     ]

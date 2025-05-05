@@ -7,7 +7,7 @@ from enum import Enum
 
 from PIL import Image
 
-from capture_context import (
+from utils.capture_context import (
     CaptureTargetInfo,
     CaptureContext,
     CaptureContextDXCam,
