@@ -4,13 +4,19 @@ from typing import (
     Optional,
     Generator,
     List,
-    Union
+    Union,
+    Callable,
+    Any
 )
 import re
+import threading
+import queue
 
 from PIL import Image
 
-import win32con, win32clipboard
+import customtkinter as ctk
+
+import win32con, win32clipboard, win32gui, win32api
 import dxcam_cpp as dxcam
 
 
@@ -121,3 +127,79 @@ def image_to_clipboard(image: Image.Image) -> None:
     win32clipboard.EmptyClipboard()
     win32clipboard.SetClipboardData(win32con.CF_DIB, data)
     win32clipboard.CloseClipboard()
+
+
+def register_global_hotkey_handler(
+    ctk_kind: Union[ctk.CTk, ctk.CTkBaseClass],
+    handler: Callable[[Any], None],
+    *args
+) -> None:
+    '''
+    グローバルホットキー `Ctrl+Alt+P` をトリガーに handler が呼ばれるように設定する。
+
+    ctk ウィジェットのハンドラを呼び出すことを念頭に置いている。
+    
+    グローバルホットキーの監視及び handler の呼び出しは別スレッドから行われるが、
+    ctk_kinnd.after 経由でディスパッチされるため、同期関係は問題ない。
+    '''
+    # 定数
+    MOD = win32con.MOD_CONTROL | win32con.MOD_ALT
+    VK_P = ord('P') # 必ず大文字
+    HOTKEY_ID = 1
+
+    # グローバルホットキー押下イベント通知キュー
+    # NOTE
+    #   ctk の機能を win32 スレッドから呼び出すとクラッシュする（ctk はマルチスレッド非対応）
+    #   そのため、このキューを介してメインスレッドへホットキー押下を通知する。
+    ghk_event_queue = queue.SimpleQueue()
+
+    # win32 から呼び出されるプロシジャー
+    def window_procedure(hWnd, msg, wParam, lParam):
+        if msg == win32con.WM_HOTKEY and wParam == HOTKEY_ID:
+            ghk_event_queue.put(None)
+        return win32gui.DefWindowProc(hWnd, msg, wParam, lParam)
+
+    # メッセージウィンドウを作成
+    wc = win32gui.WNDCLASS()
+    wc.hInstance = win32api.GetModuleHandle(None)
+    wc.lpszClassName = 'AynimeIssenStyleHotKeyMessageOnlyWindow'
+    wc.lpfnWndProc = window_procedure
+    class_atom = win32gui.RegisterClass(wc)
+    msg_hwnd = win32gui.CreateWindowEx(
+        0,
+        class_atom,
+        None,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        wc.hInstance,
+        None
+    )
+
+    # ホットキーを登録
+    win32gui.RegisterHotKey(
+        msg_hwnd,
+        HOTKEY_ID,
+        MOD,
+        VK_P
+    )
+
+    # 保留メッセージのポンプ処理をデーモンスレッドで実行
+    threading.Thread(
+        target=win32gui.PumpWaitingMessages,
+        daemon=True
+    ).start()
+
+    # グローバルホットキーイベントポーリング関数
+    def poll_ghk_event():
+        if not ghk_event_queue.empty():
+            ghk_event_queue.get()
+            handler(*args)
+        ctk_kind.after(10, poll_ghk_event)
+
+    # ポーリング処理をキック
+    ctk_kind.after(0, poll_ghk_event)

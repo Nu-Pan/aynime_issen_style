@@ -17,7 +17,10 @@ from pil_wrapper import (
     isotropic_scale_image_in_rectangle,
     save_pil_image_to_jpeg_file
 )
-from windows_wrapper import image_to_clipboard
+from windows_wrapper import (
+    image_to_clipboard,
+    register_global_hotkey_handler
+)
 
 
 class CaptureFrame(ctk.CTkFrame):
@@ -63,11 +66,8 @@ class CaptureFrame(ctk.CTkFrame):
         # リサイズ前のキャプチャ画像
         self.original_capture_image = None
 
-        # ホットキー用のバックグラウンドスレッドを開始
-        # NOTE
-        #   ホットキーのリスニングはメインスレッドで行うと、GUIがフリーズしてしまうので、バックグラウンドスレッドを使用する。
-        #   デーモンスレッドにすることで、メインスレッドが終了したときに自動的に終了する。
-        threading.Thread(target=self.listen_hotkey, daemon=True).start()
+        # グローバルホットキーを登録
+        register_global_hotkey_handler(self, self.on_preview_label_click, None)
 
 
     def on_preview_label_click(self, event) -> None:
@@ -107,15 +107,6 @@ class CaptureFrame(ctk.CTkFrame):
         :return: None
         '''
         self.update_preview_label()
-
-
-    def listen_hotkey(self) -> None:
-        '''
-        ホットキーをリスニングする。
-        :return: None
-        '''
-        keyboard.add_hotkey('ctrl+alt+p', lambda: self.on_preview_label_click(None))
-        keyboard.wait()
 
 
     def update_original_capture_image(self) -> None:
