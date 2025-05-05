@@ -1,10 +1,5 @@
 from dataclasses import dataclass
-from typing import (
-    Generator,
-    Union,
-    Callable,
-    Any
-)
+from typing import Generator, Union, Callable, Any
 import re
 import threading
 import queue
@@ -21,10 +16,9 @@ import dxcam_cpp as dxcam
 
 @dataclass
 class DXGIOutputInfo:
-    '''
+    """
     DXGI のアウトプット（モニター）情報を保持するクラス
-    '''
-
+    """
 
     adapter_index: int
     output_index: int
@@ -32,50 +26,49 @@ class DXGIOutputInfo:
     height: int
     primary: bool
 
-
     def __str__(self) -> str:
-        '''
+        """
         DXGI アウトプットの情報を文字列として返す
         :return: DXGI アウトプットの情報の文字列
-        '''
+        """
         # 必ず表示するベース部分
         sub_strs = [
-            f'GPU{self.adapter_index}',
-            f'Monitor{self.output_index}',
-            f'{self.width}x{self.height}'
+            f"GPU{self.adapter_index}",
+            f"Monitor{self.output_index}",
+            f"{self.width}x{self.height}",
         ]
 
         # プライマリモニターの場合
         if self.primary:
-            sub_strs += ['Primary']
+            sub_strs += ["Primary"]
 
         # 正常終了
-        return ' '.join(sub_strs)
-        
+        return " ".join(sub_strs)
+
 
 def enumerate_dxgi_outputs() -> Generator[DXGIOutputInfo, None, None]:
-    '''
+    """
     DXGI のアウトプット（モニター）情報を列挙する
     :return: DXGI アウトプットの情報のリスト
-    '''
+    """
     # DXGI のアウトプット情報を取得
     for output_str in dxcam.output_info().splitlines():
         # GPU 番号をパース
-        m = re.search(r'Device\[(\d)+\]', output_str)
+        m = re.search(r"Device\[(\d)+\]", output_str)
         if m is None:
             raise RuntimeError("Failed to parse DXGI output info(Device).")
         else:
             adapter_index = int(m.group(1))
 
         # モニター番号をパース
-        m = re.search(r'Output\[(\d)+\]', output_str)
+        m = re.search(r"Output\[(\d)+\]", output_str)
         if m is None:
             raise RuntimeError("Failed to parse DXGI output info(Output).")
         else:
             output_index = int(m.group(1))
 
         # 解像度をパース
-        m = re.search(r'Res:\((\d+), (\d+)\)', output_str)
+        m = re.search(r"Res:\((\d+), (\d+)\)", output_str)
         if m is None:
             raise RuntimeError("Failed to parse DXGI output info(Res).")
         else:
@@ -83,13 +76,13 @@ def enumerate_dxgi_outputs() -> Generator[DXGIOutputInfo, None, None]:
             height = int(m.group(2))
 
         # プライマリモニターかどうかをパース
-        m = re.search(r'Primary:(\w+)', output_str)
+        m = re.search(r"Primary:(\w+)", output_str)
         if m is None:
             raise RuntimeError("Failed to parse DXGI output info(Primary).")
         else:
-            if m.group(1) == 'True':
+            if m.group(1) == "True":
                 primary = True
-            elif m.group(1) == 'False':
+            elif m.group(1) == "False":
                 primary = False
             else:
                 raise RuntimeError("Failed to parse DXGI output info(Primary).")
@@ -100,50 +93,50 @@ def enumerate_dxgi_outputs() -> Generator[DXGIOutputInfo, None, None]:
             output_index=output_index,
             width=width,
             height=height,
-            primary=primary
+            primary=primary,
         )
 
 
 def file_to_clipboard(file_path: Path) -> None:
-    '''
+    """
     file_path の指すファイルをクリップボードに乗せて、
     エクスプローラー上でペースト可能な状態にする。
-    '''
+    """
     # ファイルの存在をチェック
     if not file_path.exists():
         raise FileNotFoundError(str(file_path))
 
-    # pwershell でやる    
+    # pwershell でやる
     subprocess.run(
         [
-            'powershell',
-            '-NoLogo', '-NoProfile',
-            'Set-Clipboard',
-            '-LiteralPath', str(file_path)
+            "powershell",
+            "-NoLogo",
+            "-NoProfile",
+            "Set-Clipboard",
+            "-LiteralPath",
+            str(file_path),
         ],
         check=True,
         creationflags=subprocess.CREATE_NO_WINDOW,
         stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL
+        stderr=subprocess.DEVNULL,
     )
 
 
 def register_global_hotkey_handler(
-    ctk_kind: Union[ctk.CTk, ctk.CTkBaseClass],
-    handler: Callable[[Any], None],
-    *args
+    ctk_kind: Union[ctk.CTk, ctk.CTkBaseClass], handler: Callable[[Any], None], *args
 ) -> None:
-    '''
+    """
     グローバルホットキー `Ctrl+Alt+P` をトリガーに handler が呼ばれるように設定する。
 
     ctk ウィジェットのハンドラを呼び出すことを念頭に置いている。
-    
+
     グローバルホットキーの監視及び handler の呼び出しは別スレッドから行われるが、
     ctk_kinnd.after 経由でディスパッチされるため、同期関係は問題ない。
-    '''
+    """
     # 定数
     MOD = win32con.MOD_CONTROL | win32con.MOD_ALT
-    VK_P = ord('P') # 必ず大文字
+    VK_P = ord("P")  # 必ず大文字
     HOTKEY_ID = 1
 
     # グローバルホットキー押下イベント通知キュー
@@ -161,37 +154,18 @@ def register_global_hotkey_handler(
     # メッセージウィンドウを作成
     wc = win32gui.WNDCLASS()
     wc.hInstance = win32api.GetModuleHandle(None)
-    wc.lpszClassName = 'AynimeIssenStyleHotKeyMessageOnlyWindow'
+    wc.lpszClassName = "AynimeIssenStyleHotKeyMessageOnlyWindow"
     wc.lpfnWndProc = window_procedure
     class_atom = win32gui.RegisterClass(wc)
     msg_hwnd = win32gui.CreateWindowEx(
-        0,
-        class_atom,
-        None,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        wc.hInstance,
-        None
+        0, class_atom, None, 0, 0, 0, 0, 0, 0, 0, wc.hInstance, None
     )
 
     # ホットキーを登録
-    win32gui.RegisterHotKey(
-        msg_hwnd,
-        HOTKEY_ID,
-        MOD,
-        VK_P
-    )
+    win32gui.RegisterHotKey(msg_hwnd, HOTKEY_ID, MOD, VK_P)
 
     # 保留メッセージのポンプ処理をデーモンスレッドで実行
-    threading.Thread(
-        target=win32gui.PumpWaitingMessages,
-        daemon=True
-    ).start()
+    threading.Thread(target=win32gui.PumpWaitingMessages, daemon=True).start()
 
     # グローバルホットキーイベントポーリング関数
     def poll_ghk_event():
@@ -200,12 +174,16 @@ def register_global_hotkey_handler(
             try:
                 handler(*args)
             except Exception as e:
-                warnings.warn(cleandoc(f'''
+                warnings.warn(
+                    cleandoc(
+                        f"""
                 Unexpected exception raised in poll_ghk_event.
                 Swallowing this and continue.
                 Exception detail:
                 {args}
-                '''))
+                """
+                    )
+                )
         ctk_kind.after(10, poll_ghk_event)
 
     # ポーリング処理をキック
