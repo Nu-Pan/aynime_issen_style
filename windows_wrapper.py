@@ -13,6 +13,8 @@ import threading
 import queue
 import warnings
 from inspect import cleandoc
+from pathlib import Path
+import subprocess
 
 from PIL import Image
 
@@ -107,28 +109,25 @@ def enumerate_dxgi_outputs() -> Generator[DXGIOutputInfo, None, None]:
         )
 
 
-def image_to_clipboard(image: Image.Image) -> None:
+def file_to_clipboard(file_path: Path) -> None:
     '''
-    画像をクリップボードにコピーする
-    :param image: PILのImageオブジェクト
-    :return: None
+    file_path の指すファイルをクリップボードに乗せて、
+    エクスプローラー上でペースト可能な状態にする。
     '''
-    # 画像をRGBモードに変換
-    image = image.convert("RGB")
-    
-    # 画像をクリップボードにコピー
-    with io.BytesIO() as bmp_io:
-        image.save(bmp_io, format="BMP")
-        bmp_data = bmp_io.getvalue()
+    # ファイルの存在をチェック
+    if not file_path.exists():
+        raise FileNotFoundError(str(file_path))
 
-    # BMPヘッダを除去
-    data = bmp_data[14:]
-
-    # クリップボードに CF_DIB 形式でデータをセット
-    win32clipboard.OpenClipboard()
-    win32clipboard.EmptyClipboard()
-    win32clipboard.SetClipboardData(win32con.CF_DIB, data)
-    win32clipboard.CloseClipboard()
+    # pwershell でやる    
+    subprocess.run(
+        [
+            'powershell',
+            '-NoLogo', '-NoProfile',
+            'Set-Clipboard',
+            '-LiteralPath', str(file_path)
+        ],
+        check=True
+    )
 
 
 def register_global_hotkey_handler(

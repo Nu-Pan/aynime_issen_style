@@ -18,7 +18,7 @@ from pil_wrapper import (
     save_pil_image_to_jpeg_file
 )
 from windows_wrapper import (
-    image_to_clipboard,
+    file_to_clipboard,
     register_global_hotkey_handler
 )
 
@@ -83,21 +83,17 @@ class CaptureFrame(ctk.CTkFrame):
         if self.original_capture_image is None:
             return
 
-        # 結果をクリップボードに転送
-        # NOTE
-        #   discoard にはサイズ制限があって 4K だと弾かれる
-        #   よってこの段階でフル HD にダウンスケールする
-        downscale_image = isotropic_scale_image_in_rectangle(self.original_capture_image, 1920, 1080)
-        image_to_clipboard(downscale_image)
-
-        # クリップボード転送完了通知
-        self.notify_status('一閃\nクリップボード転送完了')
-
         # キャプチャをローカルにファイル保存する
         nime_dir_path = Path('.\\nime')
         date_str = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
         jpeg_file_path = nime_dir_path / (date_str + '.jpg')
-        save_pil_image_to_jpeg_file(self.original_capture_image, jpeg_file_path)        
+        save_pil_image_to_jpeg_file(self.original_capture_image, jpeg_file_path)
+
+        # 保存したファイルをクリップボードに乗せる
+        file_to_clipboard(jpeg_file_path)
+
+        # クリップボード転送完了通知
+        self.notify_status('一閃\nクリップボード転送完了')
 
 
     def on_preview_label_resize(self, event) -> None:
