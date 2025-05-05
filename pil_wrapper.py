@@ -50,7 +50,7 @@ def save_pil_image_to_jpeg_file(
     image.convert('RGB').save(
         str(file_path),
         format='JPEG',
-        quality=85,
+        quality=92,
         optimize=True,
         progressive=True
     )
