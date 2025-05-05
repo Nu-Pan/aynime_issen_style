@@ -25,7 +25,7 @@ class CaptureMode(Enum):
 
 class AynimeIssenStyleModel:
     '''
-    えぃにめ一閃流奥義のモデル
+    えぃにめ一閃流奥義「一閃」のモデル
     '''
 
 

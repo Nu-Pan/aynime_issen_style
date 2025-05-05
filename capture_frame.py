@@ -51,7 +51,7 @@ class CaptureFrame(ctk.CTkFrame):
         # プレビューラベル兼キャプチャボタン
         self.preview_label = ctk.CTkLabel(
             self,
-            text='Click here or Ctrl+Alt+P',
+            text='Click Here or Ctrl+Alt+P',
             font=default_font
         )
         self.preview_label.pack(
@@ -93,7 +93,7 @@ class CaptureFrame(ctk.CTkFrame):
         file_to_clipboard(jpeg_file_path)
 
         # クリップボード転送完了通知
-        self.notify_status('一閃\nクリップボード転送完了')
+        self.notify_status('「一閃」\nクリップボード転送完了')
 
 
     def on_preview_label_resize(self, event) -> None:
