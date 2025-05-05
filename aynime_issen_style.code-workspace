@@ -8,7 +8,9 @@
 	"extensions": {
 		"recommendations": [
 			"ms-python.vscode-pylance",
-			"ms-python.python"
+			"ms-python.python",
+			"ms-python.debugpy",
+			"ms-python.black-formatter"
 		]
 	}
 }
