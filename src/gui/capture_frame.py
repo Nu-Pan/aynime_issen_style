@@ -6,20 +6,25 @@ import warnings
 
 from aynime_issen_style_model import AynimeIssenStyleModel
 from utils.constants import WIDGET_PADDING, DEFAULT_FONT_NAME
-from utils.pil import isotropic_scale_image_in_rectangle, save_pil_image_to_jpeg_file
+from utils.pil import (
+    isotropic_downscale_image_in_rectangle,
+    save_pil_image_to_jpeg_file,
+)
 from utils.windows import file_to_clipboard, register_global_hotkey_handler
 
 
 class CaptureFrame(ctk.CTkFrame):
     """
-    キャプチャ操作を行うフレーム
+    キャプチャ操作を行う CTk フレーム
     """
 
     def __init__(self, master, model: AynimeIssenStyleModel, **kwargs):
         """
         コンストラクタ
-        :param master: 親ウィジェット
-        :param kwargs: その他のキーワード引数
+
+        Args:
+            master (_type_): 親ウィジェット
+            model (AynimeIssenStyleModel): モデル
         """
         super().__init__(master, **kwargs)
 
@@ -47,8 +52,10 @@ class CaptureFrame(ctk.CTkFrame):
 
     def on_preview_label_click(self, event) -> None:
         """
-        キャプチャボタンがクリックされたときの処理
-        :param event: イベントオブジェクト
+        プレビューラベルクリックイベントハンドラ
+
+        Args:
+            event (_type_): イベントオブジェクト
         """
         # まずはキャプチャ＆プレビュー
         self.update_original_capture_image()
@@ -73,15 +80,16 @@ class CaptureFrame(ctk.CTkFrame):
     def on_preview_label_resize(self, event) -> None:
         """
         フレームのリサイズイベントハンドラ
-        :param event: イベントオブジェクト
-        :return: None
+
+        Args:
+            event (_type_): イベントオブジェクト
         """
+
         self.update_preview_label()
 
     def update_original_capture_image(self) -> None:
         """
         選択されたウィンドウのキャプチャを撮影し、その画像で内部状態を更新する。
-        :return: None
         """
         try:
             self.original_capture_image = self.model.capture()
@@ -95,7 +103,6 @@ class CaptureFrame(ctk.CTkFrame):
         """
         プレビューの表示状態を更新する。
         キャプチャは行わない。
-        :return: None
         """
         # キャプチャ画像がない場合は何もしない
         if self.original_capture_image is None:
@@ -113,7 +120,7 @@ class CaptureFrame(ctk.CTkFrame):
         )
 
         # 画像をリサイズ
-        pil_image = isotropic_scale_image_in_rectangle(
+        pil_image = isotropic_downscale_image_in_rectangle(
             self.original_capture_image, actual_image_width, actual_image_height
         )
 
@@ -129,10 +136,11 @@ class CaptureFrame(ctk.CTkFrame):
 
     def notify_status(self, message: str, duration_ms: int = 2000) -> None:
         """
-        duration_ms の間、隅っこにメッセージを通知する。
-        :param message: メッセージ文字列
-        :param duration_ms: 表示時間（ミリ秒）
-        :return: None
+        duration_ms の間、メッセージを表示する。
+
+        Args:
+            message (str): メッセージ文字列
+            duration_ms (int, optional): 表示時間（ミリ秒）. Defaults to 2000.
         """
         # フォントを生成
         default_font = ctk.CTkFont(DEFAULT_FONT_NAME)

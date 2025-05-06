@@ -33,8 +33,9 @@ class VersionFrame(ctk.CTkFrame):
     def __init__(self, master, **kwargs):
         """
         コンストラクタ
-        :param master: 親ウィジェット
-        :param kwargs: その他のキーワード引数
+
+        Args:
+            master (_type_): 親ウィジェット
         """
         super().__init__(master, **kwargs)
 

@@ -35,7 +35,12 @@ class AynimeIssenStyleModel:
     def change_capture_mode(self, mode: CaptureMode) -> None:
         """
         キャプチャモードを変更する
-        :param mode: キャプチャモード
+
+        Args:
+            mode (CaptureMode): 変更後のキャプチャモード
+
+        Raises:
+            ValueError: mode が不正な場合
         """
         # キャプチャコンテキストを再生成する
         # NOTE
@@ -61,10 +66,18 @@ class AynimeIssenStyleModel:
         else:
             raise ValueError(f"Unsupported capture mode: {mode}")
 
-    def enumerate_capture_targets(self) -> Generator[Generator, None, None]:
+    def enumerate_capture_targets(self) -> Generator[CaptureTargetInfo, None, None]:
         """
         キャプチャ対象を列挙する
-        :return: キャプチャ対象のジェネレータ
+
+        Raises:
+            RuntimeError: コンテキストが未初期化の場合
+
+        Returns:
+            _type_: キャプチャ対象のジェネレータ
+
+        Yields:
+            Generator[CaptureTargetInfo, None, None]: 合法なキャプチャ対象を順番に返す
         """
         if self._capture_context is None:
             raise RuntimeError("Capture context is not initialized.")
@@ -74,14 +87,22 @@ class AynimeIssenStyleModel:
     def change_capture_target(self, capture_target_info: CaptureTargetInfo) -> None:
         """
         キャプチャ対象を変更する
-        :param capture_target_info: キャプチャ対象の情報
+
+        Args:
+            capture_target_info (CaptureTargetInfo): 変更後のキャプチャ対象
         """
         self._capture_target_info = capture_target_info
 
     def capture(self) -> Image.Image:
         """
         キャプチャを実行する
-        :return: キャプチャした画像
+
+        Raises:
+            RuntimeError: キャプチャコンテキストが未初期化の場合
+            RuntimeError: キャプチャ対象が未設定の場合
+
+        Returns:
+            Image.Image: キャプチャ結果の PIL 画像
         """
         if self._capture_context is None:
             raise RuntimeError("Capture context is not initialized.")
