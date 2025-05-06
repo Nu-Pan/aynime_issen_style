@@ -2,6 +2,7 @@ from inspect import cleandoc
 import re
 import webbrowser
 import sys
+from textwrap import dedent
 
 import customtkinter as ctk
 
@@ -13,14 +14,11 @@ from utils.constants import WIDGET_PADDING, DEFAULT_FONT_NAME, VERSION_FILE_PATH
 #   git のトラック対象外としている。
 #   つまり、ファイルが存在しない場合があるため、その場合は動的に生成する。
 if not hasattr(sys, "_MEIPASS") and not VERSION_FILE_PATH.exists():
-    open(VERSION_FILE_PATH, "w").write(
-        cleandoc(
-            """
+    __version_text = """
     COMMIT_HASH = '-'
     BUILD_DATE = '----/--/-- --:--'
     """
-        )
-    )
+    open(VERSION_FILE_PATH, "w").write(cleandoc(__version_text))
 from utils.version_constants import COMMIT_HASH, BUILD_DATE
 
 
@@ -42,8 +40,7 @@ class VersionFrame(ctk.CTkFrame):
         default_font = ctk.CTkFont(DEFAULT_FONT_NAME)
 
         # 表示用バージョン文字列
-        version_text = cleandoc(
-            f"""
+        version_text = f"""
         Author
         \tNU-Pan
 
@@ -62,13 +59,12 @@ class VersionFrame(ctk.CTkFrame):
         俺は星間国家の悪徳領主!
         \thttps://seikankokka-anime.com/
         """
-        )
+        version_text = cleandoc(version_text)
 
         # プレビュー画像表示領域
         self.version_text_box = ctk.CTkTextbox(
             self, font=default_font, border_width=0, fg_color="transparent", wrap="word"
         )
-        # self.version_text_box.insert('1.0', version_text)
         self.version_text_box.pack(
             fill="both", expand=True, padx=WIDGET_PADDING, pady=WIDGET_PADDING
         )
