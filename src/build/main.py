@@ -17,7 +17,9 @@ ZIP_OUTPUT_DIR = Path("release")
 
 
 def clean_build_artifacts():
-    print("🧹 古いビルドを削除中...")
+    """
+    古い中間・成果物を削除
+    """
     for path in [BUILD_DIR, DIST_DIR]:
         if path.exists():
             if path.is_dir():
@@ -27,6 +29,9 @@ def clean_build_artifacts():
 
 
 def make_version_file():
+    """
+    バージョン情報ファイルを生成する
+    """
     # git コミットハッシュ
     commit_hash = subprocess.run(
         ["git", "rev-parse", "HEAD"],
@@ -39,17 +44,18 @@ def make_version_file():
     # ビルド日時
     build_date = datetime.now().strftime("%Y/%m/%d %H:%M")
 
-    # バージョンファイルの中身
+    # 中身作ってファイルに書き込み
     version_constants_text = f"""
     COMMIT_HASH = '{commit_hash}'
     BUILD_DATE = '{build_date}'
     """
-    version_constants_text = cleandoc(version_constants_text)
-    open(VERSION_FILE_PATH, "w").write(version_constants_text)
+    open(VERSION_FILE_PATH, "w").write(cleandoc(version_constants_text))
 
 
 def run_pyinstaller():
-    print("🔧 PyInstaller ビルド中...")
+    """
+    pyinstaller を呼び出してビルド
+    """
     subprocess.run(
         [
             "pyinstaller",
@@ -70,8 +76,9 @@ def run_pyinstaller():
 
 
 def zip_executable():
-    print("📦 ZIP 圧縮中...")
-
+    """
+    成果物を zip 圧縮する
+    """
     # 日付付きファイル名
     date_str = datetime.now().strftime("%Y%m%d")
     zip_name = f"{APP_NAME}_{date_str}.zip"
@@ -83,18 +90,23 @@ def zip_executable():
     exe_path = DIST_DIR / f"{APP_NAME}.exe"
     zip_path = ZIP_OUTPUT_DIR / zip_name
 
+    # 圧縮・保存
     with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
         zf.write(exe_path, arcname=f"{APP_NAME}.exe")
 
-    print(f"✅ 完了: {zip_path}")
-
 
 def cleanup_file():
+    """
+    自動生成されたファイルの後始末
+    """
     for p in Path(".").glob("*.spec"):
         p.unlink()
 
 
 def main():
+    """
+    メイン関数
+    """
     clean_build_artifacts()
     make_version_file()
     run_pyinstaller()
