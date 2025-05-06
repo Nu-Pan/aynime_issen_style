@@ -7,36 +7,28 @@ from tkinter import PhotoImage
 from window_selection_frame import WindowSelectionFrame
 from capture_frame import CaptureFrame
 from version_frame import VersionFrame
-from aynime_issen_style_model import (
-    CaptureMode,
-    AynimeIssenStyleModel
-)
-from utils.constants import (
-    WINDOW_MIN_WIDTH,
-    WINDOW_MIN_HEIGHT,
-    DEFAULT_FONT_NAME
-)
+from aynime_issen_style_model import CaptureMode, AynimeIssenStyleModel
+from utils.constants import WINDOW_MIN_WIDTH, WINDOW_MIN_HEIGHT, DEFAULT_FONT_NAME
 
 
 def resource_path(relative_path: str):
     """PyInstaller 実行環境と通常環境の両方に対応したパス解決"""
-    if hasattr(sys, '_MEIPASS'):
+    if hasattr(sys, "_MEIPASS"):
         # PyInstaller バンドル実行時
         return os.path.join(sys._MEIPASS, relative_path)
     return os.path.join(os.path.abspath("."), relative_path)
 
 
 class AynimeIssenStyleApp(ctk.CTk):
-    '''
+    """
     えぃにめ一閃流奥義「一閃」
     アプリケーションクラス
-    '''
-
+    """
 
     def __init__(self):
-        '''
+        """
         コンストラクタ
-        '''
+        """
         super().__init__()
 
         # フォントを設定
@@ -47,7 +39,7 @@ class AynimeIssenStyleApp(ctk.CTk):
         self.title("えぃにめ一閃流奥義「一閃」")
 
         # アイコンを設定
-        self.iconbitmap(resource_path('app.ico'))
+        self.iconbitmap(resource_path("app.ico"))
 
         # 初期位置を設定
         self.geometry(f"{WINDOW_MIN_WIDTH*2}x{WINDOW_MIN_HEIGHT*2}")
@@ -65,25 +57,17 @@ class AynimeIssenStyleApp(ctk.CTk):
 
         # ウィンドウ選択タブを追加
         self.tabview.add("構え")
-        self.select_frame = WindowSelectionFrame(
-            self.tabview.tab("構え"),
-            self.model
-        )
+        self.select_frame = WindowSelectionFrame(self.tabview.tab("構え"), self.model)
         self.select_frame.pack(fill="both", expand=True)
 
         # キャプチャタブを追加
         self.tabview.add("「一閃」")
-        self.capture_frame = CaptureFrame(
-            self.tabview.tab("「一閃」"),
-            self.model
-        )
+        self.capture_frame = CaptureFrame(self.tabview.tab("「一閃」"), self.model)
         self.capture_frame.pack(fill="both", expand=True)
 
         # バージョン情報タブを追加
         self.tabview.add("バージョン")
-        self.capture_frame = VersionFrame(
-            self.tabview.tab("バージョン")
-        )
+        self.capture_frame = VersionFrame(self.tabview.tab("バージョン"))
         self.capture_frame.pack(fill="both", expand=True)
 
         # 初期選択
