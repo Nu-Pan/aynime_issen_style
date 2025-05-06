@@ -7,7 +7,7 @@ WIDGET_PADDING = 4
 # ウィンドウの最小サイズ
 # NOTE
 #   最小サイズであると同時に初期サイズでもある
-#   8:5
+#   いろいろあって 8:5 になった
 WINDOW_MIN_WIDTH = 640
 WINDOW_MIN_HEIGHT = 400
 

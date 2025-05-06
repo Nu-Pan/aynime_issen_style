@@ -5,22 +5,26 @@ from datetime import datetime
 from pathlib import Path
 from inspect import cleandoc
 from pathlib import Path
+import shutil
 
+from utils.constants import VERSION_FILE_PATH
 
 # 設定
 APP_NAME = "aynime_issen_style"
-VERSION_FILE_PATH = Path("src\\utils\\version_constants.py")
-SPEC_FILE = "main.spec"
-DIST_DIR = Path("dist")
-BUILD_DIR = Path("build")
+DIST_DIR_PATH = Path(f"dist") / APP_NAME
+DIST_APP_DIR_PATH = DIST_DIR_PATH / APP_NAME
+BUILD_DIR_PATH = Path("build")
+WORK_DIR_PATH = BUILD_DIR_PATH / "temp"
+SPEC_DIR_PATH = BUILD_DIR_PATH / "spec"
 ZIP_OUTPUT_DIR = Path("release")
+APP_ICO_FILE_ABS_PATH = Path("app.ico").resolve()
 
 
 def clean_build_artifacts():
     """
     古い中間・成果物を削除
     """
-    for path in [BUILD_DIR, DIST_DIR]:
+    for path in [BUILD_DIR_PATH, DIST_DIR_PATH]:
         if path.exists():
             if path.is_dir():
                 shutil.rmtree(path)
@@ -60,16 +64,18 @@ def run_pyinstaller():
         [
             "pyinstaller",
             "src\\gui\\main.py",
-            "--name=aynime_issen_style",
+            f"--name={APP_NAME}",
             "--onefile",
             "--strip",
             "--noconsole",
-            "--icon=app.ico",
             "--log-level=WARN",
             "--collect-submodules=numpy",
             "--collect-data=numpy",
-            "--add-data",
-            "app.ico;.",
+            f"--icon={APP_ICO_FILE_ABS_PATH}",
+            f"--add-data={APP_ICO_FILE_ABS_PATH}:.",
+            f"--distpath={DIST_APP_DIR_PATH}",
+            f"--workpath={WORK_DIR_PATH}",
+            f"--specpath={SPEC_DIR_PATH}",
         ],
         check=True,
     )
@@ -79,28 +85,18 @@ def zip_executable():
     """
     成果物を zip 圧縮する
     """
-    # 日付付きファイル名
+    # zip ファイルパスを生成
     date_str = datetime.now().strftime("%Y%m%d")
-    zip_name = f"{APP_NAME}_{date_str}.zip"
+    zip_file_stem = f"{APP_NAME}_{date_str}"
+    zip_file_base_path = ZIP_OUTPUT_DIR / zip_file_stem
 
     # 出力フォルダを確保
     ZIP_OUTPUT_DIR.mkdir(exist_ok=True)
 
-    # 圧縮対象ファイル
-    exe_path = DIST_DIR / f"{APP_NAME}.exe"
-    zip_path = ZIP_OUTPUT_DIR / zip_name
-
-    # 圧縮・保存
-    with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
-        zf.write(exe_path, arcname=f"{APP_NAME}.exe")
-
-
-def cleanup_file():
-    """
-    自動生成されたファイルの後始末
-    """
-    for p in Path(".").glob("*.spec"):
-        p.unlink()
+    # zip ファイルに圧縮
+    shutil.make_archive(
+        base_name=str(zip_file_base_path), format="zip", root_dir=DIST_DIR_PATH
+    )
 
 
 def main():
@@ -111,7 +107,6 @@ def main():
     make_version_file()
     run_pyinstaller()
     zip_executable()
-    cleanup_file()
 
 
 if __name__ == "__main__":
