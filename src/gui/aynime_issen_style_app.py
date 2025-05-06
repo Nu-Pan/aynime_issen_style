@@ -53,8 +53,8 @@ class AynimeIssenStyleApp(ctk.CTk):
         # アイコンを設定
         self.iconbitmap(resource_path("app.ico"))
 
-        # 初期位置を設定
-        self.geometry(f"{WINDOW_MIN_WIDTH*2}x{WINDOW_MIN_HEIGHT*2}")
+        # 初期サイズを設定
+        self.geometry(f"{WINDOW_MIN_WIDTH}x{WINDOW_MIN_HEIGHT}")
 
         # 最小サイズを設定
         self.minsize(WINDOW_MIN_WIDTH, WINDOW_MIN_HEIGHT)
@@ -79,8 +79,8 @@ class AynimeIssenStyleApp(ctk.CTk):
 
         # バージョン情報タブを追加
         self.tabview.add("バージョン")
-        self.capture_frame = VersionFrame(self.tabview.tab("バージョン"))
-        self.capture_frame.pack(fill="both", expand=True)
+        self.version_frame = VersionFrame(self.tabview.tab("バージョン"))
+        self.version_frame.pack(fill="both", expand=True)
 
         # 初期選択
         self.tabview.set("構え")
