@@ -40,12 +40,11 @@ def make_version_file():
     build_date = datetime.now().strftime("%Y/%m/%d %H:%M")
 
     # バージョンファイルの中身
-    version_constants_text = cleandoc(
-        f"""
+    version_constants_text = f"""
     COMMIT_HASH = '{commit_hash}'
     BUILD_DATE = '{build_date}'
     """
-    )
+    version_constants_text = cleandoc(version_constants_text)
     open(VERSION_FILE_PATH, "w").write(version_constants_text)
 
 

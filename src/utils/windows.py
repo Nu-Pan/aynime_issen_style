@@ -196,16 +196,13 @@ def register_global_hotkey_handler(
             try:
                 handler(*args)
             except Exception as e:
-                warnings.warn(
-                    cleandoc(
-                        f"""
+                warn_text = f"""
                 Unexpected exception raised in poll_ghk_event.
                 Swallowing this and continue.
                 Exception detail:
                 {args}
                 """
-                    )
-                )
+                warnings.warn(cleandoc(warn_text))
         ctk_kind.after(10, poll_ghk_event)
 
     # ポーリング処理をキック
