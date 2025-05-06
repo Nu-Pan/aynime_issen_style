@@ -29,7 +29,9 @@ class DXGIOutputInfo:
     def __str__(self) -> str:
         """
         DXGI アウトプットの情報を文字列として返す
-        :return: DXGI アウトプットの情報の文字列
+
+        Returns:
+            str: DXGI アウトプットの情報の文字列
         """
         # 必ず表示するベース部分
         sub_strs = [
@@ -49,6 +51,16 @@ class DXGIOutputInfo:
 def enumerate_dxgi_outputs() -> Generator[DXGIOutputInfo, None, None]:
     """
     DXGI のアウトプット（モニター）情報を列挙する
+
+    Raises:
+        RuntimeError: 何らかの問題が発生した場合
+
+    Yields:
+        Generator[DXGIOutputInfo, None, None]: モニター情報のジェネレータ
+            有効なモニターの情報を順番に返す
+    """
+
+    """
     :return: DXGI アウトプットの情報のリスト
     """
     # DXGI のアウトプット情報を取得
@@ -101,6 +113,12 @@ def file_to_clipboard(file_path: Path) -> None:
     """
     file_path の指すファイルをクリップボードに乗せて、
     エクスプローラー上でペースト可能な状態にする。
+
+    Args:
+        file_path (Path): クリップボードに乗せたいファイルのパス
+
+    Raises:
+        FileNotFoundError: file_path が存在しない場合
     """
     # ファイルの存在をチェック
     if not file_path.exists():
@@ -133,6 +151,10 @@ def register_global_hotkey_handler(
 
     グローバルホットキーの監視及び handler の呼び出しは別スレッドから行われるが、
     ctk_kinnd.after 経由でディスパッチされるため、同期関係は問題ない。
+
+    Args:
+        ctk_kind (Union[ctk.CTk, ctk.CTkBaseClass]): 親 CTk ウィジェット
+        handler (Callable[[Any], None]): ホットキーハンドラー
     """
     # 定数
     MOD = win32con.MOD_CONTROL | win32con.MOD_ALT

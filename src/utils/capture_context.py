@@ -41,7 +41,9 @@ class CaptureTargetInfo:
     def __str__(self) -> str:
         """
         キャプチャ対象の情報を文字列として返す
-        :return: キャプチャ対象の情報の文字列
+
+        Returns:
+            str: キャプチャ対象の情報の文字列
         """
         return self.name
 
@@ -55,16 +57,23 @@ class CaptureContext(ABC):
     def enumerate_capture_targets(self) -> Generator[CaptureTargetInfo, None, None]:
         """
         キャプチャ対象を列挙する
-        :return: キャプチャ対象のジェネレータ
+
+        Yields:
+            Generator[CaptureTargetInfo, None, None]: キャプチャ対象のジェネレータ
+                合法なキャプチャ対象を順番に返す
         """
         ...
 
     @abstractmethod
-    def capture(self, capture_target_info: CaptureTargetInfo) -> Optional[Image.Image]:
+    def capture(self, capture_target_info: CaptureTargetInfo) -> Image.Image:
         """
         キャプチャを実行する
-        :param capture_target_info: キャプチャ対象の情報
-        :return: キャプチャした画像
+
+        Args:
+            capture_target_info (CaptureTargetInfo): キャプチャ対象の情報
+
+        Returns:
+            Image.Image: キャプチャした画像
         """
         ...
 
@@ -74,7 +83,6 @@ class CaptureContext(ABC):
         内部リソースを開放する。
         dxcam-cpp のダメ挙動に対処するために必要なダメ関数。
         インスタンスを del する直前に呼び出すことで、確実に内部リソースを開放できる。
-        :return: なし
         """
         ...
 
@@ -104,7 +112,7 @@ class CaptureContextDXCam(CaptureContext):
                 str(dxgi_output_info),
             )
 
-    def capture(self, capture_target_info: CaptureTargetInfo) -> Optional[Image.Image]:
+    def capture(self, capture_target_info: CaptureTargetInfo) -> Image.Image:
         # 引数の型チェック
         if not isinstance(capture_target_info.id, MonitorIdentifier):
             raise TypeError("Invalid capture target info type.")
@@ -198,7 +206,7 @@ class CaptureContextPyWin32(CaptureContext):
             # ウィンドウ情報を生成して返す
             yield CaptureTargetInfo(WindowIdentifier(hwnd), title)
 
-    def capture(self, capture_target_info: CaptureTargetInfo) -> Optional[Image.Image]:
+    def capture(self, capture_target_info: CaptureTargetInfo) -> Image.Image:
         # ウィンドウハンドルを解決
         if isinstance(capture_target_info.id, WindowIdentifier):
             hwnd = capture_target_info.id.hwnd

@@ -11,18 +11,30 @@ from aynime_issen_style_model import CaptureMode, AynimeIssenStyleModel
 from utils.constants import WINDOW_MIN_WIDTH, WINDOW_MIN_HEIGHT, DEFAULT_FONT_NAME
 
 
-def resource_path(relative_path: str):
-    """PyInstaller 実行環境と通常環境の両方に対応したパス解決"""
+def resource_path(relative_path: str) -> str:
+    """
+    ファイル relative_path のリソースパスを生成する。
+    「直接実行した場合」と「 pyinstaller で生成した exe から実行された場合」の差異を吸収するための関数。
+
+    Args:
+        relative_path (str): 入力ファイル相対パス
+
+    Returns:
+        str: リソースパス
+            直接実行時は relative_path がそのまま返される。
+            pyinstaller で生成した exe から実行された場合は処理されたパスが返される。
+
+    """
     if hasattr(sys, "_MEIPASS"):
         # PyInstaller バンドル実行時
         return os.path.join(sys._MEIPASS, relative_path)
-    return os.path.join(os.path.abspath("."), relative_path)
+    else:
+        return os.path.join(os.path.abspath("."), relative_path)
 
 
 class AynimeIssenStyleApp(ctk.CTk):
     """
-    えぃにめ一閃流奥義「一閃」
-    アプリケーションクラス
+    えぃにめ一閃流奥義「一閃」 アプリケーションクラス
     """
 
     def __init__(self):

@@ -6,7 +6,7 @@ from CTkListbox import CTkListbox
 
 from PIL import ImageTk
 
-from utils.pil import isotropic_scale_image_in_rectangle
+from utils.pil import isotropic_downscale_image_in_rectangle
 from utils.capture_context import CaptureTargetInfo
 from aynime_issen_style_model import CaptureMode, AynimeIssenStyleModel
 from utils.constants import WIDGET_PADDING, WINDOW_MIN_WIDTH, DEFAULT_FONT_NAME
@@ -20,8 +20,10 @@ class WindowSelectionFrame(ctk.CTkFrame):
     def __init__(self, master, model: AynimeIssenStyleModel, **kwargs):
         """
         コンストラクタ
-        :param master: 親ウィジェット
-        :param kwargs: その他のキーワード引数
+
+        Args:
+            master (_type_): 親ウィジェット
+            model (AynimeIssenStyleModel): モデル
         """
         super().__init__(master, **kwargs)
 
@@ -133,7 +135,6 @@ class WindowSelectionFrame(ctk.CTkFrame):
     def on_capture_mode_radio_change(self) -> None:
         """
         キャプチャモードの選択イベントハンドラ
-        :return: None
         """
         self.model.change_capture_mode(CaptureMode(self.capture_mode_var.get()))
         self.update_list()
@@ -142,8 +143,9 @@ class WindowSelectionFrame(ctk.CTkFrame):
     def on_capture_target_select(self, event) -> None:
         """
         リストボックスの選択イベントハンドラ
-        :param event: イベントオブジェクト
-        :return: None
+
+        Args:
+            event (_type_): イベントオブジェクト
         """
         # キャプチャ対象の変更をモデルに反映
         selection = cast(
@@ -161,15 +163,15 @@ class WindowSelectionFrame(ctk.CTkFrame):
     def on_capture_target_preview_resize(self, event) -> None:
         """
         右側フレームのリサイズイベントハンドラ
-        :param event: イベントオブジェクト
-        :return: None
+
+        Args:
+            event (_type_): イベントオブジェクト
         """
         self.update_capture_target_preview()
 
     def update_list(self) -> None:
         """
         ウィンドウリストを更新する
-        :return: None
         """
         # リストボックスをクリアしてから、ウィンドウタイトルを取得して追加
         try:
@@ -184,7 +186,6 @@ class WindowSelectionFrame(ctk.CTkFrame):
     def update_original_capture_image(self) -> None:
         """
         選択されたウィンドウのキャプチャを撮影し、その画像で内部状態を更新する。
-        :return: None
         """
         self.original_capture_image = self.model.capture()
         if self.original_capture_image is None:
@@ -193,7 +194,6 @@ class WindowSelectionFrame(ctk.CTkFrame):
     def clear_capture_target_preview(self) -> None:
         """
         プレビューの表示状態をクリアする。
-        :return: None
         """
         self.original_capture_image = None
         with warnings.catch_warnings():
@@ -210,7 +210,6 @@ class WindowSelectionFrame(ctk.CTkFrame):
         """
         プレビューの表示状態を更新する。
         キャプチャは行わない。
-        :return: None
         """
         # 描画対象画像を解決
         image = self.original_capture_image
@@ -219,7 +218,7 @@ class WindowSelectionFrame(ctk.CTkFrame):
             return
 
         # 画像をリサイズ
-        image = isotropic_scale_image_in_rectangle(
+        image = isotropic_downscale_image_in_rectangle(
             image,
             self.capture_target_preview_label.winfo_width() - 2 * WIDGET_PADDING,
             self.capture_target_preview_label.winfo_height() - 2 * WIDGET_PADDING,

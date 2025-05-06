@@ -2,15 +2,21 @@ from pathlib import Path
 from PIL import Image
 
 
-def isotropic_scale_image_in_rectangle(
+def isotropic_downscale_image_in_rectangle(
     image: Image.Image, rectangle_width: int, rectangle_height: int
 ) -> Image.Image:
     """
-    画像を指定された矩形に収まるように等比縮小する
-    :param image: PILのImageオブジェクト
-    :param rectangle_width: 矩形の幅
-    :param rectangle_height: 矩形の高さ
-    :return: 矩形に収まるように縮小された画像
+    image を rectangle_width, rectangle_height に収まるように縮小する
+    収縮前後でアスペクト比は維持される
+    image のほうが小さい場合、拡大は行われない
+
+    Args:
+        image (Image.Image): 入力画像
+        rectangle_width (int): 縮小後サイズ（横）
+        rectangle_height (int): 縮小後サイズ（縦）
+
+    Returns:
+        Image.Image: 縮小された画像
     """
     # 矩形のアスペクト比を計算
     rectangle_aspect_ratio = rectangle_width / rectangle_height
@@ -36,6 +42,10 @@ def isotropic_scale_image_in_rectangle(
 def save_pil_image_to_jpeg_file(image: Image.Image, file_path: Path) -> None:
     """
     image を jpeg 圧縮して file_path に保存する。
+
+    Args:
+        image (Image.Image): 保存したい画像
+        file_path (Path): 保存先ファイルパス
     """
     # 親ディレクトリがなければ生成
     file_path.parent.mkdir(parents=True, exist_ok=True)
