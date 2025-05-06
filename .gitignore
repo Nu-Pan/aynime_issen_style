@@ -5,3 +5,4 @@ __pycache__
 /nime/
 /*.spec
 /src/utils/version_constants.py
+/log/
