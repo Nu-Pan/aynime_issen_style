@@ -1,19 +1,18 @@
 from inspect import cleandoc
 import re
 import webbrowser
+import sys
 
 import customtkinter as ctk
 
-from utils.constants import WIDGET_PADDING, DEFAULT_FONT_NAME
+from utils.constants import WIDGET_PADDING, DEFAULT_FONT_NAME, VERSION_FILE_PATH
 
 # バージョン情報のインポート
 # NOTE
 #   バージョン情報はビルド時の動的生成が絡むため、
 #   git のトラック対象外としている。
 #   つまり、ファイルが存在しない場合があるため、その場合は動的に生成する。
-from utils.constants import VERSION_FILE_PATH
-
-if not VERSION_FILE_PATH.exists():
+if not hasattr(sys, "_MEIPASS") and not VERSION_FILE_PATH.exists():
     open(VERSION_FILE_PATH, "w").write(
         cleandoc(
             """
