@@ -5,8 +5,11 @@ from pathlib import Path
 WIDGET_PADDING = 4
 
 # ウィンドウの最小サイズ
+# NOTE
+#   最小サイズであると同時に初期サイズでもある
+#   8:5
 WINDOW_MIN_WIDTH = 640
-WINDOW_MIN_HEIGHT = 480
+WINDOW_MIN_HEIGHT = 400
 
 # 共通して使用するフォント
 DEFAULT_FONT_NAME = "Yu Gothic UI"

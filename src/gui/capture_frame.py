@@ -84,7 +84,6 @@ class CaptureFrame(ctk.CTkFrame):
         Args:
             event (_type_): イベントオブジェクト
         """
-
         self.update_preview_label()
 
     def update_original_capture_image(self) -> None:
@@ -112,12 +111,8 @@ class CaptureFrame(ctk.CTkFrame):
         # NOTE
         #   フレームが一度も表示されていない段階ではフレームサイズとして (1, 1) が報告される。
         #   こういった特殊ケースで画像サイズが異常値になるのを防ぐため、最低保障値を付ける。
-        actual_image_width = max(
-            self.preview_label.winfo_width() - 2 * WIDGET_PADDING, 32
-        )
-        actual_image_height = max(
-            self.preview_label.winfo_height() - 2 * WIDGET_PADDING, 32
-        )
+        actual_image_width = max(self.capture_image_width, 32)
+        actual_image_height = max(self.capture_image_height, 32)
 
         # 画像をリサイズ
         pil_image = isotropic_downscale_image_in_rectangle(
@@ -161,3 +156,23 @@ class CaptureFrame(ctk.CTkFrame):
 
         # 通知ラベルは一定時間後に自動破棄
         self.after(duration_ms, status_label.destroy)
+
+    @property
+    def capture_image_width(self) -> int:
+        """
+        現在のウィジェットの状態における、キャプチャ画像の適切なサイズを得る
+
+        Returns:
+            int: キャプチャ画像サイズ（横）
+        """
+        return self.preview_label.winfo_width() - 2 * WIDGET_PADDING
+
+    @property
+    def capture_image_height(self) -> int:
+        """
+        現在のウィジェットの状態における、キャプチャ画像の適切なサイズを得る
+
+        Returns:
+            int: キャプチャ画像サイズ（縦）
+        """
+        return self.preview_label.winfo_height() - 2 * WIDGET_PADDING
