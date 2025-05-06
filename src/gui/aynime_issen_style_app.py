@@ -79,8 +79,8 @@ class AynimeIssenStyleApp(ctk.CTk):
 
         # バージョン情報タブを追加
         self.tabview.add("バージョン")
-        self.capture_frame = VersionFrame(self.tabview.tab("バージョン"))
-        self.capture_frame.pack(fill="both", expand=True)
+        self.version_frame = VersionFrame(self.tabview.tab("バージョン"))
+        self.version_frame.pack(fill="both", expand=True)
 
         # 初期選択
         self.tabview.set("構え")
