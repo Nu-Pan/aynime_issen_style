@@ -39,6 +39,49 @@ def isotropic_downscale_image_in_rectangle(
     return image.resize(new_size, Image.Resampling.BILINEAR)
 
 
+def crop_to_aspect_ratio(image: Image.Image, h_ratio: int, v_ratio: int) -> Image.Image:
+    """
+    image が h_ratio:v_ratio になるように端っこを切り落とす。
+
+    Args:
+        image (Image.Image): 入力画像
+        h_ratio (int): 所望のアスペクト比（水平）
+        v_ratio (int): 所望のアスペクト比（垂直）
+
+    Returns:
+        Image.Image: 所望のアスペクト比になった画像
+    """
+    expected_width_by_height = image.height * h_ratio // v_ratio
+    expected_height_by_width = image.width * v_ratio // h_ratio
+    if image.width > expected_width_by_height:
+        # 左右を切り落とす
+        half_expected_width_by_height = expected_width_by_height // 2
+        center = image.width // 2
+        return image.crop(
+            (
+                center - half_expected_width_by_height,
+                0,
+                center + half_expected_width_by_height,
+                image.height,
+            )
+        )
+    elif image.height > expected_height_by_width:
+        # 上下を切り落とす
+        half_expected_height_by_height = expected_height_by_width // 2
+        center = image.height // 2
+        return image.crop(
+            (
+                0,
+                center - half_expected_height_by_height,
+                image.width,
+                center + half_expected_height_by_height,
+            )
+        )
+    else:
+        # アスペクト比ぴったりの場合はそのまま返す
+        return image
+
+
 def save_pil_image_to_jpeg_file(image: Image.Image, file_path: Path) -> None:
     """
     image を jpeg 圧縮して file_path に保存する。
