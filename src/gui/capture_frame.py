@@ -75,7 +75,7 @@ class CaptureFrame(ctk.CTkFrame):
         file_to_clipboard(jpeg_file_path)
 
         # クリップボード転送完了通知
-        self.notify_status("「一閃」\nクリップボード転送完了")
+        self.show_notify("「一閃」\nクリップボード転送完了")
 
     def on_preview_label_resize(self, event) -> None:
         """
@@ -129,9 +129,10 @@ class CaptureFrame(ctk.CTkFrame):
             )
             self.preview_label.configure(image=tk_image, text="")
 
-    def notify_status(self, message: str, duration_ms: int = 2000) -> None:
+    def show_notify(self, message: str, duration_ms: int = 2000) -> None:
         """
-        duration_ms の間、メッセージを表示する。
+        通知ラベルを表示する
+        duration_ms の間、message が表示される。
 
         Args:
             message (str): メッセージ文字列
@@ -143,7 +144,7 @@ class CaptureFrame(ctk.CTkFrame):
         # 通知ラベルを生成
         # NOTE
         #   ラベルの四隅の外側はテーマ色でフィルされてしまうので、角丸のないラベルを使用する(corner_radius=0)。
-        status_label = ctk.CTkLabel(
+        self._status_label = ctk.CTkLabel(
             self,
             text=message,
             fg_color="#3a8d3f",
@@ -151,11 +152,20 @@ class CaptureFrame(ctk.CTkFrame):
             corner_radius=0,
             font=default_font,
         )
-        status_label.place(relx=0.5, rely=0.5, anchor="center")
-        status_label.configure(padx=WIDGET_PADDING, pady=WIDGET_PADDING)
+        self._status_label.place(relx=0.5, rely=0.5, anchor="center")
+        self._status_label.configure(padx=WIDGET_PADDING, pady=WIDGET_PADDING)
+        self._status_label.bind("<Button-1>", self.on_preview_label_click)
 
         # 通知ラベルは一定時間後に自動破棄
-        self.after(duration_ms, status_label.destroy)
+        self.after(duration_ms, self.hidden_notify)
+
+    def hidden_notify(self) -> None:
+        """
+        通知ラベルを隠す
+        """
+        if self._status_label is not None:
+            self._status_label.destroy()
+            self._status_label = None
 
     @property
     def capture_image_width(self) -> int:
