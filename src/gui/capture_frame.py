@@ -144,7 +144,7 @@ class CaptureFrame(ctk.CTkFrame):
         # 通知ラベルを生成
         # NOTE
         #   ラベルの四隅の外側はテーマ色でフィルされてしまうので、角丸のないラベルを使用する(corner_radius=0)。
-        self._status_label = ctk.CTkLabel(
+        status_label = ctk.CTkLabel(
             self,
             text=message,
             fg_color="#3a8d3f",
@@ -152,20 +152,12 @@ class CaptureFrame(ctk.CTkFrame):
             corner_radius=0,
             font=default_font,
         )
-        self._status_label.place(relx=0.5, rely=0.5, anchor="center")
-        self._status_label.configure(padx=WIDGET_PADDING, pady=WIDGET_PADDING)
-        self._status_label.bind("<Button-1>", self.on_preview_label_click)
+        status_label.place(relx=0.5, rely=0.5, anchor="center")
+        status_label.configure(padx=WIDGET_PADDING, pady=WIDGET_PADDING)
+        status_label.bind("<Button-1>", self.on_preview_label_click)
 
         # 通知ラベルは一定時間後に自動破棄
-        self.after(duration_ms, self.hidden_notify)
-
-    def hidden_notify(self) -> None:
-        """
-        通知ラベルを隠す
-        """
-        if self._status_label is not None:
-            self._status_label.destroy()
-            self._status_label = None
+        self.after(duration_ms, status_label.destroy)
 
     @property
     def capture_image_width(self) -> int:
