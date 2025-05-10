@@ -8,7 +8,7 @@ from PIL import ImageTk
 
 from utils.pil import isotropic_downscale_image_in_rectangle
 from utils.capture_context import CaptureTargetInfo
-from aynime_issen_style_model import CaptureMode, AynimeIssenStyleModel
+from aynime_issen_style_model import CaptureMode, AspectRatioMode, AynimeIssenStyleModel
 from utils.constants import WIDGET_PADDING, WINDOW_MIN_WIDTH, DEFAULT_FONT_NAME
 
 
@@ -49,7 +49,7 @@ class WindowSelectionFrame(ctk.CTkFrame):
         self.west_frame.rowconfigure(2, weight=0)
         self.west_frame.columnconfigure(0, weight=1)
 
-        # モード選択フレーム
+        # キャプチャモード選択フレーム
         self.capture_mode_frame = ctk.CTkFrame(self.west_frame)
         self.capture_mode_frame.grid(
             row=0, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nwe"
@@ -57,31 +57,33 @@ class WindowSelectionFrame(ctk.CTkFrame):
         self.capture_mode_frame.columnconfigure(0, weight=1)
         self.capture_mode_frame.columnconfigure(1, weight=1)
 
-        # モード選択ラジオボタンの排他選択用変数
+        # キャプチャモード選択ラジオボタン変数
         self.capture_mode_var = ctk.StringVar(value=CaptureMode.DXCAM.value)
 
-        # モード選択ラジオボタン（DXCAM）
+        # キャプチャモード選択ラジオボタン（DXCAM）
         self.capture_mode_dxcam_radio = ctk.CTkRadioButton(
             self.capture_mode_frame,
             text=CaptureMode.DXCAM.name,
             variable=self.capture_mode_var,
             value=CaptureMode.DXCAM.value,
             command=self.on_capture_mode_radio_change,
+            width=0,
         )
         self.capture_mode_dxcam_radio.grid(
-            row=0, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING
+            row=0, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
         )
 
-        # モード選択ラジオボタン（PYWIN32）
+        # キャプチャモード選択ラジオボタン（PYWIN32）
         self.capture_mode_pywin32_radio = ctk.CTkRadioButton(
             self.capture_mode_frame,
             text=CaptureMode.PYWIN32.name,
             variable=self.capture_mode_var,
             value=CaptureMode.PYWIN32.value,
             command=self.on_capture_mode_radio_change,
+            width=0,
         )
         self.capture_mode_pywin32_radio.grid(
-            row=0, column=1, padx=WIDGET_PADDING, pady=WIDGET_PADDING
+            row=0, column=1, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
         )
 
         # キャプチャ対象リストボックス
@@ -111,13 +113,67 @@ class WindowSelectionFrame(ctk.CTkFrame):
         self.east_frame.grid(
             row=0, column=1, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
         )
+        self.east_frame.rowconfigure(0, weight=0)
+        self.east_frame.rowconfigure(1, weight=1)
+        self.east_frame.columnconfigure(0, weight=1)
+
+        # アス比モード選択フレーム
+        self.aspect_ratio_mode_frame = ctk.CTkFrame(self.east_frame)
+        self.aspect_ratio_mode_frame.grid(
+            row=0, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="n"
+        )
+        self.aspect_ratio_mode_frame.columnconfigure(0, weight=0)
+        self.aspect_ratio_mode_frame.columnconfigure(1, weight=0)
+        self.aspect_ratio_mode_frame.columnconfigure(2, weight=0)
+
+        # アス比モード選択ラジオボタン変数
+        self.aspect_ratio_mode_var = ctk.StringVar(value=AspectRatioMode.MODE_RAW.value)
+
+        # アス比モード選択ラジオボタン（RAW）
+        self.aspect_ratio_mode_raw_radio = ctk.CTkRadioButton(
+            self.aspect_ratio_mode_frame,
+            text="RAW",
+            variable=self.aspect_ratio_mode_var,
+            value=AspectRatioMode.MODE_RAW.value,
+            command=self.on_aspect_ratio_mode_radio_change,
+            width=0,
+        )
+        self.aspect_ratio_mode_raw_radio.grid(
+            row=0, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING
+        )
+
+        # アス比モード選択ラジオボタン（16:9）
+        self.aspect_ratio_mode_16_9_radio = ctk.CTkRadioButton(
+            self.aspect_ratio_mode_frame,
+            text="16:9",
+            variable=self.aspect_ratio_mode_var,
+            value=AspectRatioMode.MODE_16_9.value,
+            command=self.on_aspect_ratio_mode_radio_change,
+            width=0,
+        )
+        self.aspect_ratio_mode_16_9_radio.grid(
+            row=0, column=1, padx=WIDGET_PADDING, pady=WIDGET_PADDING
+        )
+
+        # アス比モード選択ラジオボタン（4:3）
+        self.aspect_ratio_mode_4_3_radio = ctk.CTkRadioButton(
+            self.aspect_ratio_mode_frame,
+            text="4:3",
+            variable=self.aspect_ratio_mode_var,
+            value=AspectRatioMode.MODE_4_3.value,
+            command=self.on_aspect_ratio_mode_radio_change,
+            width=0,
+        )
+        self.aspect_ratio_mode_4_3_radio.grid(
+            row=0, column=2, padx=WIDGET_PADDING, pady=WIDGET_PADDING
+        )
 
         # プレビュー画像表示用ラベル
         self.capture_target_preview_label = ctk.CTkLabel(
             self.east_frame, text="Preview", font=default_font
         )
-        self.capture_target_preview_label.pack(
-            fill="both", expand=True, padx=WIDGET_PADDING, pady=WIDGET_PADDING
+        self.capture_target_preview_label.grid(
+            row=1, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
         )
 
         # ウィンドウサイズ変更イベントのバインド
@@ -128,17 +184,37 @@ class WindowSelectionFrame(ctk.CTkFrame):
         # リサイズ前のキャプチャ画像
         self.original_capture_image = None
 
-        # 初期リスト更新
+        # 初回キャプチャターゲットリスト更新
         self.update_list()
         self.clear_capture_target_preview()
+
+        # UI 上の設定をモデルに反映
+        self.on_capture_mode_radio_change()
+        self.on_aspect_ratio_mode_radio_change()
 
     def on_capture_mode_radio_change(self) -> None:
         """
         キャプチャモードの選択イベントハンドラ
         """
+        # モデルに変更を反映
         self.model.change_capture_mode(CaptureMode(self.capture_mode_var.get()))
         self.update_list()
+
+        # プレビューをクリア
         self.clear_capture_target_preview()
+
+    def on_aspect_ratio_mode_radio_change(self) -> None:
+        """
+        アス比モードの選択イベントハンドラ
+        """
+        # モデルに変更を反映
+        self.model.change_aspect_ratio_mode(
+            AspectRatioMode(self.aspect_ratio_mode_var.get())
+        )
+
+        # 描画更新
+        self.update_original_capture_image()
+        self.update_capture_target_preview()
 
     def on_capture_target_select(self, event) -> None:
         """
@@ -187,9 +263,10 @@ class WindowSelectionFrame(ctk.CTkFrame):
         """
         選択されたウィンドウのキャプチャを撮影し、その画像で内部状態を更新する。
         """
-        self.original_capture_image = self.model.capture()
-        if self.original_capture_image is None:
-            self.capture_target_preview_label.configure(text="キャプチャ失敗")
+        try:
+            self.original_capture_image = self.model.capture()
+        except Exception as e:
+            self.original_capture_image = None
 
     def clear_capture_target_preview(self) -> None:
         """
