@@ -1,5 +1,8 @@
 from pathlib import Path
 
+# アプリ名
+APP_NAME_EN = "aynime_issen_style"
+APP_NAME_JP = "えぃにめ一閃流奥義「一閃」"
 
 # ウィジェットのパディングサイズ
 WIDGET_PADDING = 4

@@ -8,11 +8,11 @@ from pathlib import Path
 import shutil
 
 from utils.constants import VERSION_FILE_PATH
+from utils.constants import APP_NAME_EN
 
 # 設定
-APP_NAME = "aynime_issen_style"
 DIST_DIR_PATH = Path(f"dist")
-DIST_APP_DIR_PATH = DIST_DIR_PATH / APP_NAME
+DIST_APP_DIR_PATH = DIST_DIR_PATH / APP_NAME_EN
 BUILD_DIR_PATH = Path("build")
 WORK_DIR_PATH = BUILD_DIR_PATH / "temp"
 SPEC_DIR_PATH = BUILD_DIR_PATH / "spec"
@@ -64,7 +64,7 @@ def run_pyinstaller():
         [
             "pyinstaller",
             "src\\gui\\main.py",
-            f"--name={APP_NAME}",
+            f"--name={APP_NAME_EN}",
             "--onefile",
             "--strip",
             "--noconsole",
@@ -87,7 +87,7 @@ def zip_executable():
     """
     # zip ファイルパスを生成
     date_str = datetime.now().strftime("%Y%m%d")
-    zip_file_stem = f"{APP_NAME}_{date_str}"
+    zip_file_stem = f"{APP_NAME_EN}_{date_str}"
     zip_file_base_path = ZIP_OUTPUT_DIR / zip_file_stem
 
     # 出力フォルダを確保

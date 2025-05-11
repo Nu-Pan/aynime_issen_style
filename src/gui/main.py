@@ -1,12 +1,13 @@
 import sys
 
 import customtkinter as ctk
+import tkinter.messagebox as mb
 
 from aynime_issen_style_app import AynimeIssenStyleApp
 from utils.pyinstaller import is_frozen
 from utils.std import redirect_to_file
 from utils.windows import SystemWideMutex
-import tkinter.messagebox as mb
+from utils.constants import APP_NAME_EN, APP_NAME_JP
 
 if __name__ == "__main__":
     # ログファイルリダイレクト設定
@@ -20,9 +21,9 @@ if __name__ == "__main__":
     # 二重起動は禁止
     # NOTE
     #   ここで止めないとホットキー登録でコケて、ユーザーにとって理解しにくいエラーが出る
-    system_wide_mutex = SystemWideMutex("aynime_issen_style")
+    system_wide_mutex = SystemWideMutex(APP_NAME_EN)
     if system_wide_mutex.already_exists:
-        mb.showerror("エラー", "えぃにめ一閃流奥義「一閃」はすでに起動しています")
+        mb.showerror(APP_NAME_JP, "アプリはすでに起動しています")
         sys.exit(-1)
 
     # CTk アプリを生成・開始
