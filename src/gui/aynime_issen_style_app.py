@@ -8,7 +8,12 @@ from window_selection_frame import WindowSelectionFrame
 from capture_frame import CaptureFrame
 from version_frame import VersionFrame
 from aynime_issen_style_model import CaptureMode, AynimeIssenStyleModel
-from utils.constants import WINDOW_MIN_WIDTH, WINDOW_MIN_HEIGHT, DEFAULT_FONT_NAME
+from utils.constants import (
+    APP_NAME_JP,
+    WINDOW_MIN_WIDTH,
+    WINDOW_MIN_HEIGHT,
+    DEFAULT_FONT_NAME,
+)
 from utils.pyinstaller import resource_path
 
 
@@ -28,7 +33,7 @@ class AynimeIssenStyleApp(ctk.CTk):
         self.configure(font=default_font)
 
         # タイトルを設定
-        self.title("えぃにめ一閃流奥義「一閃」")
+        self.title(APP_NAME_JP)
 
         # アイコンを設定
         self.iconbitmap(resource_path("app.ico"))
