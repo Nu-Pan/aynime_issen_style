@@ -10,7 +10,7 @@ import subprocess
 
 import customtkinter as ctk
 
-import win32con, win32gui, win32api
+import win32con, win32gui, win32api, win32event, winerror
 import dxcam_cpp as dxcam
 
 
@@ -207,3 +207,41 @@ def register_global_hotkey_handler(
 
     # ポーリング処理をキック
     ctk_kind.after(0, poll_ghk_event)
+
+
+class SystemWideMutex:
+    """
+    システムワイドのミューテックスを表すクラス
+    """
+
+    def __init__(self, name: str):
+        """
+        コンストラクタ
+
+        Args:
+            name (str): ミューテックス名
+        """
+        self._handle = win32event.CreateMutex(None, False, "Global\\" + name)
+        self._last_error = win32api.GetLastError()
+
+    @property
+    def already_exists(self) -> bool:
+        """
+        すでに同名のミューテックスが存在しているか調べる
+
+        Returns:
+            bool: すでに同名のミューテックスが存在しているなら True
+        """
+        return self._last_error == winerror.ERROR_ALREADY_EXISTS
+
+
+def already_running(mutex_name: str) -> bool:
+    """
+    すでにツールが起動中であるかを調べる
+
+    Args:
+        mutex_name (str): ミューテックス名（＝ツール名）
+
+    Returns:
+        bool: 同一ツールが起動中なら
+    """
