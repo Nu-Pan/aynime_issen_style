@@ -11,7 +11,7 @@ from utils.constants import VERSION_FILE_PATH
 
 # 設定
 APP_NAME = "aynime_issen_style"
-DIST_DIR_PATH = Path(f"dist") / APP_NAME
+DIST_DIR_PATH = Path(f"dist")
 DIST_APP_DIR_PATH = DIST_DIR_PATH / APP_NAME
 BUILD_DIR_PATH = Path("build")
 WORK_DIR_PATH = BUILD_DIR_PATH / "temp"
