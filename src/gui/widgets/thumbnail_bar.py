@@ -1,4 +1,5 @@
 from typing import cast, Tuple, Callable, List
+import time
 
 from PIL import Image
 
@@ -69,6 +70,9 @@ class ThumbnailItem(ctk.CTkFrame):
         self._button.bind("<Button-1>", self._on_click_left)
         self._button.bind("<Button-3>", self._on_click_right)
 
+        # 最後にスワップを行った時刻を初期化
+        self._last_swap_time = 0.0
+
     def _begin_drag(self, event: Event):
         """
         ドラッグ開始
@@ -85,14 +89,21 @@ class ThumbnailItem(ctk.CTkFrame):
         Args:
             event (Event): イベント
         """
+        # 最後にスワップを行った直後なら無視
+        # NOTE
+        #   チャタリング防止用
+        #   汚い対処法だけど、問題は再現しなくなるのでヨシ
+        if (time.time() - self._last_swap_time) < 0.05:
+            return
+
         # ドラッグ先のインデックスを解決
         cur_idx = self._master._items.index(self)
-        if event.x < 0:
+        if event.x < -WIDGET_PADDING:
             new_idx = cur_idx - 1
-        elif event.x > self._button.winfo_width():
+        elif event.x > self._button.winfo_width() + WIDGET_PADDING:
             new_idx = cur_idx + 1
         else:
-            return
+            new_idx = cur_idx
 
         # 不要 or 範囲外なら何もしない
         if new_idx == cur_idx or new_idx < 0 or new_idx >= len(self._master._items):
@@ -100,6 +111,9 @@ class ThumbnailItem(ctk.CTkFrame):
 
         # 自分自身の位置を移動させる
         self._master.swap(cur_idx, new_idx)
+
+        # 最後にスワップを行った時刻を更新
+        self._last_swap_time = time.time()
 
     def _end_drag(self, event: Event):
         """
