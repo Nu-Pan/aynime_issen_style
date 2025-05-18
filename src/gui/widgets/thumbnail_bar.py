@@ -98,9 +98,9 @@ class ThumbnailItem(ctk.CTkFrame):
 
         # ドラッグ先のインデックスを解決
         cur_idx = self._master._items.index(self)
-        if event.x < -WIDGET_PADDING:
+        if event.x < 0:
             new_idx = cur_idx - 1
-        elif event.x > self._button.winfo_width() + WIDGET_PADDING:
+        elif event.x > self._button.winfo_width():
             new_idx = cur_idx + 1
         else:
             new_idx = cur_idx
