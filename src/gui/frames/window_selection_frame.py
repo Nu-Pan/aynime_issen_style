@@ -11,6 +11,7 @@ from utils.pil import isotropic_downscale_image_in_rectangle
 from utils.capture_context import CaptureTargetInfo
 from aynime_issen_style_model import CaptureMode, AspectRatioMode, AynimeIssenStyleModel
 from utils.constants import WIDGET_PADDING, WINDOW_MIN_WIDTH, DEFAULT_FONT_NAME
+from gui.widgets.still_label import StillLabel
 
 
 class WindowSelectionFrame(ctk.CTkFrame):
@@ -172,17 +173,11 @@ class WindowSelectionFrame(ctk.CTkFrame):
         )
 
         # プレビュー画像表示用ラベル
-        self.capture_target_preview_label = ctk.CTkLabel(
-            self.east_frame, text="Preview", font=default_font
-        )
+        self.capture_target_preview_label = StillLabel(self.east_frame)
         self.capture_target_preview_label.grid(
             row=1, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
         )
-
-        # ウィンドウサイズ変更イベントのバインド
-        self.capture_target_preview_label.bind(
-            "<Configure>", self.on_capture_target_preview_resize
-        )
+        self.capture_target_preview_label.set_contents(text="Preview")
 
         # リサイズ前のキャプチャ画像
         self.original_capture_image = None
@@ -239,15 +234,6 @@ class WindowSelectionFrame(ctk.CTkFrame):
         self.update_original_capture_image()
         self.update_capture_target_preview()
 
-    def on_capture_target_preview_resize(self, event: Event) -> None:
-        """
-        右側フレームのリサイズイベントハンドラ
-
-        Args:
-            event (_type_): イベントオブジェクト
-        """
-        self.update_capture_target_preview()
-
     def update_list(self) -> None:
         """
         ウィンドウリストを更新する
@@ -276,15 +262,7 @@ class WindowSelectionFrame(ctk.CTkFrame):
         プレビューの表示状態をクリアする。
         """
         self.original_capture_image = None
-        with warnings.catch_warnings():
-            warnings.filterwarnings(
-                "ignore",
-                message="CTkLabel Warning: Given image is not CTkImage",
-                category=UserWarning,
-            )
-            self.capture_target_preview_label.configure(
-                image="", text="Capture Target Preview"
-            )
+        self.capture_target_preview_label.set_contents(text="Capture Target Preview")
 
     def update_capture_target_preview(self) -> None:
         """
@@ -297,19 +275,5 @@ class WindowSelectionFrame(ctk.CTkFrame):
             self.clear_capture_target_preview()
             return
 
-        # 画像をリサイズ
-        image = isotropic_downscale_image_in_rectangle(
-            image,
-            self.capture_target_preview_label.winfo_width() - 2 * WIDGET_PADDING,
-            self.capture_target_preview_label.winfo_height() - 2 * WIDGET_PADDING,
-        )
-
-        # 画像をラベルに表示
-        tk_image = ImageTk.PhotoImage(image)
-        with warnings.catch_warnings():
-            warnings.filterwarnings(
-                "ignore",
-                message="CTkLabel Warning: Given image is not CTkImage",
-                category=UserWarning,
-            )
-            self.capture_target_preview_label.configure(image=tk_image, text="")
+        # 画像を表示
+        self.capture_target_preview_label.set_contents(image=image)

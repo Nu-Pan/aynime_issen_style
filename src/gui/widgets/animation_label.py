@@ -11,7 +11,7 @@ from utils.pil import isotropic_downscale_image_in_rectangle
 
 class AnimationLabel(ctk.CTkLabel):
     """
-    アニメーション再生
+    連番静止画をアニメーション再生する用のラベル
     """
 
     def __init__(self, master: ctk.CTkBaseClass, **kwargs):
@@ -67,13 +67,13 @@ class AnimationLabel(ctk.CTkLabel):
             with warnings.catch_warnings():
                 warnings.filterwarnings(
                     "ignore",
-                    message="CTkLabel Warning: Given image is not CTkImage",
+                    message="Warning: Given image is not CTkImage",
                     category=UserWarning,
                 )
-                self.configure(image="", text="Animation Preview")
+                self.silent_configure(image="", text="Animation Preview")
         else:
             self._frame_index = (self._frame_index + 1) % len(self._frames)
-            self.configure(image=self._frames[self._frame_index], text="")
+            self.silent_configure(image=self._frames[self._frame_index], text="")
 
         # 次の更新処理をキック
         self.after(self._interval_in_ms, self._next_frame_handler)
@@ -94,3 +94,11 @@ class AnimationLabel(ctk.CTkLabel):
             )
             tk_frame = ImageTk.PhotoImage(pil_frame)
             self._frames.append(tk_frame)
+
+    def silent_configure(self, **kwargs):
+        """
+        警告抑制付き configure
+        """
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", UserWarning)
+            self.configure(**kwargs)
