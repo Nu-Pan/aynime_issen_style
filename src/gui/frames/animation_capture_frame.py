@@ -14,10 +14,7 @@ from tkinterdnd2.TkinterDnD import DnDEvent
 
 from aynime_issen_style_model import AynimeIssenStyleModel
 from utils.constants import WIDGET_PADDING, DEFAULT_FONT_NAME
-from utils.pil import (
-    isotropic_downscale_image_in_rectangle,
-    save_pil_image_to_jpeg_file,
-)
+from utils.pil import save_pil_images_to_gif_file
 from utils.windows import file_to_clipboard, register_global_hotkey_handler
 from gui.widgets.thumbnail_bar import ThumbnailBar
 from gui.widgets.animation_label import AnimationLabel
@@ -100,6 +97,17 @@ class AnimationCaptureFrame(ctk.CTkFrame):
         # 初期フレームレートを設定
         self._on_frame_rate_slider(24)
 
+        # gif 生成ボタン
+        self._create_button = ctk.CTkButton(
+            self._ctrl_frame,
+            text="萌え",
+            width=80,
+            command=self._on_create_button_clicked,
+        )
+        self._create_button.grid(
+            row=0, column=2, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
+        )
+
     def _on_drop_file(self, event: DnDEvent):
         """
         ファイルドロップハンドラ
@@ -134,3 +142,23 @@ class AnimationCaptureFrame(ctk.CTkFrame):
         frame_rate_int = round(float(value))
         self._frame_rate_label.configure(text=f"{frame_rate_int} FPS")
         self._animation_preview_label.set_frame_rate(frame_rate_int)
+
+    def _on_create_button_clicked(self):
+        """
+        生成ボタンクリックハンドラ
+
+        Args:
+            event (Event): イベント
+        """
+        # 対象フレームの列挙
+        frames = self._frame_list_bar.original_frames
+        if len(frames) < 2:
+            raise ValueError(f"# of frames less than 2(actual={len(frames)})")
+
+        # gif ファイルとして保存
+        nime_dir_path = Path.cwd() / "nime"
+        date_str = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        gif_file_path = nime_dir_path / (date_str + ".gif")
+        save_pil_images_to_gif_file(
+            frames, self._animation_preview_label.interval_in_ms, gif_file_path
+        )

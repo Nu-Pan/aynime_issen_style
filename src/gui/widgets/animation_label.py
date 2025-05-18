@@ -58,6 +58,16 @@ class AnimationLabel(ctk.CTkLabel):
         """
         self._interval_in_ms = int(1000 / frame_rate)
 
+    @property
+    def interval_in_ms(self) -> int:
+        """
+        更新間隔（ミリ秒）
+
+        Returns:
+            int: 更新間隔（ミリ秒）
+        """
+        return self._interval_in_ms
+
     def _next_frame_handler(self):
         """
         表示状態を次のフレームに進めるハンドラ

@@ -194,7 +194,7 @@ class ThumbnailBar(ctk.CTkScrollableFrame):
         self._items.append(item)
 
         # リスト変更をコールバックで通知
-        self._on_change([item.original_image for item in self._items])
+        self._on_change(self.original_frames)
 
     def delete_image(self, removal_item: ThumbnailItem):
         """
@@ -217,7 +217,7 @@ class ThumbnailBar(ctk.CTkScrollableFrame):
                 item.grid_configure(column=idx)
 
         # リスト変更をコールバックで通知
-        self._on_change([item.original_image for item in self._items])
+        self._on_change(self.original_frames)
 
     def swap(self, idx_A: int, idx_B: int):
         """
@@ -238,4 +238,14 @@ class ThumbnailBar(ctk.CTkScrollableFrame):
         self._items[idx_B].grid_configure(column=idx_B)
 
         # リスト変更をコールバックで通知
-        self._on_change([item.original_image for item in self._items])
+        self._on_change(self.original_frames)
+
+    @property
+    def original_frames(self) -> List[Image.Image]:
+        """
+        縮小前のフレーム（画像）を得る
+
+        Returns:
+            List[Image.Image]: 縮小前のフレーム
+        """
+        return [item.original_image for item in self._items]

@@ -59,7 +59,7 @@ class StillCaptureFrame(ctk.CTkFrame):
             return
 
         # キャプチャをローカルにファイル保存する
-        nime_dir_path = Path(".\\nime")
+        nime_dir_path = Path.cwd() / "nime"
         date_str = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         jpeg_file_path = nime_dir_path / (date_str + ".jpg")
         save_pil_image_to_jpeg_file(capture_image, jpeg_file_path)

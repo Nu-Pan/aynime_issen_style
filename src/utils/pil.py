@@ -1,4 +1,6 @@
 from pathlib import Path
+from typing import List
+
 from PIL import Image
 
 
@@ -96,4 +98,42 @@ def save_pil_image_to_jpeg_file(image: Image.Image, file_path: Path) -> None:
     # 圧縮・ファイル保存
     image.convert("RGB").save(
         str(file_path), format="JPEG", quality=92, optimize=True, progressive=True
+    )
+
+
+def save_pil_images_to_gif_file(
+    frames: List[Image.Image], interval_in_ms: int, file_path: Path
+) -> None:
+    """
+    frames を gif アニメーションとして file_path に保存する
+
+    Args:
+        frames (List[Image.Image]): 連番静止画像
+        file_path (Path): 保存先ファイルパス
+    """
+    # 親ディレクトリがなければ生成
+    file_path.parent.mkdir(parents=True, exist_ok=True)
+
+    # 高さが一番小さいやつに揃うように縮小する
+    # NOTE
+    #   高さは最大 720 で制限（大きすぎるとファイルサイズがヤバい）
+    max_width = max([f.width for f in frames])
+    min_height = min([f.height for f in frames] + [720])
+    frames = [
+        isotropic_downscale_image_in_rectangle(f, max_width, min_height) for f in frames
+    ]
+
+    # 幅が一番小さいやつに揃うように切り取る
+    min_width = min([f.width for f in frames])
+    frames = [crop_to_aspect_ratio(f, min_width, min_height) for f in frames]
+
+    # gif ファイル保存
+    frames[0].save(
+        file_path,
+        save_all=True,
+        append_images=frames[1:],
+        duration=interval_in_ms,
+        loop=0,
+        disposal=2,
+        optimize=True,
     )
