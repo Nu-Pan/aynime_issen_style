@@ -13,9 +13,9 @@ from utils.pil import (
 from utils.windows import file_to_clipboard, register_global_hotkey_handler
 
 
-class CaptureFrame(ctk.CTkFrame):
+class StillCaptureFrame(ctk.CTkFrame):
     """
-    キャプチャ操作を行う CTk フレーム
+    スチル画像のキャプチャ操作を行う CTk フレーム
     """
 
     def __init__(self, master, model: AynimeIssenStyleModel, **kwargs):

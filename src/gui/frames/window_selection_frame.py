@@ -1,6 +1,7 @@
 from typing import cast
 import warnings
 
+from tkinter import Event
 import customtkinter as ctk
 from CTkListbox import CTkListbox
 
@@ -17,7 +18,9 @@ class WindowSelectionFrame(ctk.CTkFrame):
     ウィンドウ選択フレームクラス
     """
 
-    def __init__(self, master, model: AynimeIssenStyleModel, **kwargs):
+    def __init__(
+        self, master: ctk.CTkBaseClass, model: AynimeIssenStyleModel, **kwargs
+    ):
         """
         コンストラクタ
 
@@ -216,7 +219,7 @@ class WindowSelectionFrame(ctk.CTkFrame):
         self.update_original_capture_image()
         self.update_capture_target_preview()
 
-    def on_capture_target_select(self, event) -> None:
+    def on_capture_target_select(self, event: Event) -> None:
         """
         リストボックスの選択イベントハンドラ
 
@@ -236,7 +239,7 @@ class WindowSelectionFrame(ctk.CTkFrame):
         self.update_original_capture_image()
         self.update_capture_target_preview()
 
-    def on_capture_target_preview_resize(self, event) -> None:
+    def on_capture_target_preview_resize(self, event: Event) -> None:
         """
         右側フレームのリサイズイベントハンドラ
 
