@@ -1,5 +1,6 @@
 from typing import Callable, List
 import time
+import sys
 
 from PIL import Image, ImageTk
 
@@ -247,9 +248,13 @@ class ThumbnailBar(ctk.CTkScrollableFrame):
         self._items.append(sentinel_item)
         sentinel_item.grid(row=0, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING)
 
+        # マウスホイール横スクロール設定
+        self._parent_canvas.bind("<Enter>", self._mouse_enter)
+        self._parent_canvas.bind("<Leave>", self._mouse_leave)
+
     def _on_change(self):
         """
-        リストに変更が合った時に呼び出されるハンドラ
+        サムネリストに変更が合った時に呼び出されるハンドラ
         """
         # 親ウィジェットに通知
         self._parent_on_change(self.original_frames)
@@ -343,3 +348,30 @@ class ThumbnailBar(ctk.CTkScrollableFrame):
             for item in self._items
             if isinstance(item, ThumbnailItem) and item.enabled
         ]
+
+    def _mouse_enter(self, _):
+        """
+        ウィジェットにマウスカーソルが入った時のハンドラ
+        """
+        # NOTE
+        #   カーソルが入った時だけマウスホイールのハンドラを有効化する
+        self._parent_canvas.bind_all("<MouseWheel>", self._on_mousewheel_windows)
+
+    def _mouse_leave(self, _):
+        """
+        ウィジェットからマウスカーソルが離れた時のハンドラ
+        """
+        # NOTE
+        #   カーソルが外れたらマウスホイールのハンドラを無効化する
+        self._parent_canvas.unbind_all("<MouseWheel>")
+
+    def _on_mousewheel_windows(self, event: Event):
+        """
+        マウスホイールころころハンドラ
+
+        Args:
+            event (_type_): イベント
+        """
+        # NOTE
+        #   普通のスクロールで横方向にスクロール
+        self._parent_canvas.xview_scroll(-event.delta, "units")
