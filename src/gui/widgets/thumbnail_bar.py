@@ -1,6 +1,7 @@
 from typing import Callable, List
 import time
 import sys
+from math import sqrt
 
 from PIL import Image, ImageTk
 
@@ -70,6 +71,8 @@ class ThumbnailItem(ctk.CTkFrame):
 
         # 内部状態
         self._enabled = True
+        self._last_swap_time = 0.0
+        self._mlb_press_pos = (0, 0)
 
         # サムネイルサイズを解決
         thumbnail_width = int(pil_image.width * thumbnail_height / pil_image.height)
@@ -105,21 +108,13 @@ class ThumbnailItem(ctk.CTkFrame):
         )
         self._button.pack()
 
-        # マウスドラッグイベント
+        # マウスイベント
         # NOTE
-        #   こっちは並び替え用
+        #   並び替え・有効無効切り替え・削除
         self._button.bind("<ButtonPress-1>", self._begin_drag)
         self._button.bind("<B1-Motion>", self._on_drag)
         self._button.bind("<ButtonRelease-1>", self._end_drag)
-
-        # マウスクリックイベント
-        # NOTE
-        #   こっちは有効・無効切り替えと削除
-        self._button.bind("<Button-1>", self._on_click_left)
         self._button.bind("<Button-3>", self._on_click_right)
-
-        # 最後にスワップを行った時刻を初期化
-        self._last_swap_time = 0.0
 
     def _begin_drag(self, event: Event):
         """
@@ -128,7 +123,7 @@ class ThumbnailItem(ctk.CTkFrame):
         Args:
             event (Event): イベント
         """
-        pass
+        self._mlb_press_pos = (event.x_root, event.y_root)
 
     def _on_drag(self, event: Event):
         """
@@ -170,21 +165,22 @@ class ThumbnailItem(ctk.CTkFrame):
         Args:
             event (Event): イベント
         """
-        pass
+        # ドラッグ挙動の場合は何もしない
+        mlb_current_pos = (event.x_root, event.y_root)
+        diff = max(
+            [abs(v1 - v2) for v1, v2 in zip(self._mlb_press_pos, mlb_current_pos)]
+        )
+        torelance = min(self._button.winfo_width(), self._button.winfo_height()) / 2
+        if diff < torelance:
+            # 状態をトグルして画像を差し替え
+            self._enabled = not self._enabled
+            if self._enabled:
+                self._button.configure(image=self._tk_enable_image)
+            else:
+                self._button.configure(image=self._tk_disable_image)
 
-    def _on_click_left(self, event: Event):
-        """
-        マウスクリック（左ボタン）
-        """
-        # 状態をトグルして画像を差し替え
-        self._enabled = not self._enabled
-        if self._enabled:
-            self._button.configure(image=self._tk_enable_image)
-        else:
-            self._button.configure(image=self._tk_disable_image)
-
-        # 親ウィジェットに通知
-        self._master._on_change()
+            # 親ウィジェットに通知
+            self._master._on_change()
 
     def _on_click_right(self, event: Event):
         """
