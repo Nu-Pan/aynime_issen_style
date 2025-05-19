@@ -1,15 +1,14 @@
-from typing import cast, Tuple, Callable, List
+from typing import Callable, List
 import time
 
-from PIL import Image
+from PIL import Image, ImageTk
 
 from tkinter import Event
-from tkinterdnd2 import TkinterDnD, DND_FILES
-from tkinterdnd2.TkinterDnD import DnDEvent
 
 import customtkinter as ctk
 
 from utils.constants import WIDGET_PADDING, DEFAULT_FONT_NAME
+from utils.pil import make_disabled_image
 
 
 class SentinelItem(ctk.CTkFrame):
@@ -68,20 +67,35 @@ class ThumbnailItem(ctk.CTkFrame):
         self._master = master
         self._original_image = pil_image.copy()
 
-        # サムネイル画像を生成
+        # 内部状態
+        self._enabled = True
+
+        # サムネイルサイズを解決
         thumbnail_width = int(pil_image.width * thumbnail_height / pil_image.height)
         thumbnail_size = (thumbnail_width, thumbnail_height)
-        pil_image.thumbnail(thumbnail_size, Image.Resampling.BOX)
-        self._tk_image = ctk.CTkImage(
-            light_image=pil_image,
-            dark_image=pil_image,
+
+        # サムネイル画像（有効時）を生成
+        pil_enable_image = pil_image.copy()
+        pil_enable_image.thumbnail(thumbnail_size, Image.Resampling.BOX)
+        self._tk_enable_image = ctk.CTkImage(
+            light_image=pil_enable_image,
+            dark_image=pil_enable_image,
+            size=(thumbnail_width, thumbnail_height),
+        )
+
+        # サムネイル画像（無効時）を生成
+        pil_disable_image = make_disabled_image(pil_image)
+        pil_disable_image.thumbnail(thumbnail_size, Image.Resampling.BOX)
+        self._tk_disable_image = ctk.CTkImage(
+            light_image=pil_disable_image,
+            dark_image=pil_disable_image,
             size=(thumbnail_width, thumbnail_height),
         )
 
         # ドラッグをハンドルするためのボタン
         self._button = ctk.CTkButton(
             self,
-            image=self._tk_image,
+            image=self._tk_enable_image,
             text="",
             width=thumbnail_width,
             height=thumbnail_height,
@@ -161,7 +175,15 @@ class ThumbnailItem(ctk.CTkFrame):
         """
         マウスクリック（左ボタン）
         """
-        pass
+        # 状態をトグルして画像を差し替え
+        self._enabled = not self._enabled
+        if self._enabled:
+            self._button.configure(image=self._tk_enable_image)
+        else:
+            self._button.configure(image=self._tk_disable_image)
+
+        # 親ウィジェットに通知
+        self._master._on_change()
 
     def _on_click_right(self, event: Event):
         """
@@ -178,6 +200,16 @@ class ThumbnailItem(ctk.CTkFrame):
             Image.Image: リサイズ前の画像
         """
         return self._original_image
+
+    @property
+    def enabled(self) -> bool:
+        """
+        このアイテムが有効であるかどうか
+
+        Returns:
+            bool: 有効なら True
+        """
+        return self._enabled
 
 
 class ThumbnailBar(ctk.CTkScrollableFrame):
@@ -208,12 +240,19 @@ class ThumbnailBar(ctk.CTkScrollableFrame):
         # 内部状態
         self._thumbnail_height = thumbnail_height
         self._items: list[ctk.CTkFrame] = []
-        self._on_change = on_change
+        self._parent_on_change = on_change
 
         # 番兵アイテムを追加
         sentinel_item = SentinelItem(self, thumbnail_height)
         self._items.append(sentinel_item)
         sentinel_item.grid(row=0, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING)
+
+    def _on_change(self):
+        """
+        リストに変更が合った時に呼び出されるハンドラ
+        """
+        # 親ウィジェットに通知
+        self._parent_on_change(self.original_frames)
 
     def add_image(self, image: Image.Image):
         """
@@ -235,7 +274,7 @@ class ThumbnailBar(ctk.CTkScrollableFrame):
         self._items[-1].grid(column=len(self._items))
 
         # リスト変更をコールバックで通知
-        self._on_change(self.original_frames)
+        self._on_change()
 
     def delete_image(self, removal_item: ctk.CTkFrame):
         """
@@ -262,7 +301,7 @@ class ThumbnailBar(ctk.CTkScrollableFrame):
                 item.grid_configure(column=idx)
 
         # リスト変更をコールバックで通知
-        self._on_change(self.original_frames)
+        self._on_change()
 
     def swap(self, idx_A: int, idx_B: int):
         """
@@ -289,7 +328,7 @@ class ThumbnailBar(ctk.CTkScrollableFrame):
         self._items[idx_B].grid_configure(column=idx_B)
 
         # リスト変更をコールバックで通知
-        self._on_change(self.original_frames)
+        self._on_change()
 
     @property
     def original_frames(self) -> List[Image.Image]:
@@ -302,5 +341,5 @@ class ThumbnailBar(ctk.CTkScrollableFrame):
         return [
             item.original_image
             for item in self._items
-            if isinstance(item, ThumbnailItem)
+            if isinstance(item, ThumbnailItem) and item.enabled
         ]

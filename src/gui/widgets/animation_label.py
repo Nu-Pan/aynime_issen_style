@@ -80,13 +80,7 @@ class AnimationLabel(ctk.CTkLabel):
         """
         # 表示を更新
         if len(self._frames) == 0:
-            with warnings.catch_warnings():
-                warnings.filterwarnings(
-                    "ignore",
-                    message="Warning: Given image is not CTkImage",
-                    category=UserWarning,
-                )
-                self.silent_configure(image="", text=self._blank_text)
+            self.silent_configure(image="", text=self._blank_text)
         else:
             self._frame_index = (self._frame_index + 1) % len(self._frames)
             self.silent_configure(image=self._frames[self._frame_index], text="")

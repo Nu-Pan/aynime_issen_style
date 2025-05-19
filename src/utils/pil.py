@@ -1,7 +1,9 @@
 from pathlib import Path
-from typing import List
+from typing import List, Tuple
 
-from PIL import Image
+from PIL import Image, ImageDraw, ImageEnhance, ImageFont
+
+from utils.constants import DEFAULT_FONT_NAME
 
 
 def isotropic_downscale_image_in_rectangle(
@@ -82,6 +84,60 @@ def crop_to_aspect_ratio(image: Image.Image, h_ratio: int, v_ratio: int) -> Imag
     else:
         # アスペクト比ぴったりの場合はそのまま返す
         return image
+
+
+def get_text_bbox_size(
+    draw: ImageDraw.ImageDraw, text: str, font: ImageFont.FreeTypeFont
+) -> Tuple[float, float]:
+    """
+    指定された条件でのテキストバウンディングボックスのサイズを返す
+
+    Args:
+        draw (ImageDraw.ImageDraw): 描画コンテキスト
+        text (str): テキスト
+        font (ImageFont.FreeTypeFont): フォント
+
+    Returns:
+        Tuple[int, int]: バウンディングボックスの幅・高さ
+    """
+    x0, y0, x1, y1 = draw.textbbox((0, 0), text, font=font, anchor=None)
+    return x1 - x0, y1 - y0
+
+
+def make_disabled_image(
+    source_image: Image.Image, text="DISABLED", darkness=0.35
+) -> Image.Image:
+    """
+    source_image を元に「無効っぽい見た目の画像」を生成する
+
+    Args:
+        source_image (Image.Image): 元画像
+        text (str, optional): オーバーレイする文字列
+        darkness (float, optional): 画像の暗さ
+
+    Returns:
+        Image.Image: 無効っぽい見た目の画像
+    """
+    # 輝度を割合で下げる
+    enhancer = ImageEnhance.Brightness(source_image.convert("RGBA"))
+    dark_image = enhancer.enhance(darkness)
+
+    # 黒画像を半透明合成して更に暗くする
+    w, h = dark_image.size
+    overlay = Image.new("RGBA", (w, h), (0, 0, 0, 120))
+    dark_image.alpha_composite(overlay)
+
+    # テキストを描画
+    draw = ImageDraw.Draw(dark_image)
+    font = ImageFont.truetype("arial.ttf", size=h // 8)
+    tw, th = get_text_bbox_size(draw, text, font)
+    center_w = (w - tw) / 2
+    center_h = (h - th) / 2
+    center_pos = (center_w, center_h)
+    draw.text(center_pos, text, font=font, fill=(255, 255, 255, 230))
+
+    # 正常終了
+    return dark_image
 
 
 def save_pil_image_to_jpeg_file(image: Image.Image, file_path: Path) -> None:
