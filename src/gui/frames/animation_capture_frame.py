@@ -20,7 +20,7 @@ from gui.widgets.thumbnail_bar import ThumbnailBar
 from gui.widgets.animation_label import AnimationLabel
 
 
-class AnimationCaptureFrame(ctk.CTkFrame):
+class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
     """
     スチル画像のキャプチャ操作を行う CTk フレーム
     """
@@ -55,7 +55,7 @@ class AnimationCaptureFrame(ctk.CTkFrame):
         # フレームリスト
         self._frame_list_bar = ThumbnailBar(self, 120, self._on_frame_list_change)
         self._frame_list_bar.grid(
-            row=1, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="swe"
+            row=1, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
         )
 
         # ファイルドロップ関係
@@ -68,7 +68,7 @@ class AnimationCaptureFrame(ctk.CTkFrame):
         # コントロール類配置用フレーム
         self._ctrl_frame = ctk.CTkFrame(self, width=0, height=0)
         self._ctrl_frame.grid(
-            row=2, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="swe"
+            row=2, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
         )
         self._ctrl_frame.rowconfigure(0, weight=1)
         self._ctrl_frame.columnconfigure(0, weight=1)
@@ -116,7 +116,8 @@ class AnimationCaptureFrame(ctk.CTkFrame):
             event (Event): イベント
         """
         ACCEPTABLE_EXTENSIONS = (".png", ".jpg", ".jpeg", ".webp", ".bmp", ".gif")
-        paths = cast(Tuple[str], self.tk.splitlist(event.data))
+        event_data = cast(str, vars(event)["data"])
+        paths = cast(Tuple[str], self.tk.splitlist(event_data))
         pil_images = [
             Image.open(p) for p in paths if p.lower().endswith(ACCEPTABLE_EXTENSIONS)
         ]

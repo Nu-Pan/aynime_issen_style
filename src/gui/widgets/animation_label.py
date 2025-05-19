@@ -1,4 +1,4 @@
-from typing import List, Union
+from typing import List, Union, Optional
 import warnings
 
 from PIL import Image, ImageTk
@@ -14,7 +14,9 @@ class AnimationLabel(ctk.CTkLabel):
     連番静止画をアニメーション再生する用のラベル
     """
 
-    def __init__(self, master: ctk.CTkBaseClass, **kwargs):
+    def __init__(
+        self, master: ctk.CTkBaseClass, blank_text: Optional[str] = None, **kwargs
+    ):
         """
         コンストラクタ
         """
@@ -24,6 +26,10 @@ class AnimationLabel(ctk.CTkLabel):
         self.set_frames()
         self.set_frame_rate(24)
         self._frame_index = 0
+        if blank_text is None:
+            self._blank_text = "Animation Preview"
+        else:
+            self._blank_text = blank_text
 
         # リサイズハンドラ
         self.bind("<Configure>", self._on_resize)
@@ -80,7 +86,7 @@ class AnimationLabel(ctk.CTkLabel):
                     message="Warning: Given image is not CTkImage",
                     category=UserWarning,
                 )
-                self.silent_configure(image="", text="Animation Preview")
+                self.silent_configure(image="", text=self._blank_text)
         else:
             self._frame_index = (self._frame_index + 1) % len(self._frames)
             self.silent_configure(image=self._frames[self._frame_index], text="")

@@ -12,6 +12,39 @@ import customtkinter as ctk
 from utils.constants import WIDGET_PADDING, DEFAULT_FONT_NAME
 
 
+class SentinelItem(ctk.CTkFrame):
+    """
+    サムネイルリスト上の「番兵」的なアイテム
+    ドロップ可能であることをユーザーに伝えるためだけに存在
+    """
+
+    def __init__(self, master: "ThumbnailBar", thumbnail_height: int):
+        """
+        コンストラクタ
+
+        Args:
+            master (ThumbnailBar): このアイテムが所属する ThumbnailBar
+            thumbnail_height (int): サムネイルのサイズ（縦方向）
+        """
+        super().__init__(master)
+        # フォントを生成
+        default_font = ctk.CTkFont(DEFAULT_FONT_NAME)
+
+        # 通知ラベルを生成
+        # NOTE
+        #   ラベルの四隅の外側はテーマ色でフィルされてしまうので、角丸のないラベルを使用する(corner_radius=0)。
+        self._text_label = ctk.CTkLabel(
+            self,
+            text="Drop image file(s) HERE",
+            width=thumbnail_height * 16 // 9,
+            height=thumbnail_height,
+            bg_color="transparent",
+            font=default_font,
+        )
+        self._text_label.pack(fill="both", expand=True)
+        self._text_label.configure(padx=WIDGET_PADDING, pady=WIDGET_PADDING)
+
+
 class ThumbnailItem(ctk.CTkFrame):
     """
     画像をサムネイル表示するためのウィジェット
@@ -174,10 +207,15 @@ class ThumbnailBar(ctk.CTkScrollableFrame):
 
         # 内部状態
         self._thumbnail_height = thumbnail_height
-        self._items: list[ThumbnailItem] = []
+        self._items: list[ctk.CTkFrame] = []
         self._on_change = on_change
 
-    def add_image(self, image: Image):
+        # 番兵アイテムを追加
+        sentinel_item = SentinelItem(self, thumbnail_height)
+        self._items.append(sentinel_item)
+        sentinel_item.grid(row=0, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING)
+
+    def add_image(self, image: Image.Image):
         """
         画像（アイテム）を追加
 
@@ -187,22 +225,29 @@ class ThumbnailBar(ctk.CTkScrollableFrame):
         # アイテムを生成・GUI配置
         item = ThumbnailItem(self, image, self._thumbnail_height)
         item.grid(
-            row=0, column=len(self._items), padx=WIDGET_PADDING, pady=WIDGET_PADDING
+            row=0, column=len(self._items) - 1, padx=WIDGET_PADDING, pady=WIDGET_PADDING
         )
 
         # アイテムリストに追加
-        self._items.append(item)
+        self._items.insert(-1, item)
+
+        # 番兵をずらす
+        self._items[-1].grid(column=len(self._items))
 
         # リスト変更をコールバックで通知
         self._on_change(self.original_frames)
 
-    def delete_image(self, removal_item: ThumbnailItem):
+    def delete_image(self, removal_item: ctk.CTkFrame):
         """
         画像（アイテム）を削除
 
         Args:
             item (ThumbnailItem): 削除対象アイテム
         """
+        # 番兵アイテムは削除不可
+        if isinstance(removal_item, SentinelItem):
+            return
+
         # アイテムリストから除外
         removal_index = self._items.index(removal_item)
         self._items.pop(removal_index)
@@ -227,6 +272,12 @@ class ThumbnailBar(ctk.CTkScrollableFrame):
             idx_A (int): 入れ替え対象インデックス(A)
             idx_B (int): 入れ替え対象インデックス(B)
         """
+        # 番兵アイテムとの入れ替えは不可
+        is_sentinel_A = isinstance(self._items[idx_A], SentinelItem)
+        is_sentinel_B = isinstance(self._items[idx_B], SentinelItem)
+        if is_sentinel_A or is_sentinel_B:
+            return
+
         # リスト上の順序を入れ替え
         self._items[idx_A], self._items[idx_B] = (
             self._items[idx_B],
@@ -248,4 +299,8 @@ class ThumbnailBar(ctk.CTkScrollableFrame):
         Returns:
             List[Image.Image]: 縮小前のフレーム
         """
-        return [item.original_image for item in self._items]
+        return [
+            item.original_image
+            for item in self._items
+            if isinstance(item, ThumbnailItem)
+        ]
