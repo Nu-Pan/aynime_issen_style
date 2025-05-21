@@ -1,89 +1,242 @@
 from pathlib import Path
-from typing import List, Tuple
+from typing import List, Tuple, Optional
+from enum import Enum, auto
 
 from PIL import Image, ImageDraw, ImageEnhance, ImageFont
 
 from utils.constants import DEFAULT_FONT_NAME
 
 
-def isotropic_downscale_image_in_rectangle(
-    image: Image.Image, rectangle_width: int, rectangle_height: int
+class AspectRatio(Enum):
+    """
+    アスペクト比を定義する列挙型
+    """
+
+    E_RAW = "RAW"  # オリジナルのアスペクト比をそのまま使う
+    E_16_9 = "16:9"
+    E_4_3 = "4:3"
+    E_1_1 = "1:1"
+
+    @property
+    def int_value(self) -> Optional[Tuple[int, int]]:
+        """
+        列挙値を数値に変換する
+
+        Args:
+            default_value (Tuple[int, int]): RAW だった場合のデフォルト値
+
+        Returns:
+            Optional[Tuple[int, int]]:
+                アスペクト比（横：縦）
+                E_RAW の場合 None
+        """
+        if self == AspectRatio.E_RAW:
+            return None
+        elif self == AspectRatio.E_16_9:
+            return (16, 9)
+        elif self == AspectRatio.E_4_3:
+            return (4, 3)
+        elif self == AspectRatio.E_1_1:
+            return (1, 1)
+        else:
+            raise ValueError(f"Invalid AspectRatio({self})")
+
+
+class Resolution(Enum):
+    """
+    典型的な解像度を定義する列挙型
+    """
+
+    E_RAW = "RAW"  # オリジナルの解像度をそのまま使う
+    E_HVGA = "320"  # 320
+    E_VGA = "640"  # 640
+    E_QHD = "960"  # 960
+    E_HD = "1280"  # 1280
+    E_FHD = "1920"  # 1920
+    E_3K = "2880"  # 2880
+    E_4K = "3840"  # 3840
+
+    @property
+    def int_value(self) -> Optional[int]:
+        """
+        列挙値を数値に変換する
+
+        Returns:
+            Optional[Tuple[int, int]]:
+                解像度（横：縦）
+                E_RAW の場合 None
+        """
+        if self == Resolution.E_RAW:
+            return None
+        elif self == Resolution.E_HVGA:
+            return 320
+        elif self == Resolution.E_VGA:
+            return 640
+        elif self == Resolution.E_QHD:
+            return 960
+        elif self == Resolution.E_HD:
+            return 1280
+        elif self == Resolution.E_FHD:
+            return 1920
+        elif self == Resolution.E_3K:
+            return 2880
+        elif self == Resolution.E_4K:
+            return 3840
+        else:
+            raise ValueError(f"Invalid Resolution({self})")
+
+
+def resolve_target_size(
+    source_width: int,
+    source_height: int,
+    aspect_ratio: AspectRatio,
+    resolution: Resolution,
+) -> Tuple[int, int]:
+    """
+    サイズ (source_width, source_height) の画像を
+    aspect_ratio, resolution にリサイズする場合の適切な目標サイズを解決する。
+
+    Args:
+        source_width (int): 元画像のサイズ（横）
+        source_height (int): 元画像のサイズ（縦）
+        aspect_ratio (AspectRatio): 目標アスペクト比（パターン）
+        resolution (Resolution): 目標解像度（パターン）
+
+    Returns:
+        Tuple[int, int]: 目標サイズ（横：縦）
+    """
+    # アスペクト比を解決
+    aspect_ratio_int = aspect_ratio.int_value
+    if aspect_ratio_int is None:
+        aspect_ratio_int = (source_width, source_height)
+
+    # 幅を解決
+    target_width = resolution.int_value
+    if target_width is None:
+        target_width = source_width
+
+    # 高さを解決
+    target_height = target_width * aspect_ratio_int[1] // aspect_ratio_int[0]
+
+    # 正常終了
+    return (target_width, target_height)
+
+
+def resize_contain_free_size(
+    image: Image.Image, target_width: int, target_height: int
 ) -> Image.Image:
     """
-    image を rectangle_width, rectangle_height に収まるように縮小する
-    収縮前後でアスペクト比は維持される
-    image のほうが小さい場合、拡大は行われない
+    (width, height) のボックス内に image 全体が収まるようにリサイズする。
+    リサイズ前後でアスペクト比は維持される。
+    拡大は行われない。
 
     Args:
-        image (Image.Image): 入力画像
-        rectangle_width (int): 縮小後サイズ（横）
-        rectangle_height (int): 縮小後サイズ（縦）
+        image (Image.Image): 元画像
+        target_width (int): リサイズ後のサイズ（横）
+        target_height (int): リサイズ後のサイズ（縦）
 
     Returns:
-        Image.Image: 縮小された画像
+        Image.Image: リサイズ後の画像
     """
-    # 矩形のアスペクト比を計算
-    rectangle_aspect_ratio = rectangle_width / rectangle_height
-
-    # 画像のアスペクト比を計算
-    image_aspect_ratio = image.width / image.height
-
-    # 縮小率を計算
-    if image_aspect_ratio > rectangle_aspect_ratio:
-        scale = rectangle_width / image.width
+    # スケール後のサイズを解決
+    width_scale = target_width / image.width
+    height_scale = target_height / image.height
+    if min(width_scale, height_scale) > 1.0:
+        actual_width = image.width
+        actual_height = image.height
+    elif width_scale < height_scale:
+        actual_width = target_width
+        actual_height = image.height * target_width // image.width
     else:
-        scale = rectangle_height / image.height
+        actual_width = image.width * target_height // image.height
+        actual_height = target_height
 
-    # ダウンスケール不要な場合は入力をそのまま返す
-    if scale >= 1.0:
-        return image
+    # スケール不要ならコピーを返す
+    if actual_width == image.width and actual_height == image.height:
+        return image.copy()
 
-    # 画像を縮小
-    new_size = (int(image.width * scale), int(image.height * scale))
-    return image.resize(new_size, Image.Resampling.BILINEAR)
+    # リサイズして返す
+    return image.resize(
+        (actual_width, actual_height), Image.Resampling.LANCZOS, reducing_gap=2.0
+    )
 
 
-def crop_to_aspect_ratio(image: Image.Image, h_ratio: int, v_ratio: int) -> Image.Image:
+def resize_contain_pattern_size(
+    image: Image.Image, aspect_ratio: AspectRatio, resolution: Resolution
+) -> Image.Image:
     """
-    image が h_ratio:v_ratio になるように端っこを切り落とす。
+    resize_contain_free_size のパターン指定版。
+    """
+    target_width, target_height = resolve_target_size(
+        image.width, image.height, aspect_ratio, resolution
+    )
+    return resize_contain_free_size(image, target_width, target_height)
+
+
+def resize_cover_free_size(
+    image: Image.Image, target_width: int, target_height: int
+) -> Image.Image:
+    """
+    image の範囲内に (width, height) のボックスがちょうど収まるように image をリサイズする。
+    リサイズ前後でアスペクト比は維持される。
+    はみ出た分はカットされる。
+    拡大・縮小両方が行われる。
 
     Args:
-        image (Image.Image): 入力画像
-        h_ratio (int): 所望のアスペクト比（水平）
-        v_ratio (int): 所望のアスペクト比（垂直）
+        image (Image.Image): 元画像
+        target_width (int): リサイズ後のサイズ（横）
+        target_height (int): リサイズ後のサイズ（縦）
 
     Returns:
-        Image.Image: 所望のアスペクト比になった画像
+        Image.Image: リサイズ後の画像
     """
-    expected_width_by_height = image.height * h_ratio // v_ratio
-    expected_height_by_width = image.width * v_ratio // h_ratio
-    if image.width > expected_width_by_height:
-        # 左右を切り落とす
-        half_expected_width_by_height = expected_width_by_height // 2
-        center = image.width // 2
-        return image.crop(
-            (
-                center - half_expected_width_by_height,
-                0,
-                center + half_expected_width_by_height,
-                image.height,
-            )
-        )
-    elif image.height > expected_height_by_width:
-        # 上下を切り落とす
-        half_expected_height_by_height = expected_height_by_width // 2
-        center = image.height // 2
-        return image.crop(
-            (
-                0,
-                center - half_expected_height_by_height,
-                image.width,
-                center + half_expected_height_by_height,
-            )
-        )
+    # スケール後のサイズを解決
+    width_scale = target_width / image.width
+    height_scale = target_height / image.height
+    if width_scale > height_scale:
+        pre_crop_width = target_width
+        pre_crop_height = image.height * target_width // image.width
     else:
-        # アスペクト比ぴったりの場合はそのまま返す
-        return image
+        pre_crop_width = image.width * target_height // image.height
+        pre_crop_height = target_height
+
+    # スケーリング
+    # NOTE
+    #   まずはアスペクト比を維持したスケーリングを行う
+    #   スケール不要ならコピーを返す
+    if pre_crop_width == image.width and pre_crop_height == image.height:
+        scaled_image = image
+    else:
+        scaled_image = image.resize(
+            (pre_crop_width, pre_crop_height),
+            Image.Resampling.LANCZOS,
+            reducing_gap=2.0,
+        )
+
+    # 切り取り
+    croped_image = scaled_image.crop(
+        (
+            scaled_image.width // 2 - target_width // 2,
+            scaled_image.height // 2 - target_height // 2,
+            scaled_image.width // 2 + target_width // 2,
+            scaled_image.height // 2 + target_height // 2,
+        )
+    )
+
+    # 正常終了
+    return croped_image
+
+
+def resize_cover_pattern_size(
+    image: Image.Image, aspect_ratio: AspectRatio, resolution: Resolution
+) -> Image.Image:
+    """
+    resize_cover_pattern_size のパターン指定版。
+    """
+    target_width, target_height = resolve_target_size(
+        image.width, image.height, aspect_ratio, resolution
+    )
+    return resize_cover_free_size(image, target_width, target_height)
 
 
 def get_text_bbox_size(
@@ -170,18 +323,13 @@ def save_pil_images_to_gif_file(
     # 親ディレクトリがなければ生成
     file_path.parent.mkdir(parents=True, exist_ok=True)
 
-    # 高さが一番小さいやつに揃うように縮小する
+    # 一番小さいやつに合わせる
     # NOTE
-    #   高さは最大 720 で制限（大きすぎるとファイルサイズがヤバい）
-    max_width = max([f.width for f in frames])
-    min_height = min([f.height for f in frames] + [720])
-    frames = [
-        isotropic_downscale_image_in_rectangle(f, max_width, min_height) for f in frames
-    ]
-
-    # 幅が一番小さいやつに揃うように切り取る
+    #   サイズが揃ってないと gif 化できないので、問題回避のための予防措置として画像を切りそろえている。
+    #   そもそも不揃いの画像を渡してくる状況がおかしいので、こういう雑な対処でも構わない。
     min_width = min([f.width for f in frames])
-    frames = [crop_to_aspect_ratio(f, min_width, min_height) for f in frames]
+    min_height = min([f.height for f in frames])
+    frames = [resize_cover_free_size(f, min_width, min_height) for f in frames]
 
     # gif ファイル保存
     frames[0].save(

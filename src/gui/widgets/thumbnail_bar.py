@@ -80,7 +80,7 @@ class ThumbnailItem(ctk.CTkFrame):
 
         # サムネイル画像（有効時）を生成
         pil_enable_image = pil_image.copy()
-        pil_enable_image.thumbnail(thumbnail_size, Image.Resampling.BOX)
+        pil_enable_image.thumbnail(thumbnail_size, Image.Resampling.LANCZOS)
         self._tk_enable_image = ctk.CTkImage(
             light_image=pil_enable_image,
             dark_image=pil_enable_image,
@@ -89,7 +89,7 @@ class ThumbnailItem(ctk.CTkFrame):
 
         # サムネイル画像（無効時）を生成
         pil_disable_image = make_disabled_image(pil_image)
-        pil_disable_image.thumbnail(thumbnail_size, Image.Resampling.BOX)
+        pil_disable_image.thumbnail(thumbnail_size, Image.Resampling.LANCZOS)
         self._tk_disable_image = ctk.CTkImage(
             light_image=pil_disable_image,
             dark_image=pil_disable_image,

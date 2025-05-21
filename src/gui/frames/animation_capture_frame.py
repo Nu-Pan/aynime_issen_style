@@ -15,7 +15,6 @@ from tkinterdnd2.TkinterDnD import DnDEvent
 from aynime_issen_style_model import AynimeIssenStyleModel
 from utils.constants import WIDGET_PADDING, DEFAULT_FONT_NAME
 from utils.pil import save_pil_images_to_gif_file
-from utils.windows import file_to_clipboard, register_global_hotkey_handler
 from gui.widgets.thumbnail_bar import ThumbnailBar
 from gui.widgets.animation_label import AnimationLabel
 
@@ -65,18 +64,18 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
         self.drop_target_register(DND_FILES)
         self.dnd_bind("<<Drop>>", self._on_drop_file)
 
-        # コントロール類配置用フレーム
-        self._ctrl_frame = ctk.CTkFrame(self, width=0, height=0)
-        self._ctrl_frame.grid(
+        # フレームレート関係フレーム
+        self._frame_rate_frame = ctk.CTkFrame(self, width=0, height=0)
+        self._frame_rate_frame.grid(
             row=2, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
         )
-        self._ctrl_frame.rowconfigure(0, weight=1)
-        self._ctrl_frame.columnconfigure(0, weight=1)
-        self._ctrl_frame.columnconfigure(1, weight=0)
+        self._frame_rate_frame.rowconfigure(0, weight=1)
+        self._frame_rate_frame.columnconfigure(0, weight=1)
+        self._frame_rate_frame.columnconfigure(1, weight=0)
 
         # フレームレートスライダー
         self._frame_rate_slider = ctk.CTkSlider(
-            self._ctrl_frame,
+            self._frame_rate_frame,
             from_=1,
             to=60,
             number_of_steps=59,
@@ -88,7 +87,7 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
 
         # フレームレートラベル
         self._frame_rate_label = ctk.CTkLabel(
-            self._ctrl_frame, text=f"-- FPS", font=default_font, width=80
+            self._frame_rate_frame, text=f"-- FPS", font=default_font, width=80
         )
         self._frame_rate_label.grid(
             row=0, column=1, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
@@ -99,7 +98,7 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
 
         # gif 生成ボタン
         self._create_button = ctk.CTkButton(
-            self._ctrl_frame,
+            self._frame_rate_frame,
             text="萌え",
             width=80,
             command=self._on_create_button_clicked,
@@ -107,6 +106,17 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
         self._create_button.grid(
             row=0, column=2, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
         )
+
+        # 画像解像度フレーム
+        self._resolution_frame = ctk.CTkFrame(self, width=0, height=0)
+        self._resolution_frame.grid(
+            row=3, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
+        )
+        self._resolution_frame.rowconfigure(0, weight=1)
+        # self._resolution_frame.columnconfigure(0, weight=0)
+        # self._resolution_frame.columnconfigure(1, weight=0)
+
+        # アスペクト比ラジオボタン
 
     def _on_drop_file(self, event: DnDEvent):
         """

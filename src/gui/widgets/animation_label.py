@@ -6,7 +6,8 @@ from PIL import Image, ImageTk
 from tkinter import Event
 import customtkinter as ctk
 
-from utils.pil import isotropic_downscale_image_in_rectangle
+from utils.pil import resize_contain_free_size
+from utils.ctk import silent_configure
 
 
 class AnimationLabel(ctk.CTkLabel):
@@ -80,10 +81,10 @@ class AnimationLabel(ctk.CTkLabel):
         """
         # 表示を更新
         if len(self._frames) == 0:
-            self.silent_configure(image="", text=self._blank_text)
+            silent_configure(self, image="", text=self._blank_text)
         else:
             self._frame_index = (self._frame_index + 1) % len(self._frames)
-            self.silent_configure(image=self._frames[self._frame_index], text="")
+            silent_configure(self, image=self._frames[self._frame_index], text="")
 
         # 次の更新処理をキック
         self.after(self._interval_in_ms, self._next_frame_handler)
@@ -99,16 +100,8 @@ class AnimationLabel(ctk.CTkLabel):
         # リサイズ
         self._frames: List[ImageTk.PhotoImage] = []
         for original_frame in self._original_frames:
-            pil_frame = isotropic_downscale_image_in_rectangle(
+            pil_frame = resize_contain_free_size(
                 original_frame, actual_width, actual_height
             )
             tk_frame = ImageTk.PhotoImage(pil_frame)
             self._frames.append(tk_frame)
-
-    def silent_configure(self, **kwargs):
-        """
-        警告抑制付き configure
-        """
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore", UserWarning)
-            self.configure(**kwargs)
