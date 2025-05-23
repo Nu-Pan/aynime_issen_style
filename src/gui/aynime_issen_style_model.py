@@ -9,7 +9,6 @@ from utils.capture_context import (
     CaptureContextDXCam,
     CaptureContextPyWin32,
 )
-from utils.pil import crop_to_aspect_ratio
 
 
 class CaptureMode(Enum):
@@ -19,16 +18,6 @@ class CaptureMode(Enum):
 
     DXCAM = "dxcam"
     PYWIN32 = "pywin32"
-
-
-class AspectRatioMode(Enum):
-    """
-    キャプチャのアスペクト比モードを定義する列挙型
-    """
-
-    MODE_RAW = "raw"
-    MODE_16_9 = "16:9"
-    MODE_4_3 = "4:3"
 
 
 class AynimeIssenStyleModel:
@@ -41,7 +30,6 @@ class AynimeIssenStyleModel:
         コンストラクタ
         """
         self._capture_context: Optional[CaptureContext] = None
-        self._aspect_ratio_mode: Optional[AspectRatioMode] = None
         self._capture_target_info: Optional[CaptureTargetInfo] = None
 
     def change_capture_mode(self, mode: CaptureMode) -> None:
@@ -77,15 +65,6 @@ class AynimeIssenStyleModel:
             self._capture_context = CaptureContextPyWin32()
         elif mode not in CaptureMode:
             raise ValueError(f"Unsupported capture mode: {mode}")
-
-    def change_aspect_ratio_mode(self, mode: AspectRatioMode) -> None:
-        """
-        アスペクト比モードを変更する
-
-        Args:
-            mode (AspectRatioMode): アスペクト比モード
-        """
-        self._aspect_ratio_mode = mode
 
     def enumerate_capture_targets(self) -> Generator[CaptureTargetInfo, None, None]:
         """
@@ -128,18 +107,13 @@ class AynimeIssenStyleModel:
         reasons = self.capture_not_ready_reasons
         if len(reasons) != 0:
             raise RuntimeError(reasons)
+        elif self._capture_context is None:
+            raise ValueError("self._capture_context is None")
+        elif self._capture_target_info is None:
+            raise ValueError("self._capture_context is None")
         else:
             capture_image = self._capture_context.capture(self._capture_target_info)
-            if self._aspect_ratio_mode == AspectRatioMode.MODE_RAW:
-                return capture_image
-            elif self._aspect_ratio_mode == AspectRatioMode.MODE_16_9:
-                return crop_to_aspect_ratio(capture_image, 16, 9)
-            elif self._aspect_ratio_mode == AspectRatioMode.MODE_4_3:
-                return crop_to_aspect_ratio(capture_image, 4, 3)
-            else:
-                raise ValueError(
-                    f"Invalid aspect ratio mode({self._aspect_ratio_mode})"
-                )
+            return capture_image
 
     @property
     def capture_not_ready_reasons(self) -> List[str]:
@@ -155,8 +129,6 @@ class AynimeIssenStyleModel:
             reasons.append(
                 "Capture context is not initialized(Tipically, capture mode is not selected)."
             )
-        if self._aspect_ratio_mode is None:
-            reasons.append("Aspect ratio mode is not selected.")
         if self._capture_target_info is None:
             reasons.append("Capture target info is not selected.")
         return reasons

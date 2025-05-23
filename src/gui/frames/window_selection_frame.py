@@ -1,15 +1,16 @@
 from typing import cast
 import warnings
 
+from tkinter import Event
 import customtkinter as ctk
 from CTkListbox import CTkListbox
 
 from PIL import ImageTk
 
-from utils.pil import isotropic_downscale_image_in_rectangle
 from utils.capture_context import CaptureTargetInfo
-from aynime_issen_style_model import CaptureMode, AspectRatioMode, AynimeIssenStyleModel
+from aynime_issen_style_model import CaptureMode, AynimeIssenStyleModel
 from utils.constants import WIDGET_PADDING, WINDOW_MIN_WIDTH, DEFAULT_FONT_NAME
+from gui.widgets.still_frame import StillLabel
 
 
 class WindowSelectionFrame(ctk.CTkFrame):
@@ -17,7 +18,9 @@ class WindowSelectionFrame(ctk.CTkFrame):
     ウィンドウ選択フレームクラス
     """
 
-    def __init__(self, master, model: AynimeIssenStyleModel, **kwargs):
+    def __init__(
+        self, master: ctk.CTkBaseClass, model: AynimeIssenStyleModel, **kwargs
+    ):
         """
         コンストラクタ
 
@@ -117,69 +120,12 @@ class WindowSelectionFrame(ctk.CTkFrame):
         self.east_frame.rowconfigure(1, weight=1)
         self.east_frame.columnconfigure(0, weight=1)
 
-        # アス比モード選択フレーム
-        self.aspect_ratio_mode_frame = ctk.CTkFrame(self.east_frame)
-        self.aspect_ratio_mode_frame.grid(
-            row=0, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="n"
-        )
-        self.aspect_ratio_mode_frame.columnconfigure(0, weight=0)
-        self.aspect_ratio_mode_frame.columnconfigure(1, weight=0)
-        self.aspect_ratio_mode_frame.columnconfigure(2, weight=0)
-
-        # アス比モード選択ラジオボタン変数
-        self.aspect_ratio_mode_var = ctk.StringVar(value=AspectRatioMode.MODE_RAW.value)
-
-        # アス比モード選択ラジオボタン（RAW）
-        self.aspect_ratio_mode_raw_radio = ctk.CTkRadioButton(
-            self.aspect_ratio_mode_frame,
-            text="RAW",
-            variable=self.aspect_ratio_mode_var,
-            value=AspectRatioMode.MODE_RAW.value,
-            command=self.on_aspect_ratio_mode_radio_change,
-            width=0,
-        )
-        self.aspect_ratio_mode_raw_radio.grid(
-            row=0, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING
-        )
-
-        # アス比モード選択ラジオボタン（16:9）
-        self.aspect_ratio_mode_16_9_radio = ctk.CTkRadioButton(
-            self.aspect_ratio_mode_frame,
-            text="16:9",
-            variable=self.aspect_ratio_mode_var,
-            value=AspectRatioMode.MODE_16_9.value,
-            command=self.on_aspect_ratio_mode_radio_change,
-            width=0,
-        )
-        self.aspect_ratio_mode_16_9_radio.grid(
-            row=0, column=1, padx=WIDGET_PADDING, pady=WIDGET_PADDING
-        )
-
-        # アス比モード選択ラジオボタン（4:3）
-        self.aspect_ratio_mode_4_3_radio = ctk.CTkRadioButton(
-            self.aspect_ratio_mode_frame,
-            text="4:3",
-            variable=self.aspect_ratio_mode_var,
-            value=AspectRatioMode.MODE_4_3.value,
-            command=self.on_aspect_ratio_mode_radio_change,
-            width=0,
-        )
-        self.aspect_ratio_mode_4_3_radio.grid(
-            row=0, column=2, padx=WIDGET_PADDING, pady=WIDGET_PADDING
-        )
-
         # プレビュー画像表示用ラベル
-        self.capture_target_preview_label = ctk.CTkLabel(
-            self.east_frame, text="Preview", font=default_font
-        )
+        self.capture_target_preview_label = StillLabel(self.east_frame)
         self.capture_target_preview_label.grid(
             row=1, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
         )
-
-        # ウィンドウサイズ変更イベントのバインド
-        self.capture_target_preview_label.bind(
-            "<Configure>", self.on_capture_target_preview_resize
-        )
+        self.capture_target_preview_label.set_contents(text="Preview")
 
         # リサイズ前のキャプチャ画像
         self.original_capture_image = None
@@ -190,7 +136,6 @@ class WindowSelectionFrame(ctk.CTkFrame):
 
         # UI 上の設定をモデルに反映
         self.on_capture_mode_radio_change()
-        self.on_aspect_ratio_mode_radio_change()
 
     def on_capture_mode_radio_change(self) -> None:
         """
@@ -203,20 +148,7 @@ class WindowSelectionFrame(ctk.CTkFrame):
         # プレビューをクリア
         self.clear_capture_target_preview()
 
-    def on_aspect_ratio_mode_radio_change(self) -> None:
-        """
-        アス比モードの選択イベントハンドラ
-        """
-        # モデルに変更を反映
-        self.model.change_aspect_ratio_mode(
-            AspectRatioMode(self.aspect_ratio_mode_var.get())
-        )
-
-        # 描画更新
-        self.update_original_capture_image()
-        self.update_capture_target_preview()
-
-    def on_capture_target_select(self, event) -> None:
+    def on_capture_target_select(self, event: Event) -> None:
         """
         リストボックスの選択イベントハンドラ
 
@@ -234,15 +166,6 @@ class WindowSelectionFrame(ctk.CTkFrame):
 
         # 描画更新
         self.update_original_capture_image()
-        self.update_capture_target_preview()
-
-    def on_capture_target_preview_resize(self, event) -> None:
-        """
-        右側フレームのリサイズイベントハンドラ
-
-        Args:
-            event (_type_): イベントオブジェクト
-        """
         self.update_capture_target_preview()
 
     def update_list(self) -> None:
@@ -273,15 +196,7 @@ class WindowSelectionFrame(ctk.CTkFrame):
         プレビューの表示状態をクリアする。
         """
         self.original_capture_image = None
-        with warnings.catch_warnings():
-            warnings.filterwarnings(
-                "ignore",
-                message="CTkLabel Warning: Given image is not CTkImage",
-                category=UserWarning,
-            )
-            self.capture_target_preview_label.configure(
-                image="", text="Capture Target Preview"
-            )
+        self.capture_target_preview_label.set_contents(text="Capture Target Preview")
 
     def update_capture_target_preview(self) -> None:
         """
@@ -294,19 +209,5 @@ class WindowSelectionFrame(ctk.CTkFrame):
             self.clear_capture_target_preview()
             return
 
-        # 画像をリサイズ
-        image = isotropic_downscale_image_in_rectangle(
-            image,
-            self.capture_target_preview_label.winfo_width() - 2 * WIDGET_PADDING,
-            self.capture_target_preview_label.winfo_height() - 2 * WIDGET_PADDING,
-        )
-
-        # 画像をラベルに表示
-        tk_image = ImageTk.PhotoImage(image)
-        with warnings.catch_warnings():
-            warnings.filterwarnings(
-                "ignore",
-                message="CTkLabel Warning: Given image is not CTkImage",
-                category=UserWarning,
-            )
-            self.capture_target_preview_label.configure(image=tk_image, text="")
+        # 画像を表示
+        self.capture_target_preview_label.set_contents(image=image)

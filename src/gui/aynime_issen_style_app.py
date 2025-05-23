@@ -1,12 +1,12 @@
-import os
-import sys
-
+from tkinter import Event
 import customtkinter as ctk
-from tkinter import PhotoImage
+from tkinterdnd2 import TkinterDnD, DND_FILES
+from tkinterdnd2.TkinterDnD import DnDEvent
 
-from window_selection_frame import WindowSelectionFrame
-from capture_frame import CaptureFrame
-from version_frame import VersionFrame
+from gui.frames.window_selection_frame import WindowSelectionFrame
+from gui.frames.still_capture_frame import StillCaptureFrame
+from gui.frames.animation_capture_frame import AnimationCaptureFrame
+from gui.frames.version_frame import VersionFrame
 from aynime_issen_style_model import CaptureMode, AynimeIssenStyleModel
 from utils.constants import (
     APP_NAME_JP,
@@ -17,7 +17,7 @@ from utils.constants import (
 from utils.pyinstaller import resource_path
 
 
-class AynimeIssenStyleApp(ctk.CTk):
+class AynimeIssenStyleApp(ctk.CTk, TkinterDnD.DnDWrapper):
     """
     えぃにめ一閃流奥義「一閃」 アプリケーションクラス
     """
@@ -27,6 +27,11 @@ class AynimeIssenStyleApp(ctk.CTk):
         コンストラクタ
         """
         super().__init__()
+
+        # tkdnd をロード
+        # NOTE
+        #   明示的にロード処理を呼び出さないと D&D 機能を使えない
+        self.tk_dnd_version = TkinterDnD._require(self)
 
         # フォントを設定
         default_font = ctk.CTkFont(DEFAULT_FONT_NAME)
@@ -57,10 +62,19 @@ class AynimeIssenStyleApp(ctk.CTk):
         self.select_frame = WindowSelectionFrame(self.tabview.tab("構え"), self.model)
         self.select_frame.pack(fill="both", expand=True)
 
-        # キャプチャタブを追加
+        # スチルキャプチャタブを追加
         self.tabview.add("「一閃」")
-        self.capture_frame = CaptureFrame(self.tabview.tab("「一閃」"), self.model)
-        self.capture_frame.pack(fill="both", expand=True)
+        self.still_capture_frame = StillCaptureFrame(
+            self.tabview.tab("「一閃」"), self.model
+        )
+        self.still_capture_frame.pack(fill="both", expand=True)
+
+        # アニメキャプチャタブを追加
+        self.tabview.add("gif")
+        self.animation_capture_frame = AnimationCaptureFrame(
+            self.tabview.tab("gif"), self.model
+        )
+        self.animation_capture_frame.pack(fill="both", expand=True)
 
         # バージョン情報タブを追加
         self.tabview.add("バージョン")
