@@ -52,7 +52,18 @@ class StillCaptureFrame(ctk.CTkFrame):
 
         # 解像度選択フレーム
         self._size_pattern_selection_frame = SizePatternSlectionFrame(
-            self, self.on_resolution_changes, AspectRatio.E_RAW, Resolution.E_HD
+            self,
+            self.on_resolution_changes,
+            AspectRatio.E_RAW,
+            Resolution.E_RAW,
+            [AspectRatio.E_RAW, AspectRatio.E_16_9, AspectRatio.E_4_3],
+            [
+                Resolution.E_RAW,
+                Resolution.E_VGA,
+                Resolution.E_HD,
+                Resolution.E_FHD,
+                Resolution.E_4K,
+            ],
         )
         self._size_pattern_selection_frame.grid(
             row=1, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="ns"

@@ -56,6 +56,16 @@ class AnimationLabel(ctk.CTkLabel):
         # ちょうどいいサイズにする
         self._on_resize(None)
 
+    @property
+    def frames(self) -> List[Image.Image]:
+        """
+        設定されているフレーム（画像）群を取得する
+
+        Returns:
+            List[Image.Image]: 設定されているフレーム（画像）群
+        """
+        return self._original_frames
+
     def set_frame_rate(self, frame_rate: int):
         """
         アニメーションのフレームレートを設定

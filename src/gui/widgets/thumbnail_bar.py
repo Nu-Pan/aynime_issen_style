@@ -218,7 +218,7 @@ class ThumbnailBar(ctk.CTkScrollableFrame):
         self,
         master: ctk.CTkBaseClass,
         thumbnail_height: int,
-        on_change: Callable[[List[Image.Image]], None],
+        on_change: Callable[[], None],
         **kwargs
     ):
         """
@@ -253,7 +253,7 @@ class ThumbnailBar(ctk.CTkScrollableFrame):
         サムネリストに変更が合った時に呼び出されるハンドラ
         """
         # 親ウィジェットに通知
-        self._parent_on_change(self.original_frames)
+        self._parent_on_change()
 
     def add_image(self, image: Image.Image):
         """

@@ -1,4 +1,4 @@
-from typing import Callable, List, Tuple
+from typing import Callable, List, Tuple, Sequence
 import time
 import sys
 from math import sqrt
@@ -53,6 +53,8 @@ class SizePatternSlectionFrame(ctk.CTkFrame):
         aux_on_radio_change: Callable[[AspectRatio, Resolution], None],
         initial_aspect_ratio: AspectRatio = AspectRatio.E_RAW,
         initial_resolution: Resolution = Resolution.E_RAW,
+        shown_aspect_raios: Sequence[AspectRatio] = [ar for ar in AspectRatio],
+        shown_resolutions: Sequence[Resolution] = [res for res in Resolution],
         **kwargs,
     ):
         """
@@ -87,7 +89,7 @@ class SizePatternSlectionFrame(ctk.CTkFrame):
         # アス比選択ラジオボタン
         self.aspect_ratio_frame.rowconfigure(0, weight=1)
         self.aspect_ratio_radios: List[ctk.CTkRadioButton] = []
-        for i, aspect_ratio in enumerate(AspectRatio):
+        for i, aspect_ratio in enumerate(shown_aspect_raios):
             aspect_ratio_radio = ctk.CTkRadioButton(
                 self.aspect_ratio_frame,
                 text=aspect_ratio.value,
@@ -115,7 +117,7 @@ class SizePatternSlectionFrame(ctk.CTkFrame):
         # 解像度選択ラジオボタン
         self.resolution_frame.rowconfigure(0, weight=1)
         self.resolution_radios: List[ctk.CTkRadioButton] = []
-        for i, resolution in enumerate(Resolution):
+        for i, resolution in enumerate(shown_resolutions):
             resolution_radio = ctk.CTkRadioButton(
                 self.resolution_frame,
                 text=resolution.value,
