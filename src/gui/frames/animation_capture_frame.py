@@ -129,7 +129,7 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
             ],
         )
         self._size_pattern_selection_frame.grid(
-            row=3, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="ns"
+            row=3, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
         )
 
         # ファイルドロップ関係

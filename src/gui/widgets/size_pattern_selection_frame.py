@@ -76,6 +76,7 @@ class SizePatternSlectionFrame(ctk.CTkFrame):
         self.rowconfigure(0, weight=0)
         self.rowconfigure(0, weight=0)
         self.columnconfigure(0, weight=1)
+        self.columnconfigure(1, weight=1)
 
         # アス比選択フレーム
         self.aspect_ratio_frame = ctk.CTkFrame(self)
@@ -108,7 +109,7 @@ class SizePatternSlectionFrame(ctk.CTkFrame):
         # 解像度選択フレーム
         self.resolution_frame = ctk.CTkFrame(self)
         self.resolution_frame.grid(
-            row=1, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="ns"
+            row=0, column=1, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="ns"
         )
 
         # 解像度選択ラジオボタン変数

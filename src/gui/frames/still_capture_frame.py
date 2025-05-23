@@ -66,7 +66,7 @@ class StillCaptureFrame(ctk.CTkFrame):
             ],
         )
         self._size_pattern_selection_frame.grid(
-            row=1, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="ns"
+            row=1, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
         )
 
     def on_preview_label_click(self, event) -> None:
