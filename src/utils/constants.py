@@ -10,9 +10,9 @@ WIDGET_PADDING = 4
 # ウィンドウの最小サイズ
 # NOTE
 #   最小サイズであると同時に初期サイズでもある
-#   いろいろあって 8:5 になった
+#   gif タブに事情を合わせて 1:1 になった
 WINDOW_MIN_WIDTH = 640
-WINDOW_MIN_HEIGHT = 400
+WINDOW_MIN_HEIGHT = 640
 
 # 共通して使用するフォント
 DEFAULT_FONT_NAME = "Yu Gothic UI"
