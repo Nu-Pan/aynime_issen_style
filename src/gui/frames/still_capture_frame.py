@@ -48,7 +48,6 @@ class StillCaptureFrame(ctk.CTkFrame):
         self.model = model
 
         self.rowconfigure(0, weight=1)
-        self.rowconfigure(1, weight=0)
         self.columnconfigure(0, weight=1)
 
         # プレビューラベル兼キャプチャボタン

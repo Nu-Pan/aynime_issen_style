@@ -67,8 +67,6 @@ class SizePatternSlectionFrame(ctk.CTkFrame):
         self._aux_on_radio_change = aux_on_radio_change
 
         # フレームのレイアウト
-        self.rowconfigure(0, weight=0)
-        self.rowconfigure(0, weight=0)
         self.columnconfigure(0, weight=1)
         self.columnconfigure(1, weight=1)
 
