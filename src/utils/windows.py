@@ -1,3 +1,4 @@
+# std
 from dataclasses import dataclass
 from typing import Generator, Union, Callable, Any
 import re
@@ -8,9 +9,13 @@ from inspect import cleandoc
 from pathlib import Path
 import subprocess
 
+# TK/CTk
 import customtkinter as ctk
 
+# win32
 import win32con, win32gui, win32api, win32event, winerror
+
+# dxcam
 import dxcam_cpp as dxcam
 
 

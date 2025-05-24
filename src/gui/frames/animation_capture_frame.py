@@ -1,23 +1,19 @@
 # std
-import warnings
 from pathlib import Path
 from datetime import datetime
-from typing import cast, Tuple, List, Optional, Iterable
+from typing import cast, Tuple, List
 from time import time
 
 # PIL
-from PIL import Image, ImageTk, ImageChops
+from PIL import Image
 
 # Tk/CTk
-import tkinter as tk
-from tkinter import Event
 import customtkinter as ctk
 from tkinterdnd2 import TkinterDnD, DND_FILES
 from tkinterdnd2.TkinterDnD import DnDEvent
 import tkinter.messagebox as mb
 
-# local
-from aynime_issen_style_model import AynimeIssenStyleModel
+# utils
 from utils.constants import WIDGET_PADDING, DEFAULT_FONT_NAME
 from utils.pil import (
     save_pil_images_to_gif_file,
@@ -25,10 +21,15 @@ from utils.pil import (
     Resolution,
     resize_cover_pattern_size,
 )
+from utils.constants import APP_NAME_JP
+
+# gui
 from gui.widgets.thumbnail_bar import ThumbnailBar
 from gui.widgets.animation_label import AnimationLabel
 from gui.widgets.size_pattern_selection_frame import SizePatternSlectionFrame
-from utils.constants import APP_NAME_JP
+
+# local
+from aynime_issen_style_model import AynimeIssenStyleModel
 
 
 class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):

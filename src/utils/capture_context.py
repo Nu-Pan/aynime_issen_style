@@ -1,12 +1,17 @@
-from typing import Optional, Generator, List, Union
+# std
+from typing import Generator, List, Union
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 import time
 
+# win32
 import win32gui, win32ui, win32con
 from PIL import Image
+
+# dxcam
 import dxcam_cpp as dxcam
 
+# utils
 from utils.windows import enumerate_dxgi_outputs
 
 

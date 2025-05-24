@@ -1,13 +1,8 @@
-from tkinter import Event
+# Tk/CTk
 import customtkinter as ctk
-from tkinterdnd2 import TkinterDnD, DND_FILES
-from tkinterdnd2.TkinterDnD import DnDEvent
+from tkinterdnd2 import TkinterDnD
 
-from gui.frames.window_selection_frame import WindowSelectionFrame
-from gui.frames.still_capture_frame import StillCaptureFrame
-from gui.frames.animation_capture_frame import AnimationCaptureFrame
-from gui.frames.version_frame import VersionFrame
-from aynime_issen_style_model import CaptureMode, AynimeIssenStyleModel
+# utils
 from utils.constants import (
     APP_NAME_JP,
     WINDOW_MIN_WIDTH,
@@ -15,6 +10,15 @@ from utils.constants import (
     DEFAULT_FONT_NAME,
 )
 from utils.pyinstaller import resource_path
+
+# gui
+from gui.frames.window_selection_frame import WindowSelectionFrame
+from gui.frames.still_capture_frame import StillCaptureFrame
+from gui.frames.animation_capture_frame import AnimationCaptureFrame
+from gui.frames.version_frame import VersionFrame
+
+# local
+from aynime_issen_style_model import CaptureMode, AynimeIssenStyleModel
 
 
 class AynimeIssenStyleApp(ctk.CTk, TkinterDnD.DnDWrapper):

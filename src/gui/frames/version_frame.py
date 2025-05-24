@@ -1,11 +1,13 @@
+# std
 from inspect import cleandoc
 import re
 import webbrowser
 import sys
-from textwrap import dedent
 
+# Tk/CTk
 import customtkinter as ctk
 
+# utils
 from utils.constants import WIDGET_PADDING, DEFAULT_FONT_NAME, VERSION_FILE_PATH
 
 # バージョン情報のインポート

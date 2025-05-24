@@ -1,8 +1,11 @@
+# std
 from typing import Optional, Generator, List
 from enum import Enum
 
+# PIL
 from PIL import Image
 
+# utils
 from utils.capture_context import (
     CaptureTargetInfo,
     CaptureContext,

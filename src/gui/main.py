@@ -1,13 +1,18 @@
+# std
 import sys
 
+# Tk/CTk
 import customtkinter as ctk
 import tkinter.messagebox as mb
 
-from aynime_issen_style_app import AynimeIssenStyleApp
+# utils
 from utils.pyinstaller import is_frozen
 from utils.std import redirect_to_file
 from utils.windows import SystemWideMutex
 from utils.constants import APP_NAME_EN, APP_NAME_JP
+
+# local
+from aynime_issen_style_app import AynimeIssenStyleApp
 
 if __name__ == "__main__":
     # ログファイルリダイレクト設定

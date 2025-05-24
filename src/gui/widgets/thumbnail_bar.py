@@ -1,14 +1,15 @@
-from typing import Callable, List, Union, Iterable
+# std
+from typing import Callable, List, Iterable
 import time
-import sys
-from math import sqrt
 
-from PIL import Image, ImageTk
+# PIL
+from PIL import Image
 
+# Tk/CTk
 from tkinter import Event
-
 import customtkinter as ctk
 
+# utils
 from utils.constants import WIDGET_PADDING, DEFAULT_FONT_NAME
 from utils.pil import make_disabled_image, calc_ssim
 

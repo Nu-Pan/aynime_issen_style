@@ -1,7 +1,7 @@
 # std
 from pathlib import Path
 from typing import List, Tuple, Optional
-from enum import Enum, auto
+from enum import Enum
 
 # PIL
 from PIL import Image, ImageDraw, ImageEnhance, ImageFont
@@ -11,8 +11,6 @@ import numpy as np
 
 # scikit
 from skimage.metrics import structural_similarity as ssim
-
-from utils.constants import DEFAULT_FONT_NAME
 
 
 class AspectRatio(Enum):

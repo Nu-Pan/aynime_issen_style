@@ -6,8 +6,7 @@ from datetime import datetime
 import customtkinter as ctk
 import tkinter.messagebox as mb
 
-# local
-from aynime_issen_style_model import AynimeIssenStyleModel
+# utils
 from utils.constants import WIDGET_PADDING, DEFAULT_FONT_NAME
 from utils.pil import (
     AspectRatio,
@@ -16,11 +15,16 @@ from utils.pil import (
     save_pil_image_to_jpeg_file,
 )
 from utils.windows import file_to_clipboard, register_global_hotkey_handler
+from utils.constants import APP_NAME_JP
+
+# gui
 from gui.widgets.still_frame import StillLabel
 from gui.widgets.size_pattern_selection_frame import (
     SizePatternSlectionFrame,
 )
-from utils.constants import APP_NAME_JP
+
+# local
+from aynime_issen_style_model import AynimeIssenStyleModel
 
 
 class StillCaptureFrame(ctk.CTkFrame):
