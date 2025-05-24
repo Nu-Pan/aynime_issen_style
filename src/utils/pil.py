@@ -1,8 +1,16 @@
+# std
 from pathlib import Path
 from typing import List, Tuple, Optional
 from enum import Enum, auto
 
+# PIL
 from PIL import Image, ImageDraw, ImageEnhance, ImageFont
+
+# numpy
+import numpy as np
+
+# scikit
+from skimage.metrics import structural_similarity as ssim
 
 from utils.constants import DEFAULT_FONT_NAME
 
@@ -291,6 +299,34 @@ def make_disabled_image(
 
     # 正常終了
     return dark_image
+
+
+def calc_ssim(image_A: Image.Image, image_B: Image.Image) -> float:
+    """
+    ２枚の画像の差分を撮って、１ピクセルあたりの輝度誤差を計算する
+
+    Args:
+        image_A (Image.Image): 比較対象 A
+        image_B (Image.Image): 比較対象 B
+
+    Returns:
+        float: 平均ピクセル誤差
+    """
+    # ndarray 化
+    np_image_A = np.array(image_A.convert("L"))
+    np_image_B = np.array(image_B.convert("L"))
+
+    # ssim の計算処理を呼び出す
+    ssim_result = ssim(np_image_A, np_image_B, full=True)
+
+    # 結果をデコード
+    if isinstance(ssim_result, tuple) and isinstance(ssim_result[0], float):
+        score = ssim_result[0]
+    else:
+        raise TypeError()
+
+    # 正常終了
+    return score
 
 
 def save_pil_image_to_jpeg_file(image: Image.Image, file_path: Path) -> None:
