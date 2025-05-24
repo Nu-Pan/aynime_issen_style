@@ -1,12 +1,17 @@
-from typing import Optional, Generator, List, Union
+# std
+from typing import Generator, List, Union, Optional
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 import time
 
+# win32
 import win32gui, win32ui, win32con
 from PIL import Image
+
+# dxcam
 import dxcam_cpp as dxcam
 
+# utils
 from utils.windows import enumerate_dxgi_outputs
 
 
@@ -162,6 +167,13 @@ class CaptureContextDXCam(CaptureContext):
         else:
             self._latest_np_image = np_image
 
+        # 必ず非 None が出るはず
+        # NOTE
+        #   静的解析を黙らせるためのチェック
+        #   関数外のコンテキストも含めて考えれば、ここで None はありえない
+        if np_image is None:
+            raise ValueError("np_image is None")
+
         # 正常終了
         return Image.fromarray(np_image)
 
@@ -214,6 +226,10 @@ class CaptureContextPyWin32(CaptureContext):
             raise TypeError("Invalid capture target info type.")
 
         # ウィンドウの画像をキャプチャ
+        saveBitMap = None
+        saveDC = None
+        mfcDC = None
+        hwndDC = None
         try:
             left, top, right, bottom = win32gui.GetWindowRect(hwnd)
             width, height = right - left, bottom - top
@@ -236,10 +252,14 @@ class CaptureContextPyWin32(CaptureContext):
                 1,
             )
         finally:
-            win32gui.DeleteObject(saveBitMap.GetHandle())
-            saveDC.DeleteDC()
-            mfcDC.DeleteDC()
-            win32gui.ReleaseDC(hwnd, hwndDC)
+            if saveBitMap is not None:
+                win32gui.DeleteObject(saveBitMap.GetHandle())
+            if saveDC is not None:
+                saveDC.DeleteDC()
+            if mfcDC is not None:
+                mfcDC.DeleteDC()
+            if hwndDC is not None:
+                win32gui.ReleaseDC(hwnd, hwndDC)
 
         # 正常終了
         return pil_image

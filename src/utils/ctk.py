@@ -1,5 +1,7 @@
+# std
 import warnings
 
+# Tk/CTk
 import customtkinter as ctk
 
 

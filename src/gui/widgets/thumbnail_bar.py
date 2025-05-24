@@ -1,16 +1,17 @@
-from typing import Callable, List
+# std
+from typing import Callable, List, Iterable
 import time
-import sys
-from math import sqrt
 
-from PIL import Image, ImageTk
+# PIL
+from PIL import Image
 
+# Tk/CTk
 from tkinter import Event
-
 import customtkinter as ctk
 
+# utils
 from utils.constants import WIDGET_PADDING, DEFAULT_FONT_NAME
-from utils.pil import make_disabled_image
+from utils.pil import make_disabled_image, calc_ssim
 
 
 class SentinelItem(ctk.CTkFrame):
@@ -172,15 +173,7 @@ class ThumbnailItem(ctk.CTkFrame):
         )
         torelance = min(self._button.winfo_width(), self._button.winfo_height()) / 2
         if diff < torelance:
-            # 状態をトグルして画像を差し替え
-            self._enabled = not self._enabled
-            if self._enabled:
-                self._button.configure(image=self._tk_enable_image)
-            else:
-                self._button.configure(image=self._tk_disable_image)
-
-            # 親ウィジェットに通知
-            self._master._on_change()
+            self.set_enable(not self._enabled)
 
     def _on_click_right(self, event: Event):
         """
@@ -197,6 +190,29 @@ class ThumbnailItem(ctk.CTkFrame):
             Image.Image: リサイズ前の画像
         """
         return self._original_image
+
+    def set_enable(self, state: bool, does_notify: bool = True):
+        """
+        このアイテムの有効・無効を切り替える
+
+        Args:
+            state (bool): True なら有効
+            does_notify (bool): True なら親ウィジェットに変更を通知する
+        """
+        # 状態に変更が無い場合は何もしない
+        if state == self._enabled:
+            return
+
+        # 状態を変更して画像を差し替え
+        self._enabled = state
+        if self._enabled:
+            self._button.configure(image=self._tk_enable_image)
+        else:
+            self._button.configure(image=self._tk_disable_image)
+
+        # 親ウィジェットに通知
+        if does_notify:
+            self._master._on_change()
 
     @property
     def enabled(self) -> bool:
@@ -255,24 +271,29 @@ class ThumbnailBar(ctk.CTkScrollableFrame):
         # 親ウィジェットに通知
         self._parent_on_change()
 
-    def add_image(self, image: Image.Image):
+    def add_image(self, images: Iterable[Image.Image]):
         """
         画像（アイテム）を追加
 
         Args:
             image (Image): 追加したい PIL 画像
         """
-        # アイテムを生成・GUI配置
-        item = ThumbnailItem(self, image, self._thumbnail_height)
-        item.grid(
-            row=0, column=len(self._items) - 1, padx=WIDGET_PADDING, pady=WIDGET_PADDING
-        )
+        # 順番に追加
+        for image in images:
+            # アイテムを生成・GUI配置
+            item = ThumbnailItem(self, image, self._thumbnail_height)
+            item.grid(
+                row=0,
+                column=len(self._items) - 1,
+                padx=WIDGET_PADDING,
+                pady=WIDGET_PADDING,
+            )
 
-        # アイテムリストに追加
-        self._items.insert(-1, item)
+            # アイテムリストに追加
+            self._items.insert(-1, item)
 
-        # 番兵をずらす
-        self._items[-1].grid(column=len(self._items))
+            # 番兵をずらす
+            self._items[-1].grid(column=len(self._items))
 
         # リスト変更をコールバックで通知
         self._on_change()
@@ -329,6 +350,97 @@ class ThumbnailBar(ctk.CTkScrollableFrame):
         self._items[idx_B].grid_configure(column=idx_B)
 
         # リスト変更をコールバックで通知
+        self._on_change()
+
+    def clear_images(self):
+        """
+        保持している全ての画像を削除
+        """
+        # 新しい画像リストを構築＆サムネを解体
+        new_items = []
+        for item in self._items:
+            if isinstance(item, SentinelItem):
+                new_items.append(item)
+            elif isinstance(item, ThumbnailItem):
+                item.destroy()
+            else:
+                raise TypeError()
+
+        # 画像リストを更新
+        self._items = new_items
+
+        # リスト変更をコールバックで通知
+        self._on_change()
+
+    def clear_disable_images(self):
+        """
+        無効化されている画像を削除
+        """
+        # 新しい画像リストを構築＆サムネを解体
+        new_items = []
+        for item in self._items:
+            if isinstance(item, SentinelItem):
+                new_items.append(item)
+            elif isinstance(item, ThumbnailItem):
+                if item.enabled:
+                    new_items.append(item)
+                else:
+                    item.destroy()
+            else:
+                raise TypeError()
+
+        # 画像リストを更新
+        self._items = new_items
+
+        # リスト変更をコールバックで通知
+        self._on_change()
+
+    def disable_dupe_images(self, threshold: float):
+        """
+        重複する画像を無効化する
+        時間方向に１つ前のフレームとの類似度が threshold を超える画像が無効化される。
+        別の言い方をすれば N 枚連続する類似フレームの 1 枚目だけが残るということ。
+
+        Args:
+            threshold (float):
+                類似判定しきい値
+                値域は [0.0, 1.0]
+        """
+        # 一旦、全てのフレームを有効化
+        for item in self._items:
+            if isinstance(item, ThumbnailItem):
+                item.set_enable(True, False)
+
+        # 全フレームに対して個別に呼び出し
+        for idx_B in range(1, len(self._items)):
+            # 前方に向かって有効フレームを探索
+            idx_A = idx_B - 1
+            while idx_A > 0:
+                item_A = self._items[idx_A]
+                if isinstance(item_A, ThumbnailItem):
+                    if item_A.enabled:
+                        break
+                idx_A -= 1
+
+            # 前フレーム
+            item_A = self._items[idx_A]
+            if isinstance(item_A, ThumbnailItem):
+                image_A = item_A.original_image
+            else:
+                continue
+
+            # 次フレーム
+            item_B = self._items[idx_B]
+            if isinstance(item_B, ThumbnailItem):
+                image_B = item_B.original_image
+            else:
+                continue
+
+            # 類似度を元に有効・無効を設定
+            similarity = calc_ssim(image_A, image_B)
+            item_B.set_enable(similarity < threshold, False)
+
+        # 変更を通知
         self._on_change()
 
     @property

@@ -1,18 +1,19 @@
-import warnings
+# std
 from pathlib import Path
 from datetime import datetime
 from typing import cast, Tuple, List
-import re
+from time import time
 
-from PIL import Image, ImageTk
+# PIL
+from PIL import Image
 
-import tkinter as tk
-from tkinter import Event
+# Tk/CTk
 import customtkinter as ctk
 from tkinterdnd2 import TkinterDnD, DND_FILES
 from tkinterdnd2.TkinterDnD import DnDEvent
+import tkinter.messagebox as mb
 
-from aynime_issen_style_model import AynimeIssenStyleModel
+# utils
 from utils.constants import WIDGET_PADDING, DEFAULT_FONT_NAME
 from utils.pil import (
     save_pil_images_to_gif_file,
@@ -20,9 +21,15 @@ from utils.pil import (
     Resolution,
     resize_cover_pattern_size,
 )
+from utils.constants import APP_NAME_JP
+
+# gui
 from gui.widgets.thumbnail_bar import ThumbnailBar
 from gui.widgets.animation_label import AnimationLabel
 from gui.widgets.size_pattern_selection_frame import SizePatternSlectionFrame
+
+# local
+from aynime_issen_style_model import AynimeIssenStyleModel
 
 
 class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
@@ -42,76 +49,38 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
         """
         super().__init__(master, **kwargs)
 
+        # メンバー保存
+        self._model = model
+
         # フォントを生成
         default_font = ctk.CTkFont(DEFAULT_FONT_NAME)
 
         # レイアウト設定
         self.rowconfigure(0, weight=1)
         self.rowconfigure(1, weight=0)
-        self.rowconfigure(2, weight=0)
         self.columnconfigure(0, weight=1)
 
+        # 出力関係フレーム
+        # NOTE
+        #   使用する画像は与えられるものとして、それをどう gif 化するか？　これを担う
+        self._output_kind_frame = ctk.CTkFrame(self, width=0, height=0)
+        self._output_kind_frame.grid(
+            row=0, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
+        )
+        self._output_kind_frame.rowconfigure(0, weight=1)
+        self._output_kind_frame.rowconfigure(1, weight=0)
+        self._output_kind_frame.columnconfigure(0, weight=1)
+
         # アニメーションプレビュー
-        self._animation_preview_label = AnimationLabel(self)
+        self._animation_preview_label = AnimationLabel(self._output_kind_frame)
         self._animation_preview_label.grid(
             row=0, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
         )
 
-        # フレームリスト
-        self._frame_list_bar = ThumbnailBar(self, 120, self._on_frame_list_change)
-        self._frame_list_bar.grid(
-            row=1, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
-        )
-
-        # フレームレート関係フレーム
-        self._frame_rate_frame = ctk.CTkFrame(self, width=0, height=0)
-        self._frame_rate_frame.grid(
-            row=2, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
-        )
-        self._frame_rate_frame.rowconfigure(0, weight=1)
-        self._frame_rate_frame.columnconfigure(0, weight=1)
-        self._frame_rate_frame.columnconfigure(1, weight=0)
-
-        # フレームレートスライダー
-        MIN_FRAME_RATE = 1
-        MAX_FRAME_RATE = 15
-        self._frame_rate_slider = ctk.CTkSlider(
-            self._frame_rate_frame,
-            from_=MIN_FRAME_RATE,
-            to=MAX_FRAME_RATE,
-            number_of_steps=MAX_FRAME_RATE - MIN_FRAME_RATE,
-            command=self._on_frame_rate_slider,
-        )
-        self._frame_rate_slider.grid(
-            row=0, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
-        )
-
-        # フレームレートラベル
-        self._frame_rate_label = ctk.CTkLabel(
-            self._frame_rate_frame, text=f"-- FPS", font=default_font, width=80
-        )
-        self._frame_rate_label.grid(
-            row=0, column=1, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
-        )
-
-        # 初期フレームレートを設定
-        self._on_frame_rate_slider(10)
-
-        # gif 生成ボタン
-        self._create_button = ctk.CTkButton(
-            self._frame_rate_frame,
-            text="萌え",
-            width=80,
-            command=self._on_create_button_clicked,
-        )
-        self._create_button.grid(
-            row=0, column=2, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
-        )
-
         # 解像度選択フレーム
         self._size_pattern_selection_frame = SizePatternSlectionFrame(
-            self,
-            self.on_resolution_changes,
+            self._output_kind_frame,
+            self._on_resolution_changes,
             AspectRatio.E_RAW,
             Resolution.E_RAW,
             [
@@ -129,31 +98,231 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
             ],
         )
         self._size_pattern_selection_frame.grid(
-            row=3, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
+            row=1, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
+        )
+
+        # フレームレート関係フレーム
+        self._frame_rate_frame = ctk.CTkFrame(
+            self._output_kind_frame, width=0, height=0
+        )
+        self._frame_rate_frame.grid(
+            row=2, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
+        )
+        self._frame_rate_frame.rowconfigure(0, weight=1)
+        # self._frame_rate_frame.columnconfigure(0, weight=0)
+        self._frame_rate_frame.columnconfigure(1, weight=1)
+        # self._frame_rate_frame.columnconfigure(2, weight=0)
+        # self._frame_rate_frame.columnconfigure(3, weight=0)
+
+        # 折り返し変数
+        self._reflect_var = ctk.BooleanVar(value=False)
+
+        # 折り返しチェックボックス
+        self._reflect_checkbox = ctk.CTkCheckBox(
+            self._frame_rate_frame,
+            text="REFLECT",
+            width=80,
+            variable=self._reflect_var,
+            command=self._on_reflect_checkbox_toggle,
+        )
+        self._reflect_checkbox.grid(
+            row=0, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
+        )
+
+        # フレームレートスライダー
+        MIN_RECORD_LENGTH = 1
+        MAX_RECORD_LENGTH = 24
+        self._frame_rate_slider = ctk.CTkSlider(
+            self._frame_rate_frame,
+            from_=MIN_RECORD_LENGTH,
+            to=MAX_RECORD_LENGTH,
+            number_of_steps=MAX_RECORD_LENGTH - MIN_RECORD_LENGTH,
+            command=self._on_frame_rate_slider_changed,
+        )
+        self._frame_rate_slider.grid(
+            row=0, column=1, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
+        )
+
+        # フレームレートラベル
+        self._frame_rate_label = ctk.CTkLabel(
+            self._frame_rate_frame, text=f"-- FPS", font=default_font, width=80
+        )
+        self._frame_rate_label.grid(
+            row=0, column=2, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
+        )
+
+        # 初期フレームレートを設定
+        self._frame_rate_slider.set(10)
+        self._on_frame_rate_slider_changed(10)
+
+        # セーブボタン
+        self._save_button = ctk.CTkButton(
+            self._frame_rate_frame,
+            text="SAVE",
+            width=80,
+            command=self._on_save_button_clicked,
+        )
+        self._save_button.grid(
+            row=0, column=3, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
+        )
+
+        # 入力関係フレーム
+        # NOTE
+        #   gif にする画像の入力・削除・選定を行う
+        self._input_kind_frame = ctk.CTkFrame(self, width=0, height=0)
+        self._input_kind_frame.grid(
+            row=1, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
+        )
+        self._input_kind_frame.rowconfigure(0, weight=0)
+        self._input_kind_frame.rowconfigure(1, weight=0)
+        self._input_kind_frame.rowconfigure(2, weight=0)
+        self._input_kind_frame.columnconfigure(0, weight=1)
+
+        # フレームリスト
+        self._frame_list_bar = ThumbnailBar(
+            self._input_kind_frame, 120, self._on_frame_list_change
+        )
+        self._frame_list_bar.grid(
+            row=0, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
+        )
+
+        # キャプチャ操作フレーム
+        self._capture_ctrl_frame = ctk.CTkFrame(
+            self._input_kind_frame, width=0, height=0
+        )
+        self._capture_ctrl_frame.grid(
+            row=1, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
+        )
+        self._capture_ctrl_frame.rowconfigure(0, weight=1)
+        self._capture_ctrl_frame.columnconfigure(0, weight=0)
+        self._capture_ctrl_frame.columnconfigure(1, weight=1)
+        self._capture_ctrl_frame.columnconfigure(2, weight=0)
+
+        # レコード秒数スライダー
+        # NOTE
+        #   100msec 単位なのでスライダー上の 10 は 1000 msec の意味
+        MIN_RECORD_LENGTH = 5
+        MAX_RECORD_LENGTH = 30
+        self._record_length_slider = ctk.CTkSlider(
+            self._capture_ctrl_frame,
+            from_=MIN_RECORD_LENGTH,
+            to=MAX_RECORD_LENGTH,
+            number_of_steps=MAX_RECORD_LENGTH - MIN_RECORD_LENGTH,
+            command=self._on_record_length_slider_changed,
+        )
+        self._record_length_slider.grid(
+            row=0, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
+        )
+
+        # レコード秒数ラベル
+        self._record_length_label = ctk.CTkLabel(
+            self._capture_ctrl_frame, text=f"--.0 SEC", font=default_font, width=80
+        )
+        self._record_length_label.grid(
+            row=0, column=1, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
+        )
+
+        # 初期レコード秒数を設定
+        self._record_length_slider.set(10)
+        self._on_record_length_slider_changed(10)
+
+        # レコードボタン
+        self._record_button = ctk.CTkButton(
+            self._capture_ctrl_frame,
+            text="REC",
+            width=80,
+            command=self._on_record_button_clicked,
+        )
+        self._record_button.grid(
+            row=0, column=2, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
+        )
+
+        # フレームリスト編集フレーム
+        self._edit_ctrl_frame = ctk.CTkFrame(self._input_kind_frame, width=0, height=0)
+        self._edit_ctrl_frame.grid(
+            row=2, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
+        )
+        self._edit_ctrl_frame.rowconfigure(0, weight=1)
+        # self._capture_ctrl_frame.columnconfigure(0, weight=0)
+        self._edit_ctrl_frame.columnconfigure(1, weight=1)
+        # self._capture_ctrl_frame.columnconfigure(2, weight=0)
+
+        # 全削除ボタン
+        self._wipe_button = ctk.CTkButton(
+            self._edit_ctrl_frame,
+            text="REMOVE ALL",
+            width=80,
+            command=self._on_wipe_button_clicked,
+        )
+        self._wipe_button.grid(
+            row=0, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
+        )
+
+        # 重複しきい値スライダー
+        # NOTE
+        #   最終的にほしいのは [0.0, 1.0] だけど、スライダー上は [0, 100] を扱う
+        MIN_DUPE_THRESHOLD = 0
+        MAX_DUPE_THRESHOLD = 99
+        self._dupe_threshold_slider = ctk.CTkSlider(
+            self._edit_ctrl_frame,
+            from_=MIN_DUPE_THRESHOLD,
+            to=MAX_DUPE_THRESHOLD,
+            number_of_steps=MAX_DUPE_THRESHOLD - MIN_DUPE_THRESHOLD,
+            command=self._on_dupe_threshold_slider_changed,
+        )
+        self._dupe_threshold_slider.grid(
+            row=0, column=1, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
+        )
+
+        # 重複しきい値ラベル
+        self._duple_threshold_label = ctk.CTkLabel(
+            self._edit_ctrl_frame, text=f"--", font=default_font, width=80
+        )
+        self._duple_threshold_label.grid(
+            row=0, column=2, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
+        )
+
+        # 初期重複除去しきい値を設定
+        self._dupe_threshold_slider.set(95)
+        self._on_dupe_threshold_slider_changed(95)
+
+        # 重複無効化ボタン
+        self._disable_dupe_button = ctk.CTkButton(
+            self._edit_ctrl_frame,
+            text="DISABLE DUPE",
+            width=80,
+            command=self._on_disable_dup_button_clicked,
+        )
+        self._disable_dupe_button.grid(
+            row=0, column=3, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
+        )
+
+        # 無効化画像ワイプボタン
+        self._remove_disable_button = ctk.CTkButton(
+            self._edit_ctrl_frame,
+            text="REMOVE DISABLED",
+            width=80,
+            command=self._on_remove_disable_button_clicked,
+        )
+        self._remove_disable_button.grid(
+            row=0, column=4, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
         )
 
         # ファイルドロップ関係
-        # NOTE
-        #   シンタックスハイライト上はメソッドが無いことになっているが、
-        #   AynimeIssenStyleApp で動的にロードしてるので実際は使える。
         self.drop_target_register(DND_FILES)
         self.dnd_bind("<<Drop>>", self._on_drop_file)
 
-    def _on_drop_file(self, event: DnDEvent):
+    def _on_resolution_changes(self, aspect_ratio: AspectRatio, resolution: Resolution):
         """
-        ファイルドロップハンドラ
+        解像度設定が変更された時に呼び出される
 
         Args:
-            event (Event): イベント
+            aspect_ratio (AspectRatio): アスペクト比
+            resolution (Resolution): 解像度
         """
-        ACCEPTABLE_EXTENSIONS = (".png", ".jpg", ".jpeg", ".webp", ".bmp", ".gif")
-        event_data = cast(str, vars(event)["data"])
-        paths = cast(Tuple[str], self.tk.splitlist(event_data))
-        pil_images = [
-            Image.open(p) for p in paths if p.lower().endswith(ACCEPTABLE_EXTENSIONS)
-        ]
-        for i in pil_images:
-            self._frame_list_bar.add_image(i)
+        self._aspect_ratio = aspect_ratio
+        self._resolution = resolution
+        self._update_preview()
 
     def _on_frame_list_change(self):
         """
@@ -164,7 +333,13 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
         """
         self._update_preview()
 
-    def _on_frame_rate_slider(self, value: float):
+    def _on_reflect_checkbox_toggle(self):
+        """
+        「折り返し」チェックボックスハンドラ
+        """
+        self._update_preview()
+
+    def _on_frame_rate_slider_changed(self, value: float):
         """
         フレームレートスライダーハンドラ
 
@@ -175,12 +350,25 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
         self._frame_rate_label.configure(text=f"{frame_rate_int} FPS")
         self._animation_preview_label.set_frame_rate(frame_rate_int)
 
-    def _on_create_button_clicked(self):
+    def _on_record_length_slider_changed(self, value: float):
         """
-        生成ボタンクリックハンドラ
+        レコード秒数スライダーハンドラ
 
         Args:
-            event (Event): イベント
+            value (float): スライダー値
+        """
+        self._record_length = float(value) / 10
+        self._record_length_label.configure(text=f"{self._record_length:.1f} SEC")
+
+    def _on_record_button_clicked(self):
+        """
+        レコードボタンクリックハンドラ
+        """
+        self.after(0, self._record_handler, time() + self._record_length, [])
+
+    def _on_save_button_clicked(self):
+        """
+        セーブボタンクリックハンドラ
         """
         # 対象フレームの列挙
         frames = self._animation_preview_label.frames
@@ -195,24 +383,110 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
             frames, self._animation_preview_label.interval_in_ms, gif_file_path
         )
 
-    def on_resolution_changes(self, aspect_ratio: AspectRatio, resolution: Resolution):
+    def _on_wipe_button_clicked(self):
         """
-        解像度設定が変更された時に呼び出される
+        ワイプボタンクリックハンドラ
+        """
+        self._frame_list_bar.clear_images()
+
+    def _on_dupe_threshold_slider_changed(self, value: float):
+        """
+        重複除去しきい値スライダーハンドラ
 
         Args:
-            aspect_ratio (AspectRatio): アスペクト比
-            resolution (Resolution): 解像度
+            value (float): スライダー値
         """
-        self._aspect_ratio = aspect_ratio
-        self._resolution = resolution
-        self._update_preview()
+        self._dupe_threshold = value / 100
+        self._duple_threshold_label.configure(text=f"{self._dupe_threshold}")
+
+    def _on_disable_dup_button_clicked(self):
+        """
+        重複無効化ボタンハンドラ
+        """
+        self._frame_list_bar.disable_dupe_images(self._dupe_threshold)
+
+    def _on_remove_disable_button_clicked(self):
+        """
+        無効画像削除ボタンハンドラ
+        """
+        self._frame_list_bar.clear_disable_images()
 
     def _update_preview(self):
         """
         現在の状態に基づいてアニメプレビューを更新する
         """
+        # 初期化途中で来ちゃった場合は何もしない
+        if "_frame_list_bar" not in vars(self):
+            return
+
+        # 一覧からオリジナル画像を取得
         frames = [
             resize_cover_pattern_size(f, self._aspect_ratio, self._resolution)
             for f in self._frame_list_bar.original_frames
         ]
+
+        # 「折り返し」の対応
+        # NOTE
+        #   最終フレームまで再生したあと、先頭フレームへ向けて逆再生を行うことを「折り返し」と呼んでいる。
+        if self._reflect_checkbox.get():
+            if len(frames) > 2:
+                extend_frames = frames[1:-1]
+                extend_frames.reverse()
+                frames = frames + extend_frames
+
+        # プレビューウィジェットに設定
         self._animation_preview_label.set_frames(frames)
+
+    def _record_handler(
+        self, stop_time_in_sec: float, record_frames: List[Image.Image] = []
+    ):
+        """
+        レコード処理を実際に担うハンドラ
+        自分自身のディスパッチを繰り返すことで並行処理を実現、連続的なキャプチャを実現している
+
+        Args:
+            stop_time_in_sec (float): レコード処理終了時刻
+            record_frames (Optional[Image.Image]): 今までに記録したフレーム
+        """
+        # 所定の時間を経過してたら終了
+        if time() > stop_time_in_sec:
+            self._frame_list_bar.add_image(record_frames)
+            return
+
+        # キャプチャ
+        try:
+            new_frame = self._model.capture()
+        except Exception as e:
+            mb.showerror(
+                APP_NAME_JP,
+                f"キャプチャに失敗。多分キャプチャ対象のディスプレイ・ウィンドウの選択を忘れてるよ。\n{e.args}",
+            )
+            return
+
+        # 新しいフレームで差分が発生している場合のみ追加する
+        if len(record_frames) == 0:
+            next_frames = [new_frame]
+        else:
+            last_frame = record_frames[-1]
+            if new_frame == last_frame:
+                next_frames = record_frames
+            else:
+                next_frames = record_frames + [new_frame]
+
+        # 次をディスパッチ
+        self.after(10, self._record_handler, stop_time_in_sec, next_frames)
+
+    def _on_drop_file(self, event: DnDEvent):
+        """
+        ファイルドロップハンドラ
+
+        Args:
+            event (Event): イベント
+        """
+        ACCEPTABLE_EXTENSIONS = (".png", ".jpg", ".jpeg", ".webp", ".bmp", ".gif")
+        event_data = cast(str, vars(event)["data"])
+        paths = cast(Tuple[str], self.tk.splitlist(event_data))
+        pil_images = [
+            Image.open(p) for p in paths if p.lower().endswith(ACCEPTABLE_EXTENSIONS)
+        ]
+        self._frame_list_bar.add_image(pil_images)

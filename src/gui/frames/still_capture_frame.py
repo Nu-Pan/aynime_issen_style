@@ -1,8 +1,12 @@
-import customtkinter as ctk
+# std
 from pathlib import Path
 from datetime import datetime
 
-from aynime_issen_style_model import AynimeIssenStyleModel
+# Tk/CTk
+import customtkinter as ctk
+import tkinter.messagebox as mb
+
+# utils
 from utils.constants import WIDGET_PADDING, DEFAULT_FONT_NAME
 from utils.pil import (
     AspectRatio,
@@ -11,10 +15,16 @@ from utils.pil import (
     save_pil_image_to_jpeg_file,
 )
 from utils.windows import file_to_clipboard, register_global_hotkey_handler
+from utils.constants import APP_NAME_JP
+
+# gui
 from gui.widgets.still_frame import StillLabel
 from gui.widgets.size_pattern_selection_frame import (
     SizePatternSlectionFrame,
 )
+
+# local
+from aynime_issen_style_model import AynimeIssenStyleModel
 
 
 class StillCaptureFrame(ctk.CTkFrame):
@@ -81,8 +91,9 @@ class StillCaptureFrame(ctk.CTkFrame):
             raw_capture_image = self.model.capture()
         except Exception as e:
             capture_image = None
-            self.preview_label.set_contents(
-                text=f"一閃失敗\n多分、キャプチャ対象のディスプレイ・ウィンドウの選択を忘れてるよ\n{e.args}"
+            mb.showerror(
+                APP_NAME_JP,
+                f"キャプチャに失敗。多分キャプチャ対象のディスプレイ・ウィンドウの選択を忘れてるよ。\n{e.args}",
             )
             return
 

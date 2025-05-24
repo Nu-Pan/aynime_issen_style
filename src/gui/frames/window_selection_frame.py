@@ -1,16 +1,20 @@
+# std
 from typing import cast
-import warnings
 
+# Tk/CTk
 from tkinter import Event
 import customtkinter as ctk
 from CTkListbox import CTkListbox
 
-from PIL import ImageTk
-
+# utils
 from utils.capture_context import CaptureTargetInfo
-from aynime_issen_style_model import CaptureMode, AynimeIssenStyleModel
 from utils.constants import WIDGET_PADDING, WINDOW_MIN_WIDTH, DEFAULT_FONT_NAME
+
+# gui
 from gui.widgets.still_frame import StillLabel
+
+# local
+from aynime_issen_style_model import CaptureMode, AynimeIssenStyleModel
 
 
 class WindowSelectionFrame(ctk.CTkFrame):

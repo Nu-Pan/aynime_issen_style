@@ -1,4 +1,6 @@
+# std
 from pathlib import Path
+
 
 # アプリ名
 APP_NAME_EN = "aynime_issen_style"

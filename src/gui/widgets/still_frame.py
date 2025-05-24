@@ -1,12 +1,13 @@
-from typing import List, Union, Optional
-import warnings
+# std
+from typing import Optional
 
-
+# PIL
 from PIL import Image, ImageTk
 
-from tkinter import Event
+# TK/CTk
 import customtkinter as ctk
 
+# utils
 from utils.pil import resize_contain_free_size
 from utils.constants import DEFAULT_FONT_NAME
 from utils.ctk import silent_configure
