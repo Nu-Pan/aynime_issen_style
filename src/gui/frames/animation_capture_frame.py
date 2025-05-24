@@ -59,7 +59,6 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
 
         # レイアウト設定
         self.rowconfigure(0, weight=1)
-        self.rowconfigure(1, weight=0)
         self.columnconfigure(0, weight=1)
 
         # 出力関係フレーム
@@ -70,7 +69,6 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
             row=0, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
         )
         self._output_kind_frame.rowconfigure(0, weight=1)
-        self._output_kind_frame.rowconfigure(1, weight=0)
         self._output_kind_frame.columnconfigure(0, weight=1)
 
         # アニメーションプレビュー
@@ -111,10 +109,7 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
             row=2, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
         )
         self._frame_rate_frame.rowconfigure(0, weight=1)
-        # self._frame_rate_frame.columnconfigure(0, weight=0)
         self._frame_rate_frame.columnconfigure(1, weight=1)
-        # self._frame_rate_frame.columnconfigure(2, weight=0)
-        # self._frame_rate_frame.columnconfigure(3, weight=0)
 
         # 折り返し変数
         self._reflect_var = ctk.BooleanVar(value=False)
@@ -175,9 +170,6 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
         self._input_kind_frame.grid(
             row=1, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
         )
-        self._input_kind_frame.rowconfigure(0, weight=0)
-        self._input_kind_frame.rowconfigure(1, weight=0)
-        self._input_kind_frame.rowconfigure(2, weight=0)
         self._input_kind_frame.columnconfigure(0, weight=1)
 
         # フレームリスト
@@ -196,9 +188,7 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
             row=1, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
         )
         self._capture_ctrl_frame.rowconfigure(0, weight=1)
-        self._capture_ctrl_frame.columnconfigure(0, weight=0)
-        self._capture_ctrl_frame.columnconfigure(1, weight=1)
-        self._capture_ctrl_frame.columnconfigure(2, weight=0)
+        self._capture_ctrl_frame.columnconfigure(0, weight=1)
 
         # レコード秒数スライダー
         # NOTE
@@ -245,9 +235,7 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
             row=2, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
         )
         self._edit_ctrl_frame.rowconfigure(0, weight=1)
-        # self._capture_ctrl_frame.columnconfigure(0, weight=0)
         self._edit_ctrl_frame.columnconfigure(1, weight=1)
-        # self._capture_ctrl_frame.columnconfigure(2, weight=0)
 
         # 全削除ボタン
         self._wipe_button = ctk.CTkButton(

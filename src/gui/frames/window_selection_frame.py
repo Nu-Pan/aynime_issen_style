@@ -51,9 +51,7 @@ class WindowSelectionFrame(ctk.CTkFrame):
             row=0, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
         )
         self.west_frame.configure(width=WINDOW_MIN_WIDTH // 2)
-        self.west_frame.rowconfigure(0, weight=0)
         self.west_frame.rowconfigure(1, weight=1)
-        self.west_frame.rowconfigure(2, weight=0)
         self.west_frame.columnconfigure(0, weight=1)
 
         # キャプチャモード選択フレーム
@@ -120,7 +118,6 @@ class WindowSelectionFrame(ctk.CTkFrame):
         self.east_frame.grid(
             row=0, column=1, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
         )
-        self.east_frame.rowconfigure(0, weight=0)
         self.east_frame.rowconfigure(1, weight=1)
         self.east_frame.columnconfigure(0, weight=1)
 
