@@ -5,6 +5,7 @@ from datetime import datetime
 # Tk/CTk
 import customtkinter as ctk
 import tkinter.messagebox as mb
+from tkinter import Event
 
 # utils
 from utils.constants import WIDGET_PADDING, DEFAULT_FONT_NAME
@@ -16,6 +17,7 @@ from utils.pil import (
 )
 from utils.windows import file_to_clipboard, register_global_hotkey_handler
 from utils.constants import APP_NAME_JP
+from utils.ctk import show_notify
 
 # gui
 from gui.widgets.still_frame import StillLabel
@@ -79,7 +81,7 @@ class StillCaptureFrame(ctk.CTkFrame):
             row=1, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
         )
 
-    def on_preview_label_click(self, event) -> None:
+    def on_preview_label_click(self, event: Event) -> None:
         """
         プレビューラベルクリックイベントハンドラ
 
@@ -113,7 +115,11 @@ class StillCaptureFrame(ctk.CTkFrame):
         file_to_clipboard(jpeg_file_path)
 
         # クリップボード転送完了通知
-        self.show_notify("「一閃」\nクリップボード転送完了")
+        show_notify(
+            self,
+            "「一閃」\nクリップボード転送完了",
+            on_click_handler=self.on_preview_label_click,
+        )
 
     def on_resolution_changes(self, aspect_ratio: AspectRatio, resolution: Resolution):
         """
@@ -125,33 +131,3 @@ class StillCaptureFrame(ctk.CTkFrame):
         """
         self._aspect_ratio = aspect_ratio
         self._resolution = resolution
-
-    def show_notify(self, message: str, duration_ms: int = 2000) -> None:
-        """
-        通知ラベルを表示する
-        duration_ms の間、message が表示される。
-
-        Args:
-            message (str): メッセージ文字列
-            duration_ms (int, optional): 表示時間（ミリ秒）. Defaults to 2000.
-        """
-        # フォントを生成
-        default_font = ctk.CTkFont(DEFAULT_FONT_NAME)
-
-        # 通知ラベルを生成
-        # NOTE
-        #   ラベルの四隅の外側はテーマ色でフィルされてしまうので、角丸のないラベルを使用する(corner_radius=0)。
-        status_label = ctk.CTkLabel(
-            self,
-            text=message,
-            fg_color="#3a8d3f",
-            text_color="white",
-            corner_radius=0,
-            font=default_font,
-        )
-        status_label.place(relx=0.5, rely=0.5, anchor="center")
-        status_label.configure(padx=WIDGET_PADDING, pady=WIDGET_PADDING)
-        status_label.bind("<Button-1>", self.on_preview_label_click)
-
-        # 通知ラベルは一定時間後に自動破棄
-        self.after(duration_ms, status_label.destroy)

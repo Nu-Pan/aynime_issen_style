@@ -22,6 +22,8 @@ from utils.pil import (
     resize_cover_pattern_size,
 )
 from utils.constants import APP_NAME_JP
+from utils.windows import file_to_clipboard
+from utils.ctk import show_notify
 
 # gui
 from gui.widgets.thumbnail_bar import ThumbnailBar
@@ -382,6 +384,12 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
         save_pil_images_to_gif_file(
             frames, self._animation_preview_label.interval_in_ms, gif_file_path
         )
+
+        # クリップボードに転送
+        file_to_clipboard(gif_file_path)
+
+        # クリップボード転送完了通知
+        show_notify(self, "「一閃」\nクリップボード転送完了")
 
     def _on_wipe_button_clicked(self):
         """
