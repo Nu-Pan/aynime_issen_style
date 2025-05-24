@@ -14,6 +14,7 @@ from tkinter import Event
 import customtkinter as ctk
 from tkinterdnd2 import TkinterDnD, DND_FILES
 from tkinterdnd2.TkinterDnD import DnDEvent
+import tkinter.messagebox as mb
 
 # local
 from aynime_issen_style_model import AynimeIssenStyleModel
@@ -27,6 +28,7 @@ from utils.pil import (
 from gui.widgets.thumbnail_bar import ThumbnailBar
 from gui.widgets.animation_label import AnimationLabel
 from gui.widgets.size_pattern_selection_frame import SizePatternSlectionFrame
+from utils.constants import APP_NAME_JP
 
 
 class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
@@ -390,6 +392,11 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
         """
         現在の状態に基づいてアニメプレビューを更新する
         """
+        # 初期化途中で来ちゃった場合は何もしない
+        if "_frame_list_bar" not in vars(self):
+            return
+
+        # 処理本体
         frames = [
             resize_cover_pattern_size(f, self._aspect_ratio, self._resolution)
             for f in self._frame_list_bar.original_frames
@@ -413,7 +420,14 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
             return
 
         # キャプチャ
-        new_frame = self._model.capture()
+        try:
+            new_frame = self._model.capture()
+        except Exception as e:
+            mb.showerror(
+                APP_NAME_JP,
+                f"キャプチャに失敗。多分キャプチャ対象のディスプレイ・ウィンドウの選択を忘れてるよ。\n{e.args}",
+            )
+            return
 
         # 新しいフレームで差分が発生している場合のみ追加する
         if len(record_frames) == 0:
