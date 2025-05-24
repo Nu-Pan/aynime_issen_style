@@ -312,6 +312,13 @@ def calc_ssim(image_A: Image.Image, image_B: Image.Image) -> float:
     Returns:
         float: 平均ピクセル誤差
     """
+    # 画像にサイズ差がある場合は小さい方に合わせる
+    if image_A.width != image_B.width or image_A.height != image_B.height:
+        actual_width = min(image_A.width, image_B.width)
+        actual_height = min(image_A.height, image_B.height)
+        image_A = resize_cover_free_size(image_A, actual_width, actual_height)
+        image_B = resize_cover_free_size(image_B, actual_width, actual_height)
+
     # ndarray 化
     np_image_A = np.array(image_A.convert("L"))
     np_image_B = np.array(image_B.convert("L"))
