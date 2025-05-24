@@ -180,12 +180,12 @@ def register_global_hotkey_handler(
 
     # メッセージウィンドウを作成
     wc = win32gui.WNDCLASS()
-    wc.hInstance = win32api.GetModuleHandle(None)
-    wc.lpszClassName = "AynimeIssenStyleHotKeyMessageOnlyWindow"
-    wc.lpfnWndProc = window_procedure
+    wc.hInstance = win32api.GetModuleHandle(None)  # type: ignore
+    wc.lpszClassName = "AynimeIssenStyleHotKeyMessageOnlyWindow"  # type: ignore
+    wc.lpfnWndProc = window_procedure  # type: ignore
     class_atom = win32gui.RegisterClass(wc)
     msg_hwnd = win32gui.CreateWindowEx(
-        0, class_atom, None, 0, 0, 0, 0, 0, 0, 0, wc.hInstance, None
+        0, class_atom, None, 0, 0, 0, 0, 0, 0, 0, wc.hInstance, None  # type: ignore
     )
 
     # ホットキーを登録
@@ -226,7 +226,7 @@ class SystemWideMutex:
         Args:
             name (str): ミューテックス名
         """
-        self._handle = win32event.CreateMutex(None, False, "Global\\" + name)
+        self._handle = win32event.CreateMutex(None, False, "Global\\" + name)  # type: ignore
         self._last_error = win32api.GetLastError()
 
     @property
@@ -238,15 +238,3 @@ class SystemWideMutex:
             bool: すでに同名のミューテックスが存在しているなら True
         """
         return self._last_error == winerror.ERROR_ALREADY_EXISTS
-
-
-def already_running(mutex_name: str) -> bool:
-    """
-    すでにツールが起動中であるかを調べる
-
-    Args:
-        mutex_name (str): ミューテックス名（＝ツール名）
-
-    Returns:
-        bool: 同一ツールが起動中なら
-    """

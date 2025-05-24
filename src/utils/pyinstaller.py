@@ -28,6 +28,6 @@ def resource_path(relative_path: str) -> str:
             直接実行時は relative_path が絶対パス化されて返される。
     """
     if is_frozen():
-        return os.path.join(sys._MEIPASS, relative_path)
+        return os.path.join(sys._MEIPASS, relative_path)  # type: ignore
     else:
         return os.path.join(Path.cwd(), relative_path)
