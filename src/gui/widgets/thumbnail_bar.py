@@ -1,4 +1,4 @@
-from typing import Callable, List
+from typing import Callable, List, Union, Iterable
 import time
 import sys
 from math import sqrt
@@ -255,24 +255,29 @@ class ThumbnailBar(ctk.CTkScrollableFrame):
         # 親ウィジェットに通知
         self._parent_on_change()
 
-    def add_image(self, image: Image.Image):
+    def add_image(self, images: Iterable[Image.Image]):
         """
         画像（アイテム）を追加
 
         Args:
             image (Image): 追加したい PIL 画像
         """
-        # アイテムを生成・GUI配置
-        item = ThumbnailItem(self, image, self._thumbnail_height)
-        item.grid(
-            row=0, column=len(self._items) - 1, padx=WIDGET_PADDING, pady=WIDGET_PADDING
-        )
+        # 順番に追加
+        for image in images:
+            # アイテムを生成・GUI配置
+            item = ThumbnailItem(self, image, self._thumbnail_height)
+            item.grid(
+                row=0,
+                column=len(self._items) - 1,
+                padx=WIDGET_PADDING,
+                pady=WIDGET_PADDING,
+            )
 
-        # アイテムリストに追加
-        self._items.insert(-1, item)
+            # アイテムリストに追加
+            self._items.insert(-1, item)
 
-        # 番兵をずらす
-        self._items[-1].grid(column=len(self._items))
+            # 番兵をずらす
+            self._items[-1].grid(column=len(self._items))
 
         # リスト変更をコールバックで通知
         self._on_change()
@@ -327,6 +332,21 @@ class ThumbnailBar(ctk.CTkScrollableFrame):
         # グリッド配置を修正
         self._items[idx_A].grid_configure(column=idx_A)
         self._items[idx_B].grid_configure(column=idx_B)
+
+        # リスト変更をコールバックで通知
+        self._on_change()
+
+    def clear_images(self):
+        """
+        保持している術の画像を削除
+        """
+        # リスト上の全アイテムを解体
+        for item in self._items:
+            if not isinstance(item, SentinelItem):
+                item.destroy()
+
+        # リストをクリア
+        self._items = [item for item in self._items if isinstance(item, SentinelItem)]
 
         # リスト変更をコールバックで通知
         self._on_change()
