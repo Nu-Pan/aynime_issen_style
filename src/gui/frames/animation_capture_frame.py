@@ -108,9 +108,25 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
             row=2, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
         )
         self._frame_rate_frame.rowconfigure(0, weight=1)
-        self._frame_rate_frame.columnconfigure(0, weight=1)
-        self._frame_rate_frame.columnconfigure(1, weight=0)
-        self._frame_rate_frame.columnconfigure(2, weight=0)
+        # self._frame_rate_frame.columnconfigure(0, weight=0)
+        self._frame_rate_frame.columnconfigure(1, weight=1)
+        # self._frame_rate_frame.columnconfigure(2, weight=0)
+        # self._frame_rate_frame.columnconfigure(3, weight=0)
+
+        # 折り返し変数
+        self._reflect_var = ctk.BooleanVar(value=False)
+
+        # 折り返しチェックボックス
+        self._reflect_checkbox = ctk.CTkCheckBox(
+            self._frame_rate_frame,
+            text="REFLECT",
+            width=80,
+            variable=self._reflect_var,
+            command=self._on_reflect_checkbox_toggle,
+        )
+        self._reflect_checkbox.grid(
+            row=0, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
+        )
 
         # フレームレートスライダー
         MIN_RECORD_LENGTH = 1
@@ -123,7 +139,7 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
             command=self._on_frame_rate_slider_changed,
         )
         self._frame_rate_slider.grid(
-            row=0, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
+            row=0, column=1, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
         )
 
         # フレームレートラベル
@@ -131,7 +147,7 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
             self._frame_rate_frame, text=f"-- FPS", font=default_font, width=80
         )
         self._frame_rate_label.grid(
-            row=0, column=1, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
+            row=0, column=2, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
         )
 
         # 初期フレームレートを設定
@@ -146,7 +162,7 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
             command=self._on_save_button_clicked,
         )
         self._save_button.grid(
-            row=0, column=2, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
+            row=0, column=3, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
         )
 
         # 入力関係フレーム
@@ -184,7 +200,7 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
         # レコード秒数スライダー
         # NOTE
         #   100msec 単位なのでスライダー上の 10 は 1000 msec の意味
-        MIN_RECORD_LENGTH = 10
+        MIN_RECORD_LENGTH = 5
         MAX_RECORD_LENGTH = 30
         self._record_length_slider = ctk.CTkSlider(
             self._capture_ctrl_frame,
@@ -316,6 +332,12 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
         """
         self._update_preview()
 
+    def _on_reflect_checkbox_toggle(self):
+        """
+        「折り返し」チェックボックスハンドラ
+        """
+        self._update_preview()
+
     def _on_frame_rate_slider_changed(self, value: float):
         """
         フレームレートスライダーハンドラ
@@ -396,11 +418,22 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
         if "_frame_list_bar" not in vars(self):
             return
 
-        # 処理本体
+        # 一覧からオリジナル画像を取得
         frames = [
             resize_cover_pattern_size(f, self._aspect_ratio, self._resolution)
             for f in self._frame_list_bar.original_frames
         ]
+
+        # 「折り返し」の対応
+        # NOTE
+        #   最終フレームまで再生したあと、先頭フレームへ向けて逆再生を行うことを「折り返し」と呼んでいる。
+        if self._reflect_checkbox.get():
+            if len(frames) > 2:
+                extend_frames = frames[1:-1]
+                extend_frames.reverse()
+                frames = frames + extend_frames
+
+        # プレビューウィジェットに設定
         self._animation_preview_label.set_frames(frames)
 
     def _record_handler(
