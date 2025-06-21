@@ -1,7 +1,6 @@
 # std
 from typing import List, Tuple, cast
 from pathlib import Path
-from datetime import datetime
 
 # Tk/CTk
 import customtkinter as ctk

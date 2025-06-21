@@ -5,6 +5,7 @@ from datetime import datetime
 from zipfile import ZipFile
 from io import BytesIO
 from statistics import mode
+import re
 
 # PIL
 from PIL import Image
@@ -18,6 +19,33 @@ from .pil import (
     make_disabled_image,
 )
 from .constants import NIME_DIR_PATH, RAW_DIR_PATH
+
+
+_TIMESTAMP_FORMAT = "%Y-%m-%d_%H-%M-%S"
+
+
+def current_time_stamp() -> str:
+    """
+    現在時刻からタイムスタンプ文字列を生成
+
+    Returns:
+        str: タイムスタンプ文字列
+    """
+    return datetime.now().strftime(_TIMESTAMP_FORMAT)
+
+
+def is_time_stamp(text: str) -> bool:
+    """
+    text がタイムスタンプ文字列であるなら True を返す
+    """
+    # datetime でパース
+    try:
+        dt = datetime.strptime(text, _TIMESTAMP_FORMAT)
+    except ValueError:
+        return False
+
+    # パース結果をまた文字列化して一致するか確認
+    return dt.strftime(_TIMESTAMP_FORMAT) == text
 
 
 class IntegratedImage:
@@ -67,7 +95,7 @@ class IntegratedImage:
         # NOTE
         #   キャプチャの同一性を判定するための ID としてタイムスタンプを使う
         if time_stamp is None:
-            self._time_stamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+            self._time_stamp = current_time_stamp()
         else:
             self._time_stamp = time_stamp
 
@@ -462,11 +490,17 @@ def integrated_load_image(
             f"Unsuported file type. Only extensions {IMAGE_EXTENSIONS + MOVIE_EXTENSIONS} are supported."
         )
 
+    # 使用するタイムスタンプを解決
+    if is_time_stamp(actual_file_path.stem):
+        time_stamp = actual_file_path.stem
+    else:
+        time_stamp = current_time_stamp()
+
     # 画像・動画を読み込む
     if actual_file_path.suffix.lower() in IMAGE_EXTENSIONS:
         # 画像ファイルの場合はそのまま読み込む
         pil_image = Image.open(actual_file_path).convert("RGB")
-        return IntegratedImage(pil_image, actual_file_path.stem)
+        return IntegratedImage(pil_image, time_stamp)
     elif actual_file_path.suffix.lower() in MOVIE_EXTENSIONS:
         # 動画ファイルの場合はフレームを全て読み込む
         frames: List[IntegratedImage] = []
@@ -474,7 +508,7 @@ def integrated_load_image(
             try:
                 while True:
                     pil_image = img.copy().convert("RGB")
-                    frames.append(IntegratedImage(pil_image, actual_file_path.stem))
+                    frames.append(IntegratedImage(pil_image, time_stamp))
                     img.seek(img.tell() + 1)
             except EOFError:
                 pass
@@ -488,8 +522,7 @@ def integrated_load_image(
             file_list = zip_file.namelist()
             frames = [
                 IntegratedImage(
-                    Image.open(zip_file.open(file_name)).convert("RGB"),
-                    actual_file_path.stem,
+                    Image.open(zip_file.open(file_name)).convert("RGB"), time_stamp
                 )
                 for file_name in file_list
             ]
