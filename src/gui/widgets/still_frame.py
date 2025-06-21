@@ -8,7 +8,7 @@ from PIL import Image, ImageTk
 import customtkinter as ctk
 
 # utils
-from utils.pil import IntegratedImage
+from utils.integrated_image import IntegratedImage
 from utils.constants import DEFAULT_FONT_NAME
 from utils.ctk import silent_configure
 

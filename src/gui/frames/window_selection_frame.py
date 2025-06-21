@@ -9,7 +9,7 @@ from CTkListbox import CTkListbox
 # utils
 from utils.capture_context import CaptureTargetInfo
 from utils.constants import WIDGET_PADDING, WINDOW_MIN_WIDTH, DEFAULT_FONT_NAME
-from utils.pil import IntegratedImage
+from utils.integrated_image import IntegratedImage
 
 # gui
 from gui.widgets.still_frame import StillLabel

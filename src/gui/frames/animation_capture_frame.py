@@ -15,12 +15,11 @@ import tkinter.messagebox as mb
 
 # utils
 from utils.constants import WIDGET_PADDING, DEFAULT_FONT_NAME
-from utils.pil import (
-    AspectRatio,
-    Resolution,
+from utils.pil import AspectRatio, Resolution
+from utils.integrated_image import (
+    IntegratedImage,
     integrated_save_image,
     integrated_load_image,
-    IntegratedImage,
 )
 from utils.constants import APP_NAME_JP, NIME_DIR_PATH, RAW_DIR_PATH
 from utils.windows import file_to_clipboard

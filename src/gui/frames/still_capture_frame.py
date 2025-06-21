@@ -9,12 +9,8 @@ from tkinter import Event
 
 # utils
 from utils.constants import WIDGET_PADDING, DEFAULT_FONT_NAME
-from utils.pil import (
-    AspectRatio,
-    Resolution,
-    integrated_save_image,
-    IntegratedImage,
-)
+from utils.pil import AspectRatio, Resolution
+from utils.integrated_image import IntegratedImage, integrated_save_image
 from utils.windows import file_to_clipboard, register_global_hotkey_handler
 from utils.constants import APP_NAME_JP, NIME_DIR_PATH
 from utils.ctk import show_notify
@@ -131,3 +127,8 @@ class StillCaptureFrame(ctk.CTkFrame):
         """
         self._aspect_ratio = aspect_ratio
         self._resolution = resolution
+
+    def on_apply_button_click(self):
+        """
+        解像度適用
+        """

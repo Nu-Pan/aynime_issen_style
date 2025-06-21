@@ -11,7 +11,8 @@ import customtkinter as ctk
 
 # utils
 from utils.constants import WIDGET_PADDING, DEFAULT_FONT_NAME
-from utils.pil import calc_ssim, IntegratedImage
+from utils.pil import calc_ssim
+from utils.integrated_image import IntegratedImage
 
 
 class SentinelItem(ctk.CTkFrame):
