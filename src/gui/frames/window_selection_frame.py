@@ -9,6 +9,7 @@ from CTkListbox import CTkListbox
 # utils
 from utils.capture_context import CaptureTargetInfo
 from utils.constants import WIDGET_PADDING, WINDOW_MIN_WIDTH, DEFAULT_FONT_NAME
+from utils.pil import IntegratedImage
 
 # gui
 from gui.widgets.still_frame import StillLabel
@@ -188,7 +189,7 @@ class WindowSelectionFrame(ctk.CTkFrame):
         選択されたウィンドウのキャプチャを撮影し、その画像で内部状態を更新する。
         """
         try:
-            self.original_capture_image = self.model.capture()
+            self.original_capture_image = IntegratedImage(self.model.capture())
         except Exception as e:
             self.original_capture_image = None
 

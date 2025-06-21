@@ -8,7 +8,7 @@ from PIL import Image, ImageTk
 import customtkinter as ctk
 
 # utils
-from utils.pil import resize_contain_free_size
+from utils.pil import IntegratedImage
 from utils.ctk import silent_configure
 
 
@@ -40,7 +40,7 @@ class AnimationLabel(ctk.CTkLabel):
         # 更新処理をキック
         self._next_frame_handler()
 
-    def set_frames(self, frames: List[Image.Image] = []):
+    def set_frames(self, frames: List[IntegratedImage] = []):
         """
         アニメーション表示するフレーム（画像）群を設定する
 
@@ -48,9 +48,9 @@ class AnimationLabel(ctk.CTkLabel):
             frames (List[Union[Image.Image, ImageTk.PhotoImage]]): 表示したいフレーム（画像）群
         """
         # 全ての画像を PIL Image として保持
-        self._original_frames = []
+        self._original_frames: List[IntegratedImage] = []
         for frame in frames:
-            if isinstance(frame, Image.Image):
+            if isinstance(frame, IntegratedImage):
                 self._original_frames.append(frame)
             else:
                 raise TypeError(f"Invalid type of frame({type(frame)})")
@@ -59,7 +59,7 @@ class AnimationLabel(ctk.CTkLabel):
         self._on_resize(None)
 
     @property
-    def frames(self) -> List[Image.Image]:
+    def frames(self) -> List[IntegratedImage]:
         """
         設定されているフレーム（画像）群を取得する
 
@@ -92,11 +92,13 @@ class AnimationLabel(ctk.CTkLabel):
         表示状態を次のフレームに進めるハンドラ
         """
         # 表示を更新
-        if len(self._frames) == 0:
+        if len(self._preview_frames) == 0:
             silent_configure(self, image="", text=self._blank_text)
         else:
-            self._frame_index = (self._frame_index + 1) % len(self._frames)
-            silent_configure(self, image=self._frames[self._frame_index], text="")
+            self._frame_index = (self._frame_index + 1) % len(self._preview_frames)
+            silent_configure(
+                self, image=self._preview_frames[self._frame_index], text=""
+            )
 
         # 次の更新処理をキック
         self.after(self._interval_in_ms, self._next_frame_handler)
@@ -109,11 +111,9 @@ class AnimationLabel(ctk.CTkLabel):
         actual_width = self.winfo_width()
         actual_height = self.winfo_height()
 
-        # リサイズ
-        self._frames: List[ImageTk.PhotoImage] = []
+        # 表示用のサイズにリサイズ
+        self._preview_frames: List[ImageTk.PhotoImage] = []
         for original_frame in self._original_frames:
-            pil_frame = resize_contain_free_size(
-                original_frame, actual_width, actual_height
-            )
+            pil_frame = original_frame.preview(actual_width, actual_height)
             tk_frame = ImageTk.PhotoImage(pil_frame)
-            self._frames.append(tk_frame)
+            self._preview_frames.append(tk_frame)

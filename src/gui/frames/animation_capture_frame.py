@@ -16,14 +16,16 @@ import tkinter.messagebox as mb
 # utils
 from utils.constants import WIDGET_PADDING, DEFAULT_FONT_NAME
 from utils.pil import (
-    save_pil_images_to_gif_file,
     AspectRatio,
     Resolution,
-    resize_cover_pattern_size,
+    integrated_save_image,
+    integrated_load_image,
+    IntegratedImage,
 )
-from utils.constants import APP_NAME_JP
+from utils.constants import APP_NAME_JP, NIME_DIR_PATH, RAW_DIR_PATH
 from utils.windows import file_to_clipboard
 from utils.ctk import show_notify
+from utils.std import flatten
 
 # gui
 from gui.widgets.thumbnail_bar import ThumbnailBar
@@ -366,12 +368,16 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
             raise ValueError(f"# of frames less than 2(actual={len(frames)})")
 
         # gif ファイルとして保存
-        nime_dir_path = Path.cwd() / "nime"
-        date_str = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        gif_file_path = nime_dir_path / (date_str + ".gif")
-        save_pil_images_to_gif_file(
-            frames, self._animation_preview_label.interval_in_ms, gif_file_path
+        # date_str = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        # gif_file_path = NIME_DIR_PATH / (date_str + ".gif")
+        gif_file_path = integrated_save_image(
+            frames, self._animation_preview_label.interval_in_ms
         )
+        if not isinstance(gif_file_path, Path):
+            raise TypeError(
+                f"Expected Path, but got {type(gif_file_path)}. "
+                "This is a bug, please report it."
+            )
 
         # クリップボードに転送
         file_to_clipboard(gif_file_path)
@@ -415,11 +421,8 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
         if "_frame_list_bar" not in vars(self):
             return
 
-        # 一覧からオリジナル画像を取得
-        frames = [
-            resize_cover_pattern_size(f, self._aspect_ratio, self._resolution)
-            for f in self._frame_list_bar.original_frames
-        ]
+        # エイリアス
+        frames = self._frame_list_bar.frames
 
         # 「折り返し」の対応
         # NOTE
@@ -434,7 +437,7 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
         self._animation_preview_label.set_frames(frames)
 
     def _record_handler(
-        self, stop_time_in_sec: float, record_frames: List[Image.Image] = []
+        self, stop_time_in_sec: float, record_frames: List[IntegratedImage] = []
     ):
         """
         レコード処理を実際に担うハンドラ
@@ -451,7 +454,7 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
 
         # キャプチャ
         try:
-            new_frame = self._model.capture()
+            new_frame = IntegratedImage(self._model.capture())
         except Exception as e:
             mb.showerror(
                 APP_NAME_JP,
@@ -479,10 +482,24 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
         Args:
             event (Event): イベント
         """
-        ACCEPTABLE_EXTENSIONS = (".png", ".jpg", ".jpeg", ".webp", ".bmp", ".gif")
-        event_data = cast(str, vars(event)["data"])
-        paths = cast(Tuple[str], self.tk.splitlist(event_data))
-        pil_images = [
-            Image.open(p) for p in paths if p.lower().endswith(ACCEPTABLE_EXTENSIONS)
-        ]
-        self._frame_list_bar.add_image(pil_images)
+        # ファイルパスのみ受付
+        event_data = vars(event)["data"]
+        if not isinstance(event_data, str):
+            return
+
+        # 動画・画像で分岐
+        try:
+            paths = cast(Tuple[str], self.tk.splitlist(event_data))
+            frames = cast(
+                List[IntegratedImage],
+                flatten([integrated_load_image(Path(p)) for p in paths]),
+            )
+        except Exception as e:
+            mb.showerror(
+                APP_NAME_JP,
+                f"画像・動画の読み込みに失敗。\n{e.args}",
+            )
+            return
+
+        # フレームリストに追加
+        self._frame_list_bar.add_image(frames)

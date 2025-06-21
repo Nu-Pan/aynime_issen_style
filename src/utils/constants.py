@@ -21,3 +21,10 @@ DEFAULT_FONT_NAME = "Yu Gothic UI"
 
 # バージョン情報ファイルのパス
 VERSION_FILE_PATH = Path("src\\utils\\version_constants.py")
+
+# キャプチャ保存先
+# NOTE
+#   nime はリサイズなどの処理適用済みの最終結果画像の保存先
+#   raw は処理適用前のオリジナルのキャプチャ画像の保存先
+NIME_DIR_PATH = Path.cwd() / "nime"
+RAW_DIR_PATH = Path.cwd() / "raw"

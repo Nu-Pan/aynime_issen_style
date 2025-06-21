@@ -8,7 +8,7 @@ from PIL import Image, ImageTk
 import customtkinter as ctk
 
 # utils
-from utils.pil import resize_contain_free_size
+from utils.pil import IntegratedImage
 from utils.constants import DEFAULT_FONT_NAME
 from utils.ctk import silent_configure
 
@@ -30,13 +30,13 @@ class StillLabel(ctk.CTkLabel):
         silent_configure(self, font=default_font)
 
         # 内部状態
-        self._original_image = None
+        self._image = None
 
         # リサイズハンドラ
         self.bind("<Configure>", self._on_resize)
 
     def set_contents(
-        self, image: Optional[Image.Image] = None, text: Optional[str] = None
+        self, image: Optional[IntegratedImage] = None, text: Optional[str] = None
     ):
         """
         表示するコンテンツを設定する
@@ -47,9 +47,9 @@ class StillLabel(ctk.CTkLabel):
         """
         # 画像の更新
         if image is None:
-            self._original_image = None
+            self._image = None
         else:
-            self._original_image = image
+            self._image = image
 
         # テキストの更新
         if text is None:
@@ -65,7 +65,7 @@ class StillLabel(ctk.CTkLabel):
         リサイズハンドラ
         """
         # 画像なしの場合は何もしない
-        if self._original_image is None:
+        if self._image is None:
             silent_configure(self, image="")
             return
 
@@ -76,7 +76,5 @@ class StillLabel(ctk.CTkLabel):
         # リサイズ
         # NOTE
         #   枠いっぱいに全体が映るようにアス比を維持してスケール
-        pil_image = resize_contain_free_size(
-            self._original_image, actual_width, actual_height
-        )
+        pil_image = self._image.preview(actual_width, actual_height)
         silent_configure(self, image=ImageTk.PhotoImage(pil_image))

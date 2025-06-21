@@ -12,11 +12,11 @@ from utils.constants import WIDGET_PADDING, DEFAULT_FONT_NAME
 from utils.pil import (
     AspectRatio,
     Resolution,
-    resize_cover_pattern_size,
-    save_pil_image_to_jpeg_file,
+    integrated_save_image,
+    IntegratedImage,
 )
 from utils.windows import file_to_clipboard, register_global_hotkey_handler
-from utils.constants import APP_NAME_JP
+from utils.constants import APP_NAME_JP, NIME_DIR_PATH
 from utils.ctk import show_notify
 
 # gui
@@ -89,29 +89,30 @@ class StillCaptureFrame(ctk.CTkFrame):
         """
         # まずはキャプチャ
         try:
-            raw_capture_image = self.model.capture()
+            pil_raw_capture_image = self.model.capture()
         except Exception as e:
-            capture_image = None
             mb.showerror(
                 APP_NAME_JP,
                 f"キャプチャに失敗。多分キャプチャ対象のディスプレイ・ウィンドウの選択を忘れてるよ。\n{e.args}",
             )
             return
 
+        # 統合画像を生成
+        capture_image = IntegratedImage(pil_raw_capture_image)
+
         # 指定サイズにリサイズの上プレビュー
-        capture_image = resize_cover_pattern_size(
-            raw_capture_image, self._aspect_ratio, self._resolution
-        )
         self.preview_label.set_contents(image=capture_image)
 
         # キャプチャをローカルにファイル保存する
-        nime_dir_path = Path.cwd() / "nime"
-        date_str = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        jpeg_file_path = nime_dir_path / (date_str + ".jpg")
-        save_pil_image_to_jpeg_file(capture_image, jpeg_file_path)
+        nime_file_path = integrated_save_image(capture_image)
+        if not isinstance(nime_file_path, Path):
+            raise TypeError(
+                f"Expected Path, got {type(nime_file_path)}. "
+                "integrated_save_image should return a single Path."
+            )
 
         # 保存したファイルをクリップボードに乗せる
-        file_to_clipboard(jpeg_file_path)
+        file_to_clipboard(nime_file_path)
 
         # クリップボード転送完了通知
         show_notify(

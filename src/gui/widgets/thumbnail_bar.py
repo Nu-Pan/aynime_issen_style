@@ -11,7 +11,7 @@ import customtkinter as ctk
 
 # utils
 from utils.constants import WIDGET_PADDING, DEFAULT_FONT_NAME
-from utils.pil import make_disabled_image, calc_ssim
+from utils.pil import calc_ssim, IntegratedImage
 
 
 class SentinelItem(ctk.CTkFrame):
@@ -54,7 +54,7 @@ class ThumbnailItem(ctk.CTkFrame):
     """
 
     def __init__(
-        self, master: "ThumbnailBar", pil_image: Image.Image, thumbnail_height: int
+        self, master: "ThumbnailBar", image: IntegratedImage, thumbnail_height: int
     ):
         """
         コンストラクタ
@@ -68,7 +68,7 @@ class ThumbnailItem(ctk.CTkFrame):
 
         # 引数を保存
         self._master = master
-        self._original_image = pil_image.copy()
+        self._image = image
 
         # 内部状態
         self._enabled = True
@@ -76,31 +76,18 @@ class ThumbnailItem(ctk.CTkFrame):
         self._mlb_press_pos = (0, 0)
 
         # サムネイルサイズを解決
-        thumbnail_width = int(pil_image.width * thumbnail_height / pil_image.height)
-        thumbnail_size = (thumbnail_width, thumbnail_height)
-
-        # サムネイル画像（有効時）を生成
-        pil_enable_image = pil_image.copy()
-        pil_enable_image.thumbnail(thumbnail_size, Image.Resampling.LANCZOS)
-        self._tk_enable_image = ctk.CTkImage(
-            light_image=pil_enable_image,
-            dark_image=pil_enable_image,
-            size=(thumbnail_width, thumbnail_height),
+        thumbnail_width = int(image.raw().width * thumbnail_height / image.raw().height)
+        pil_image = self._image.thumbnail(
+            self._enabled, thumbnail_width, thumbnail_height
         )
-
-        # サムネイル画像（無効時）を生成
-        pil_disable_image = make_disabled_image(pil_image)
-        pil_disable_image.thumbnail(thumbnail_size, Image.Resampling.LANCZOS)
-        self._tk_disable_image = ctk.CTkImage(
-            light_image=pil_disable_image,
-            dark_image=pil_disable_image,
-            size=(thumbnail_width, thumbnail_height),
+        ctk_image = ctk.CTkImage(
+            pil_image, pil_image, (pil_image.width, pil_image.height)
         )
 
         # ドラッグをハンドルするためのボタン
         self._button = ctk.CTkButton(
             self,
-            image=self._tk_enable_image,
+            image=ctk_image,
             text="",
             width=thumbnail_width,
             height=thumbnail_height,
@@ -182,14 +169,14 @@ class ThumbnailItem(ctk.CTkFrame):
         self._master.delete_image(self)
 
     @property
-    def original_image(self) -> Image.Image:
+    def image(self) -> IntegratedImage:
         """
-        リサイズ前の画像を返す
+        保持している画像を返す
 
         Returns:
-            Image.Image: リサイズ前の画像
+            Image.Image: 保持している画像
         """
-        return self._original_image
+        return self._image
 
     def set_enable(self, state: bool, does_notify: bool = True):
         """
@@ -203,12 +190,17 @@ class ThumbnailItem(ctk.CTkFrame):
         if state == self._enabled:
             return
 
-        # 状態を変更して画像を差し替え
+        # 内部ステート更新
         self._enabled = state
-        if self._enabled:
-            self._button.configure(image=self._tk_enable_image)
-        else:
-            self._button.configure(image=self._tk_disable_image)
+
+        # CTkImage を生成
+        pil_image = self._image.thumbnail(state)
+        ctk_image = ctk.CTkImage(
+            pil_image, pil_image, (pil_image.width, pil_image.height)
+        )
+
+        # ウィジェットに CTkImage を設定
+        self._button.configure(image=ctk_image)
 
         # 親ウィジェットに通知
         if does_notify:
@@ -271,12 +263,12 @@ class ThumbnailBar(ctk.CTkScrollableFrame):
         # 親ウィジェットに通知
         self._parent_on_change()
 
-    def add_image(self, images: Iterable[Image.Image]):
+    def add_image(self, images: Iterable[IntegratedImage]):
         """
         画像（アイテム）を追加
 
         Args:
-            image (Image): 追加したい PIL 画像
+            image (Image): 追加したい PIL 画像（リサイズ前）
         """
         # 順番に追加
         for image in images:
@@ -425,34 +417,34 @@ class ThumbnailBar(ctk.CTkScrollableFrame):
             # 前フレーム
             item_A = self._items[idx_A]
             if isinstance(item_A, ThumbnailItem):
-                image_A = item_A.original_image
+                image_A = item_A.image
             else:
                 continue
 
             # 次フレーム
             item_B = self._items[idx_B]
             if isinstance(item_B, ThumbnailItem):
-                image_B = item_B.original_image
+                image_B = item_B.image
             else:
                 continue
 
             # 類似度を元に有効・無効を設定
-            similarity = calc_ssim(image_A, image_B)
+            similarity = calc_ssim(image_A.nime(), image_B.nime())
             item_B.set_enable(similarity < threshold, False)
 
         # 変更を通知
         self._on_change()
 
     @property
-    def original_frames(self) -> List[Image.Image]:
+    def frames(self) -> List[IntegratedImage]:
         """
-        縮小前のフレーム（画像）を得る
+        格納しているフレーム（画像）を得る
 
         Returns:
-            List[Image.Image]: 縮小前のフレーム
+            List[IntegratedImage]: 格納しているフレーム
         """
         return [
-            item.original_image
+            item.image
             for item in self._items
             if isinstance(item, ThumbnailItem) and item.enabled
         ]
