@@ -80,3 +80,23 @@ class StillLabel(ctk.CTkLabel):
         #   枠いっぱいに全体が映るようにアス比を維持してスケール
         pil_image = self._integrated_image.preview(actual_width, actual_height)
         silent_configure(self, image=ImageTk.PhotoImage(pil_image))
+
+    @property
+    def image(self) -> Optional[IntegratedImage]:
+        """
+        表示中の統合画像を得る
+
+        Returns:
+            Optional[IntegratedImage]: 表示中の統合画像
+        """
+        return self._integrated_image
+
+    @property
+    def text(self) -> Optional[str]:
+        """
+        表示中のテキストを得る
+
+        Returns:
+            Optional[str]: 表示中のテキスト
+        """
+        return self._text

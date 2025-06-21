@@ -451,9 +451,15 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
             self._frame_list_bar.add_image(record_frames)
             return
 
+        # タイムスタンプを１枚目から流用
+        if len(record_frames) > 0:
+            time_stamp = record_frames[0].time_stamp
+        else:
+            time_stamp = None
+
         # キャプチャ
         try:
-            new_frame = IntegratedImage(self._model.capture())
+            new_frame = IntegratedImage(self._model.capture(), time_stamp)
         except Exception as e:
             mb.showerror(
                 APP_NAME_JP,

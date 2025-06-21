@@ -136,3 +136,24 @@ class SizePatternSlectionFrame(ctk.CTkFrame):
         aspect_raio = AspectRatio(self.aspect_ratio_var.get())
         resolution = Resolution(self.resolution_var.get())
         self._aux_on_radio_change(aspect_raio, resolution)
+
+    @property
+    def aspect_ratio(self) -> AspectRatio:
+        """
+        現在 UI 上で選択されているアスペクト比を返す
+
+        Returns:
+            AspectRatio: アスペクト比
+        """
+        return AspectRatio(self.aspect_ratio_var.get())
+
+    @property
+    def resolution(self) -> Resolution:
+        """
+        現在 UI 上で選択されている解像度を返す
+
+
+        Returns:
+            Resolution: 解像度
+        """
+        return Resolution(self.resolution_var.get())

@@ -43,6 +43,7 @@ class StillCaptureFrame(ctk.CTkFrame):
         # 参照を保存
         self.model = model
 
+        # レイアウト設定
         self.rowconfigure(0, weight=1)
         self.columnconfigure(0, weight=1)
 
@@ -94,13 +95,57 @@ class StillCaptureFrame(ctk.CTkFrame):
             return
 
         # 統合画像を生成
-        capture_image = IntegratedImage(pil_raw_capture_image)
+        capture_image = IntegratedImage(pil_raw_capture_image, None)
+        capture_image.nime(
+            self._size_pattern_selection_frame.aspect_ratio,
+            self._size_pattern_selection_frame.resolution,
+        )
 
-        # 指定サイズにリサイズの上プレビュー
+        # プレビューに設定
         self.preview_label.set_contents(image=capture_image)
 
-        # キャプチャをローカルにファイル保存する
-        nime_file_path = integrated_save_image(capture_image)
+        # コールバックを設定
+        capture_image.register_on_nime_changed(self.on_nime_changed)
+
+        # エクスポート処理
+        # NOTE
+        #   リサイズ --> コールバック登録の順番なので、
+        #   明示的にエクスポートを呼び出す必要がある。
+        self.export_image()
+
+    def on_resolution_changes(self, aspect_ratio: AspectRatio, resolution: Resolution):
+        """
+        解像度が変更された時に呼び出される
+
+        Args:
+            aspect_ratio (AspectRatio): アスペクト比
+            resolution (Resolution): 解像度
+        """
+        # リサイズを適用
+        # NOTE
+        #   リサイズさえすればコールバック経由でエクスポートまで走るはず
+        image = self.preview_label.image
+        if image is not None:
+            image.nime(aspect_ratio, resolution)
+
+    def on_nime_changed(self):
+        """
+        NIME 画像に変更があった際に呼び出されるハンドラ
+        """
+        self.preview_label._on_resize(None)
+        self.export_image()
+
+    def export_image(self):
+        """
+        画像のエクスポート処理を行う
+        """
+        # キャプチャがない場合は何もしない
+        image = self.preview_label.image
+        if image is None:
+            return
+
+        # キャプチャをローカルにファイルに保存する
+        nime_file_path = integrated_save_image(image)
         if not isinstance(nime_file_path, Path):
             raise TypeError(
                 f"Expected Path, got {type(nime_file_path)}. "
@@ -116,19 +161,3 @@ class StillCaptureFrame(ctk.CTkFrame):
             "「一閃」\nクリップボード転送完了",
             on_click_handler=self.on_preview_label_click,
         )
-
-    def on_resolution_changes(self, aspect_ratio: AspectRatio, resolution: Resolution):
-        """
-        解像度が変更された時に呼び出される
-
-        Args:
-            aspect_ratio (AspectRatio): アスペクト比
-            resolution (Resolution): 解像度
-        """
-        self._aspect_ratio = aspect_ratio
-        self._resolution = resolution
-
-    def on_apply_button_click(self):
-        """
-        解像度適用
-        """

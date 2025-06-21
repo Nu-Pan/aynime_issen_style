@@ -189,7 +189,7 @@ class WindowSelectionFrame(ctk.CTkFrame):
         選択されたウィンドウのキャプチャを撮影し、その画像で内部状態を更新する。
         """
         try:
-            self.original_capture_image = IntegratedImage(self.model.capture())
+            self.original_capture_image = IntegratedImage(self.model.capture(), None)
         except Exception as e:
             self.original_capture_image = None
 
