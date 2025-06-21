@@ -303,7 +303,7 @@ def make_disabled_image(
     draw.text(center_pos, text, font=font, fill=(255, 255, 255, 230))
 
     # 正常終了
-    return dark_image
+    return dark_image.convert("RGB")
 
 
 def calc_ssim(image_A: Image.Image, image_B: Image.Image) -> float:
@@ -452,7 +452,7 @@ class IntegratedImage:
         height_changed = height != self._preview_height
 
         # 再生成が不要な場合はキャッシュから返す
-        use_cache = cache_available or not width_changed or not height_changed
+        use_cache = cache_available and not width_changed and not height_changed
         if use_cache:
             return cast(Image.Image, self._preview_image)
 
@@ -508,7 +508,7 @@ class IntegratedImage:
         height_changed = height != self._thumbnail_height
 
         # 再生成が不要な場合はキャッシュから返す
-        use_cache = cache_available or not width_changed or not height_changed
+        use_cache = cache_available and not width_changed and not height_changed
         if use_cache:
             if enable:
                 return cast(Image.Image, self._thumbnail_image_enabled)
@@ -582,7 +582,7 @@ def integrated_save_image(
             format="PNG",
             optimize=True,
             compress_levvel=9,
-            transparency=0,
+            transparency=(0, 0, 0),
         )
 
         # 正常終了

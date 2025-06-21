@@ -30,7 +30,7 @@ class StillLabel(ctk.CTkLabel):
         silent_configure(self, font=default_font)
 
         # 内部状態
-        self._image = None
+        self._integrated_image = None
 
         # リサイズハンドラ
         self.bind("<Configure>", self._on_resize)
@@ -46,10 +46,12 @@ class StillLabel(ctk.CTkLabel):
             text (Optional[str], optional): 表示する文字列
         """
         # 画像の更新
-        if image is None:
-            self._image = None
+        if isinstance(image, IntegratedImage):
+            self._integrated_image = image
+        elif image is None:
+            self._integrated_image = None
         else:
-            self._image = image
+            raise TypeError(type(image))
 
         # テキストの更新
         if text is None:
@@ -65,7 +67,7 @@ class StillLabel(ctk.CTkLabel):
         リサイズハンドラ
         """
         # 画像なしの場合は何もしない
-        if self._image is None:
+        if self._integrated_image is None:
             silent_configure(self, image="")
             return
 
@@ -76,5 +78,5 @@ class StillLabel(ctk.CTkLabel):
         # リサイズ
         # NOTE
         #   枠いっぱいに全体が映るようにアス比を維持してスケール
-        pil_image = self._image.preview(actual_width, actual_height)
+        pil_image = self._integrated_image.preview(actual_width, actual_height)
         silent_configure(self, image=ImageTk.PhotoImage(pil_image))

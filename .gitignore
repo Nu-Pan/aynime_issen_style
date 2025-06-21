@@ -2,6 +2,7 @@ __pycache__
 /build/
 /dist/
 /release/
+/raw/
 /nime/
 /*.spec
 /src/utils/version_constants.py
