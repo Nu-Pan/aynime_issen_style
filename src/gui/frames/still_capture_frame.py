@@ -1,19 +1,27 @@
 # std
+from typing import List, Tuple, cast
 from pathlib import Path
 from datetime import datetime
 
 # Tk/CTk
 import customtkinter as ctk
+from tkinterdnd2 import TkinterDnD, DND_FILES
+from tkinterdnd2.TkinterDnD import DnDEvent
 import tkinter.messagebox as mb
 from tkinter import Event
 
 # utils
 from utils.constants import WIDGET_PADDING, DEFAULT_FONT_NAME
 from utils.pil import AspectRatio, Resolution
-from utils.integrated_image import IntegratedImage, integrated_save_image
+from utils.integrated_image import (
+    IntegratedImage,
+    integrated_save_image,
+    integrated_load_image,
+)
 from utils.windows import file_to_clipboard, register_global_hotkey_handler
 from utils.constants import APP_NAME_JP, NIME_DIR_PATH
 from utils.ctk import show_notify
+from utils.std import flatten
 
 # gui
 from gui.widgets.still_frame import StillLabel
@@ -25,7 +33,7 @@ from gui.widgets.size_pattern_selection_frame import (
 from aynime_issen_style_model import AynimeIssenStyleModel
 
 
-class StillCaptureFrame(ctk.CTkFrame):
+class StillCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
     """
     スチル画像のキャプチャ操作を行う CTk フレーム
     """
@@ -76,6 +84,10 @@ class StillCaptureFrame(ctk.CTkFrame):
         self._size_pattern_selection_frame.grid(
             row=1, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
         )
+
+        # ファイルドロップ関係
+        self.drop_target_register(DND_FILES)
+        self.dnd_bind("<<Drop>>", self._on_drop_file)
 
     def on_preview_label_click(self, event: Event) -> None:
         """
@@ -161,3 +173,57 @@ class StillCaptureFrame(ctk.CTkFrame):
             "「一閃」\nクリップボード転送完了",
             on_click_handler=self.on_preview_label_click,
         )
+
+    def _on_drop_file(self, event: DnDEvent):
+        """
+        ファイルドロップハンドラ
+
+        Args:
+            event (Event): イベント
+        """
+        # ファイルパスのみ受付
+        event_data = vars(event)["data"]
+        if not isinstance(event_data, str):
+            return
+
+        # 読み込み処理
+        # NOTE
+        #   複数の画像ファイルがドロップ or 動画系ファイルがドロップされた場合、
+        #   先頭のフレームを代表して取り込む。
+        paths = cast(Tuple[str], self.tk.splitlist(event_data))
+        image = None
+        exceptions: List[Exception] = []
+        for file_path in paths:
+            try:
+                load_result = integrated_load_image(Path(file_path))
+                if isinstance(load_result, IntegratedImage):
+                    image = load_result
+                    break
+                elif isinstance(load_result, list) and len(load_result) > 0:
+                    image = load_result[0]
+                    break
+                else:
+                    raise TypeError(load_result)
+            except Exception as e:
+                exceptions.append(e)
+
+        # 読み込めてない場合はここでおしまい
+        if image is None:
+            if len(exceptions) > 0:
+                mb.showerror(
+                    APP_NAME_JP,
+                    f"画像・動画の読み込みに失敗。\n{[str(e.args) for e in exceptions]}",
+                )
+            return
+
+        # アス比・解像度を反映
+        image.nime(
+            self._size_pattern_selection_frame.aspect_ratio,
+            self._size_pattern_selection_frame.resolution,
+        )
+
+        # プレビューに設定
+        self.preview_label.set_contents(image)
+
+        # コールバックを設定
+        image.register_on_nime_changed(self.on_nime_changed)
