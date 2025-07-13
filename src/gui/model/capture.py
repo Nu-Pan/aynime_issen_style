@@ -23,9 +23,10 @@ class CaptureMode(Enum):
     PYWIN32 = "pywin32"
 
 
-class AynimeIssenStyleModel:
+class CaptureModel:
     """
-    えぃにめ一閃流奥義「一閃」のモデル
+    えぃにめ一閃流奥義「一閃」のモデルの１つ
+
     """
 
     def __init__(self) -> None:

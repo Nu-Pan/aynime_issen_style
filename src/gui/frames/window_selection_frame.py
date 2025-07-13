@@ -9,13 +9,14 @@ from CTkListbox import CTkListbox
 # utils
 from utils.capture_context import CaptureTargetInfo
 from utils.constants import WIDGET_PADDING, WINDOW_MIN_WIDTH, DEFAULT_FONT_NAME
-from utils.integrated_image import IntegratedImage
+from gui.model.contents_cache import ImageModel
 
 # gui
-from gui.widgets.still_frame import StillLabel
+from gui.widgets.still_label import StillLabel
 
 # local
-from aynime_issen_style_model import CaptureMode, AynimeIssenStyleModel
+from gui.model.aynime_issen_style import AynimeIssenStyleModel
+from gui.model.capture import CaptureMode
 
 
 class WindowSelectionFrame(ctk.CTkFrame):
@@ -38,7 +39,7 @@ class WindowSelectionFrame(ctk.CTkFrame):
         # フォントを生成
         default_font = ctk.CTkFont(DEFAULT_FONT_NAME)
 
-        # 参照を保存
+        # モデル
         self.model = model
 
         # レイアウト設定
@@ -123,14 +124,12 @@ class WindowSelectionFrame(ctk.CTkFrame):
         self.east_frame.columnconfigure(0, weight=1)
 
         # プレビュー画像表示用ラベル
-        self.capture_target_preview_label = StillLabel(self.east_frame)
+        self.capture_target_preview_label = StillLabel(
+            self.east_frame, model.window_selection, "Preview"
+        )
         self.capture_target_preview_label.grid(
             row=1, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
         )
-        self.capture_target_preview_label.set_contents(text="Preview")
-
-        # リサイズ前のキャプチャ画像
-        self.original_capture_image = None
 
         # 初回キャプチャターゲットリスト更新
         self.update_list()
@@ -144,7 +143,7 @@ class WindowSelectionFrame(ctk.CTkFrame):
         キャプチャモードの選択イベントハンドラ
         """
         # モデルに変更を反映
-        self.model.change_capture_mode(CaptureMode(self.capture_mode_var.get()))
+        self.model.capture.change_capture_mode(CaptureMode(self.capture_mode_var.get()))
         self.update_list()
 
         # プレビューをクリア
@@ -164,11 +163,10 @@ class WindowSelectionFrame(ctk.CTkFrame):
                 self.capture_target_list_box.curselection()
             ),
         )
-        self.model.change_capture_target(selection)
+        self.model.capture.change_capture_target(selection)
 
         # 描画更新
         self.update_original_capture_image()
-        self.update_capture_target_preview()
 
     def update_list(self) -> None:
         """
@@ -178,7 +176,7 @@ class WindowSelectionFrame(ctk.CTkFrame):
         try:
             self.reload_capture_target_list_button.configure(state=ctk.DISABLED)
             self.capture_target_list_box.delete("all")
-            for capture_target_info in self.model.enumerate_capture_targets():
+            for capture_target_info in self.model.capture.enumerate_capture_targets():
                 self.capture_target_list_box.insert(ctk.END, capture_target_info, False)
             self.capture_target_list_box.update()
         finally:
@@ -189,27 +187,14 @@ class WindowSelectionFrame(ctk.CTkFrame):
         選択されたウィンドウのキャプチャを撮影し、その画像で内部状態を更新する。
         """
         try:
-            self.original_capture_image = IntegratedImage(self.model.capture(), None)
+            self.model.window_selection.set_raw_image(
+                self.model.capture.capture(), None
+            )
         except Exception as e:
-            self.original_capture_image = None
+            self.model.window_selection.set_raw_image(None, None)
 
     def clear_capture_target_preview(self) -> None:
         """
         プレビューの表示状態をクリアする。
         """
-        self.original_capture_image = None
-        self.capture_target_preview_label.set_contents(text="Capture Target Preview")
-
-    def update_capture_target_preview(self) -> None:
-        """
-        プレビューの表示状態を更新する。
-        キャプチャは行わない。
-        """
-        # 描画対象画像を解決
-        image = self.original_capture_image
-        if image is None:
-            self.clear_capture_target_preview()
-            return
-
-        # 画像を表示
-        self.capture_target_preview_label.set_contents(image=image)
+        self.model.window_selection.set_raw_image(None, None)

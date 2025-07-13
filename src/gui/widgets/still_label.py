@@ -1,0 +1,77 @@
+# std
+from typing import Optional
+
+# PIL
+from PIL import Image, ImageTk
+from PIL.ImageTk import PhotoImage
+
+# TK/CTk
+import customtkinter as ctk
+
+# utils
+from utils.constants import DEFAULT_FONT_NAME
+from utils.ctk import silent_configure
+from utils.pil import SizePixel
+
+# model
+from gui.model.contents_cache import ImageModel, ImageLayer
+
+
+class StillLabel(ctk.CTkLabel):
+    """
+    画像表示用のフレーム
+    設定された画像をアスペクト比を維持したまま全体が映るようにダウンスケールして表示する
+    """
+
+    def __init__(
+        self,
+        master: ctk.CTkBaseClass,
+        image_model: ImageModel,
+        blank_text: str,
+        **kwargs
+    ):
+        """
+        コンストラクタ
+        """
+        super().__init__(master, **kwargs)
+
+        # モデル関係
+        self._image_model = image_model
+        self._image_model.register_notify_handler(
+            ImageLayer.PREVIEW, self._on_preview_changed
+        )
+
+        # フォントを設定
+        default_font = ctk.CTkFont(DEFAULT_FONT_NAME)
+        silent_configure(self, font=default_font)
+
+        # ブランク表示
+        self._blank_text = blank_text
+        silent_configure(self, image="", text=blank_text)
+
+        # リサイズハンドラ
+        self.bind("<Configure>", self._on_resize)
+
+    def _on_preview_changed(self):
+        """
+        画像に変更があった際に呼び出されるハンドラ
+        """
+        # UI 的に反映
+        preview_image = self._image_model.get_image(ImageLayer.PREVIEW)
+        if isinstance(preview_image, PhotoImage):
+            silent_configure(self, image=preview_image)
+        elif preview_image is None:
+            silent_configure(self, image="", text=self._blank_text)
+        else:
+            raise TypeError()
+
+    def _on_resize(self, _):
+        """
+        リサイズハンドラ
+        """
+        # モデルにサイズを反映
+        actual_width = self.winfo_width()
+        actual_height = self.winfo_height()
+        self._image_model.set_size(
+            ImageLayer.PREVIEW, SizePixel(actual_width, actual_height)
+        ).notify(ImageLayer.PREVIEW)

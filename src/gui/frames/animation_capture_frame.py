@@ -1,6 +1,6 @@
 # std
 from pathlib import Path
-from typing import cast, Tuple, List
+from typing import cast, Tuple, List, Any
 from time import time
 
 # PIL
@@ -15,10 +15,11 @@ import tkinter.messagebox as mb
 # utils
 from utils.constants import WIDGET_PADDING, DEFAULT_FONT_NAME
 from utils.pil import AspectRatio, Resolution
-from utils.integrated_image import (
-    IntegratedImage,
-    integrated_save_image,
-    integrated_load_image,
+from gui.model.contents_cache import (
+    ImageModel,
+    VideoModel,
+    save_content_model,
+    load_content_model,
 )
 from utils.constants import APP_NAME_JP, NIME_DIR_PATH, RAW_DIR_PATH
 from utils.windows import file_to_clipboard
@@ -31,7 +32,7 @@ from gui.widgets.animation_label import AnimationLabel
 from gui.widgets.size_pattern_selection_frame import SizePatternSlectionFrame
 
 # local
-from aynime_issen_style_model import AynimeIssenStyleModel
+from gui.model.aynime_issen_style import AynimeIssenStyleModel
 
 
 class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
@@ -317,9 +318,6 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
     def _on_frame_list_change(self):
         """
         アニメフレーム更新ハンドラ
-
-        Args:
-            frames (List[Image.Image]): アニメフレーム
         """
         self._update_preview()
 
@@ -360,16 +358,16 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
         """
         セーブボタンクリックハンドラ
         """
-        # 対象フレームの列挙
-        frames = self._animation_preview_label.frames
-        if len(frames) < 2:
-            raise ValueError(f"# of frames less than 2(actual={len(frames)})")
+        # 最低２フレーム必要
+        video = self._animation_preview_label.video
+        if video.num_enable_frames < 2:
+            raise ValueError(f"# of frames less than 2(actual={len(video)})")
 
         # gif ファイルとして保存
         # date_str = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         # gif_file_path = NIME_DIR_PATH / (date_str + ".gif")
-        gif_file_path = integrated_save_image(
-            frames, self._animation_preview_label.interval_in_ms
+        gif_file_path = save_content_model(
+            video, self._animation_preview_label.interval_in_ms
         )
         if not isinstance(gif_file_path, Path):
             raise TypeError(
@@ -420,22 +418,22 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
             return
 
         # エイリアス
-        frames = self._frame_list_bar.frames
+        video = self._frame_list_bar.video
 
         # 「折り返し」の対応
         # NOTE
         #   最終フレームまで再生したあと、先頭フレームへ向けて逆再生を行うことを「折り返し」と呼んでいる。
         if self._reflect_checkbox.get():
-            if len(frames) > 2:
-                extend_frames = frames[1:-1]
+            if len(video) > 2:
+                extend_frames = video[1:-1]
                 extend_frames.reverse()
-                frames = frames + extend_frames
+                video = video + extend_frames
 
         # プレビューウィジェットに設定
-        self._animation_preview_label.set_frames(frames)
+        self._animation_preview_label.set_video(video)
 
     def _record_handler(
-        self, stop_time_in_sec: float, record_frames: List[IntegratedImage] = []
+        self, stop_time_in_sec: float, record_raw_images: List[Image.Image] = []
     ):
         """
         レコード処理を実際に担うハンドラ
@@ -447,18 +445,12 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
         """
         # 所定の時間を経過してたら終了
         if time() > stop_time_in_sec:
-            self._frame_list_bar.add_image(record_frames)
+            self._frame_list_bar.add_image(record_raw_images)
             return
-
-        # タイムスタンプを１枚目から流用
-        if len(record_frames) > 0:
-            time_stamp = record_frames[0].time_stamp
-        else:
-            time_stamp = None
 
         # キャプチャ
         try:
-            new_frame = IntegratedImage(self._model.capture(), time_stamp)
+            new_image = self._model.capture()
         except Exception as e:
             mb.showerror(
                 APP_NAME_JP,
@@ -467,14 +459,14 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
             return
 
         # 新しいフレームで差分が発生している場合のみ追加する
-        if len(record_frames) == 0:
-            next_frames = [new_frame]
+        if len(record_raw_images) == 0:
+            next_frames = [new_image]
         else:
-            last_frame = record_frames[-1]
-            if new_frame == last_frame:
-                next_frames = record_frames
+            last_frame = record_raw_images[-1]
+            if new_image == last_frame:
+                next_frames = record_raw_images
             else:
-                next_frames = record_frames + [new_frame]
+                next_frames = record_raw_images + [new_image]
 
         # 次をディスパッチ
         self.after(10, self._record_handler, stop_time_in_sec, next_frames)
@@ -494,10 +486,12 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
         # 動画・画像で分岐
         try:
             paths = cast(Tuple[str], self.tk.splitlist(event_data))
-            frames = cast(
-                List[IntegratedImage],
-                flatten([integrated_load_image(Path(p)) for p in paths]),
+            video_models = cast(
+                List[Any],
+                flatten([load_content_model(Path(p)) for p in paths]),
             )
+            # TODO 実装
+            raise NotImplementedError()
         except Exception as e:
             mb.showerror(
                 APP_NAME_JP,

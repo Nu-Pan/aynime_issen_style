@@ -1,6 +1,8 @@
 # std
-from typing import Tuple, Optional
+from typing import Tuple, Optional, Union
 from enum import Enum
+from dataclasses import dataclass
+from enum import Enum, auto
 
 # PIL
 from PIL import Image, ImageDraw, ImageEnhance, ImageFont
@@ -127,8 +129,35 @@ def resolve_target_size(
     return (target_width, target_height)
 
 
-def resize_contain_free_size(
-    image: Image.Image, target_width: int, target_height: int
+@dataclass
+class SizePattern:
+    aspect_ratio: AspectRatio
+    resolution: Resolution
+
+    def __eq__(self, other):
+        if isinstance(other, SizePattern):
+            return (
+                self.aspect_ratio == other.aspect_ratio
+                and self.resolution == other.resolution
+            )
+        else:
+            return NotImplemented
+
+
+@dataclass
+class SizePixel:
+    width: int
+    height: int
+
+    def __eq__(self, other):
+        if isinstance(other, SizePixel):
+            return self.width == other.width and self.height == other.height
+        else:
+            return NotImplemented
+
+
+def resize_contain(
+    image: Image.Image, target_size: Union[SizePixel, SizePattern]
 ) -> Image.Image:
     """
     (width, height) のボックス内に image 全体が収まるようにリサイズする。
@@ -143,6 +172,17 @@ def resize_contain_free_size(
     Returns:
         Image.Image: リサイズ後の画像
     """
+    # サイズ情報を width, height に展開
+    if isinstance(target_size, SizePixel):
+        target_width = target_size.width
+        target_height = target_size.height
+    elif isinstance(target_size, SizePattern):
+        target_width, target_height = resolve_target_size(
+            image.width, image.height, target_size.aspect_ratio, target_size.resolution
+        )
+    else:
+        raise TypeError(target_size)
+
     # スケール後のサイズを解決
     width_scale = target_width / image.width
     height_scale = target_height / image.height
@@ -166,20 +206,8 @@ def resize_contain_free_size(
     )
 
 
-def resize_contain_pattern_size(
-    image: Image.Image, aspect_ratio: AspectRatio, resolution: Resolution
-) -> Image.Image:
-    """
-    resize_contain_free_size のパターン指定版。
-    """
-    target_width, target_height = resolve_target_size(
-        image.width, image.height, aspect_ratio, resolution
-    )
-    return resize_contain_free_size(image, target_width, target_height)
-
-
-def resize_cover_free_size(
-    image: Image.Image, target_width: int, target_height: int
+def resize_cover(
+    image: Image.Image, target_size: Union[SizePixel, SizePattern]
 ) -> Image.Image:
     """
     image の範囲内に (width, height) のボックスがちょうど収まるように image をリサイズする。
@@ -195,6 +223,17 @@ def resize_cover_free_size(
     Returns:
         Image.Image: リサイズ後の画像
     """
+    # サイズ情報を width, height に展開
+    if isinstance(target_size, SizePixel):
+        target_width = target_size.width
+        target_height = target_size.height
+    elif isinstance(target_size, SizePattern):
+        target_width, target_height = resolve_target_size(
+            image.width, image.height, target_size.aspect_ratio, target_size.resolution
+        )
+    else:
+        raise TypeError(target_size)
+
     # スケール後のサイズを解決
     width_scale = target_width / image.width
     height_scale = target_height / image.height
@@ -232,16 +271,39 @@ def resize_cover_free_size(
     return croped_image
 
 
-def resize_cover_pattern_size(
-    image: Image.Image, aspect_ratio: AspectRatio, resolution: Resolution
+class ResizeMode(Enum):
+    """
+    リサイズの挙動を表す列挙値
+    """
+
+    # (width, height) のボックス内に image 全体が収まるように image をリサイズする
+    CONTAIN = auto()
+
+    # image の範囲内に (width, height) のボックスがちょうど収まるように image をリサイズする
+    COVER = auto()
+
+
+def resize(
+    image: Image.Image, target_size: Union[SizePixel, SizePattern], mode: ResizeMode
 ) -> Image.Image:
     """
-    resize_cover_pattern_size のパターン指定版。
+    image を target_size にリサイズする
+    リサイズの挙動は mode に従う
+
+    Args:
+        image (Image.Image): リサイズ元画像
+        target_size (Union[SizePixel, SizePattern]): リサイズ先サイズ
+        mode (ResizeMode): リサイズ挙動
+
+    Returns:
+        Image.Image: リサイズ済み画像
     """
-    target_width, target_height = resolve_target_size(
-        image.width, image.height, aspect_ratio, resolution
-    )
-    return resize_cover_free_size(image, target_width, target_height)
+    if mode == ResizeMode.CONTAIN:
+        return resize_contain(image, target_size)
+    elif mode == ResizeMode.COVER:
+        return resize_cover(image, target_size)
+    else:
+        raise ValueError(mode)
 
 
 def get_text_bbox_size(
@@ -313,8 +375,12 @@ def calc_ssim(image_A: Image.Image, image_B: Image.Image) -> float:
     if image_A.width != image_B.width or image_A.height != image_B.height:
         actual_width = min(image_A.width, image_B.width)
         actual_height = min(image_A.height, image_B.height)
-        image_A = resize_cover_free_size(image_A, actual_width, actual_height)
-        image_B = resize_cover_free_size(image_B, actual_width, actual_height)
+        image_A = resize(
+            image_A, SizePixel(actual_width, actual_height), ResizeMode.COVER
+        )
+        image_B = resize(
+            image_B, SizePixel(actual_width, actual_height), ResizeMode.COVER
+        )
 
     # ndarray 化
     np_image_A = np.array(image_A.convert("L"))

@@ -8,7 +8,7 @@ from PIL import Image, ImageTk
 import customtkinter as ctk
 
 # utils
-from utils.integrated_image import IntegratedImage
+from gui.model.contents_cache import ImageModel, VideoModel
 from utils.ctk import silent_configure
 
 
@@ -26,7 +26,7 @@ class AnimationLabel(ctk.CTkLabel):
         super().__init__(master, **kwargs)
 
         # 内部状態を適当に初期化
-        self.set_frames()
+        self.set_video()
         self.set_frame_rate(24)
         self._frame_index = 0
         if blank_text is None:
@@ -40,7 +40,7 @@ class AnimationLabel(ctk.CTkLabel):
         # 更新処理をキック
         self._next_frame_handler()
 
-    def set_frames(self, frames: List[IntegratedImage] = []):
+    def set_video(self, video: VideoModel):
         """
         アニメーション表示するフレーム（画像）群を設定する
 
@@ -48,25 +48,20 @@ class AnimationLabel(ctk.CTkLabel):
             frames (List[Union[Image.Image, ImageTk.PhotoImage]]): 表示したいフレーム（画像）群
         """
         # 全ての画像を PIL Image として保持
-        self._original_frames: List[IntegratedImage] = []
-        for frame in frames:
-            if isinstance(frame, IntegratedImage):
-                self._original_frames.append(frame)
-            else:
-                raise TypeError(f"Invalid type of frame({type(frame)})")
+        self._integrated_video = video
 
         # ちょうどいいサイズにする
         self._on_resize(None)
 
     @property
-    def frames(self) -> List[IntegratedImage]:
+    def video(self) -> VideoModel:
         """
-        設定されているフレーム（画像）群を取得する
+        設定されている動画を取得する
 
         Returns:
-            List[Image.Image]: 設定されているフレーム（画像）群
+            IntegratedVideo: 設定されている動画
         """
-        return self._original_frames
+        return self._integrated_video
 
     def set_frame_rate(self, frame_rate: int):
         """
@@ -113,7 +108,7 @@ class AnimationLabel(ctk.CTkLabel):
 
         # 表示用のサイズにリサイズ
         self._preview_frames: List[ImageTk.PhotoImage] = []
-        for original_frame in self._original_frames:
+        for original_frame in self._integrated_video:
             pil_frame = original_frame.preview(actual_width, actual_height)
             tk_frame = ImageTk.PhotoImage(pil_frame)
             self._preview_frames.append(tk_frame)

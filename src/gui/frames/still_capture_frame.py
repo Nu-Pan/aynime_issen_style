@@ -2,6 +2,9 @@
 from typing import List, Tuple, cast
 from pathlib import Path
 
+# PIL
+from PIL import Image
+
 # Tk/CTk
 import customtkinter as ctk
 from tkinterdnd2 import TkinterDnD, DND_FILES
@@ -11,11 +14,12 @@ from tkinter import Event
 
 # utils
 from utils.constants import WIDGET_PADDING, DEFAULT_FONT_NAME
-from utils.pil import AspectRatio, Resolution
-from utils.integrated_image import (
-    IntegratedImage,
-    integrated_save_image,
-    integrated_load_image,
+from utils.pil import AspectRatio, Resolution, SizePattern
+from gui.model.contents_cache import (
+    ImageModel,
+    VideoModel,
+    save_content_model,
+    load_content_model,
 )
 from utils.windows import file_to_clipboard, register_global_hotkey_handler
 from utils.constants import APP_NAME_JP, NIME_DIR_PATH
@@ -23,13 +27,14 @@ from utils.ctk import show_notify
 from utils.std import flatten
 
 # gui
-from gui.widgets.still_frame import StillLabel
+from gui.widgets.still_label import StillLabel
 from gui.widgets.size_pattern_selection_frame import (
     SizePatternSlectionFrame,
 )
+from gui.model.contents_cache import ImageLayer
 
 # local
-from aynime_issen_style_model import AynimeIssenStyleModel
+from gui.model.aynime_issen_style import AynimeIssenStyleModel
 
 
 class StillCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
@@ -47,16 +52,16 @@ class StillCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
         """
         super().__init__(master, **kwargs)
 
-        # 参照を保存
+        # モデル
         self.model = model
+        self.model.still.register_notify_handler(ImageLayer.NIME, self.on_nime_changed)
 
         # レイアウト設定
         self.rowconfigure(0, weight=1)
         self.columnconfigure(0, weight=1)
 
         # プレビューラベル兼キャプチャボタン
-        self.preview_label = StillLabel(self)
-        self.preview_label.set_contents(text="Click Here or Ctrl+Alt+P")
+        self.preview_label = StillLabel(self, model.still, "Click Here or Ctrl+Alt+P")
         self.preview_label.grid(
             row=0, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
         )
@@ -95,9 +100,9 @@ class StillCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
         Args:
             event (_type_): イベントオブジェクト
         """
-        # まずはキャプチャ
+        # キャプチャ
         try:
-            pil_raw_capture_image = self.model.capture()
+            pil_raw_capture_image = self.model.capture.capture()
         except Exception as e:
             mb.showerror(
                 APP_NAME_JP,
@@ -105,18 +110,10 @@ class StillCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
             )
             return
 
-        # 統合画像を生成
-        capture_image = IntegratedImage(pil_raw_capture_image, None)
-        capture_image.nime(
-            self._size_pattern_selection_frame.aspect_ratio,
-            self._size_pattern_selection_frame.resolution,
+        # モデルに反映
+        self.model.still.set_raw_image(pil_raw_capture_image, None).notify(
+            ImageLayer.RAW
         )
-
-        # プレビューに設定
-        self.preview_label.set_contents(image=capture_image)
-
-        # コールバックを設定
-        capture_image.register_on_nime_changed(self.on_nime_changed)
 
         # エクスポート処理
         # NOTE
@@ -135,15 +132,14 @@ class StillCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
         # リサイズを適用
         # NOTE
         #   リサイズさえすればコールバック経由でエクスポートまで走るはず
-        image = self.preview_label.image
-        if image is not None:
-            image.nime(aspect_ratio, resolution)
+        self.model.still.set_size(
+            ImageLayer.NIME, SizePattern(aspect_ratio, resolution)
+        ).notify(ImageLayer.NIME)
 
     def on_nime_changed(self):
         """
         NIME 画像に変更があった際に呼び出されるハンドラ
         """
-        self.preview_label._on_resize(None)
         self.export_image()
 
     def export_image(self):
@@ -151,12 +147,11 @@ class StillCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
         画像のエクスポート処理を行う
         """
         # キャプチャがない場合は何もしない
-        image = self.preview_label.image
-        if image is None:
+        if self.model.still.get_image(ImageLayer.NIME) is None:
             return
 
         # キャプチャをローカルにファイルに保存する
-        nime_file_path = integrated_save_image(image)
+        nime_file_path = save_content_model(self.model.still)
         if not isinstance(nime_file_path, Path):
             raise TypeError(
                 f"Expected Path, got {type(nime_file_path)}. "
@@ -191,15 +186,18 @@ class StillCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
         #   先頭のフレームを代表して取り込む。
         paths = cast(Tuple[str], self.tk.splitlist(event_data))
         image = None
+        time_stamp = None
         exceptions: List[Exception] = []
         for file_path in paths:
             try:
-                load_result = integrated_load_image(Path(file_path))
-                if isinstance(load_result, IntegratedImage):
-                    image = load_result
+                load_result = load_content_model(Path(file_path))
+                if isinstance(load_result, ImageModel):
+                    image = load_result.get_image(ImageLayer.RAW)
+                    time_stamp = load_result.time_stamp
                     break
-                elif isinstance(load_result, list) and len(load_result) > 0:
-                    image = load_result[0]
+                elif isinstance(load_result, VideoModel):
+                    image = load_result.get_frame(ImageLayer.RAW, 0)
+                    time_stamp = load_result.time_stamp
                     break
                 else:
                     raise TypeError(load_result)
@@ -207,7 +205,7 @@ class StillCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
                 exceptions.append(e)
 
         # 読み込めてない場合はここでおしまい
-        if image is None:
+        if not isinstance(image, Image.Image) or not isinstance(time_stamp, str):
             if len(exceptions) > 0:
                 mb.showerror(
                     APP_NAME_JP,
@@ -215,14 +213,5 @@ class StillCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
                 )
             return
 
-        # アス比・解像度を反映
-        image.nime(
-            self._size_pattern_selection_frame.aspect_ratio,
-            self._size_pattern_selection_frame.resolution,
-        )
-
-        # プレビューに設定
-        self.preview_label.set_contents(image)
-
-        # コールバックを設定
-        image.register_on_nime_changed(self.on_nime_changed)
+        # モデルに設定
+        self.model.still.set_raw_image(image, time_stamp).notify(ImageLayer.RAW)

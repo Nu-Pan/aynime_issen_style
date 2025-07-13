@@ -12,7 +12,7 @@ from utils.windows import SystemWideMutex
 from utils.constants import APP_NAME_EN, APP_NAME_JP
 
 # local
-from aynime_issen_style_app import AynimeIssenStyleApp
+from gui.aynime_issen_style_app import AynimeIssenStyleApp
 
 if __name__ == "__main__":
     # ログファイルリダイレクト設定

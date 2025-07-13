@@ -12,7 +12,7 @@ import customtkinter as ctk
 # utils
 from utils.constants import WIDGET_PADDING, DEFAULT_FONT_NAME
 from utils.pil import calc_ssim
-from utils.integrated_image import IntegratedImage
+from gui.model.contents_cache import ImageModel, VideoModel
 
 
 class SentinelItem(ctk.CTkFrame):
@@ -55,7 +55,7 @@ class ThumbnailItem(ctk.CTkFrame):
     """
 
     def __init__(
-        self, master: "ThumbnailBar", image: IntegratedImage, thumbnail_height: int
+        self, master: "ThumbnailBar", image: ImageModel, thumbnail_height: int
     ):
         """
         コンストラクタ
@@ -77,7 +77,9 @@ class ThumbnailItem(ctk.CTkFrame):
         self._mlb_press_pos = (0, 0)
 
         # サムネイルサイズを解決
-        thumbnail_width = int(image.raw().width * thumbnail_height / image.raw().height)
+        thumbnail_width = int(
+            image.raw_image().width * thumbnail_height / image.raw_image().height
+        )
         pil_image = self._image.thumbnail(
             self._enabled, thumbnail_width, thumbnail_height
         )
@@ -170,7 +172,7 @@ class ThumbnailItem(ctk.CTkFrame):
         self._master.delete_image(self)
 
     @property
-    def image(self) -> IntegratedImage:
+    def image(self) -> ImageModel:
         """
         保持している画像を返す
 
@@ -264,7 +266,7 @@ class ThumbnailBar(ctk.CTkScrollableFrame):
         # 親ウィジェットに通知
         self._parent_on_change()
 
-    def add_image(self, images: Iterable[IntegratedImage]):
+    def add_image(self, images: Iterable[ImageModel]):
         """
         画像（アイテム）を追加
 
@@ -437,12 +439,12 @@ class ThumbnailBar(ctk.CTkScrollableFrame):
         self._on_change()
 
     @property
-    def frames(self) -> List[IntegratedImage]:
+    def video(self) -> VideoModel:
         """
-        格納しているフレーム（画像）を得る
+        格納している動画を得る
 
         Returns:
-            List[IntegratedImage]: 格納しているフレーム
+            IntegratedVideo: 格納している動画
         """
         return [
             item.image
