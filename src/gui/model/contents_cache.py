@@ -189,7 +189,7 @@ class CachedScalableImage(
 
         # 遅延変数
         self._is_dirty = False
-        self._size = None
+        self._size = SizePattern(AspectRatio.E_RAW, Resolution.E_RAW)
         self._output = None
 
     def set_size(self, size: Union[SizePattern, SizePixel]) -> Self:

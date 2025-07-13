@@ -13,10 +13,9 @@ from gui.model.contents_cache import ImageModel
 
 # gui
 from gui.widgets.still_label import StillLabel
-
-# local
 from gui.model.aynime_issen_style import AynimeIssenStyleModel
 from gui.model.capture import CaptureMode
+from gui.model.contents_cache import ImageLayer
 
 
 class WindowSelectionFrame(ctk.CTkFrame):
@@ -189,12 +188,12 @@ class WindowSelectionFrame(ctk.CTkFrame):
         try:
             self.model.window_selection.set_raw_image(
                 self.model.capture.capture(), None
-            )
+            ).notify(ImageLayer.RAW)
         except Exception as e:
-            self.model.window_selection.set_raw_image(None, None)
+            self.model.window_selection.set_raw_image(None, None).notify(ImageLayer.RAW)
 
     def clear_capture_target_preview(self) -> None:
         """
         プレビューの表示状態をクリアする。
         """
-        self.model.window_selection.set_raw_image(None, None)
+        self.model.window_selection.set_raw_image(None, None).notify(ImageLayer.RAW)
