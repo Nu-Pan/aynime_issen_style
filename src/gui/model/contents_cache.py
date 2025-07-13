@@ -215,7 +215,6 @@ class CachedScalableImage(
         # 必要なものが…
         if parent_content is not None and self._size is not None:
             # 揃っている場合、更新
-            does_notify = True
             if isinstance(parent_content, Image.Image):
                 self._output = resize(parent_content, self._size, self._mode)
             else:
@@ -225,7 +224,6 @@ class CachedScalableImage(
             self._is_dirty = False
         else:
             # 揃っていない場合、単にクリア
-            does_notify = self._output is not None
             self._output = None
             self._is_dirty = False
 
@@ -286,12 +284,10 @@ class CachedPhotoImage(
         # 必要なものが…
         if isinstance(parent_content, Image.Image):
             # 揃っている場合、更新
-            does_notify = True
             self._output = PhotoImage(parent_content)
             self._is_dirty = False
         elif parent_content is None:
             # 揃っていない場合、単にクリア
-            does_notify = self._output is not None
             self._output = None
             self._is_dirty = False
         else:
