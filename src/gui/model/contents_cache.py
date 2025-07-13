@@ -342,7 +342,7 @@ class ImageModel:
 
         # 各画像メンバ
         self._raw_image = CachedSourceImage()
-        self._nime_image = CachedScalableImage(self._raw_image, ResizeMode.CONTAIN)
+        self._nime_image = CachedScalableImage(self._raw_image, ResizeMode.COVER)
         self._preview_pil_image = CachedScalableImage(
             self._nime_image, ResizeMode.CONTAIN
         )
