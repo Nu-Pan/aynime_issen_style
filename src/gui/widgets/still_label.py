@@ -59,7 +59,7 @@ class StillLabel(ctk.CTkLabel):
         # UI 的に反映
         preview_image = self._image_model.get_image(ImageLayer.PREVIEW)
         if isinstance(preview_image, PhotoImage):
-            silent_configure(self, image=preview_image)
+            silent_configure(self, image=preview_image, text="")
         elif preview_image is None:
             silent_configure(self, image="", text=self._blank_text)
         else:
