@@ -14,14 +14,8 @@ import tkinter.messagebox as mb
 
 # utils
 from utils.constants import WIDGET_PADDING, DEFAULT_FONT_NAME
-from utils.pil import AspectRatio, Resolution
-from gui.model.contents_cache import (
-    ImageModel,
-    VideoModel,
-    save_content_model,
-    load_content_model,
-)
-from utils.constants import APP_NAME_JP, NIME_DIR_PATH, RAW_DIR_PATH
+from utils.pil import AspectRatioPattern, ResizeDesc
+from utils.constants import APP_NAME_JP, THUMBNAIL_HEIGHT
 from utils.windows import file_to_clipboard
 from utils.ctk import show_notify
 from utils.std import flatten
@@ -30,6 +24,12 @@ from utils.std import flatten
 from gui.widgets.thumbnail_bar import ThumbnailBar
 from gui.widgets.animation_label import AnimationLabel
 from gui.widgets.size_pattern_selection_frame import SizePatternSlectionFrame
+from gui.model.contents_cache import (
+    ImageLayer,
+    ImageModel,
+    save_content_model,
+    load_content_model,
+)
 
 # local
 from gui.model.aynime_issen_style import AynimeIssenStyleModel
@@ -73,7 +73,9 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
         self._output_kind_frame.columnconfigure(0, weight=1)
 
         # アニメーションプレビュー
-        self._animation_preview_label = AnimationLabel(self._output_kind_frame)
+        self._animation_preview_label = AnimationLabel(
+            self._output_kind_frame, self._model
+        )
         self._animation_preview_label.grid(
             row=0, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
         )
@@ -82,24 +84,33 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
         self._size_pattern_selection_frame = SizePatternSlectionFrame(
             self._output_kind_frame,
             self._on_resolution_changes,
-            AspectRatio.E_RAW,
-            Resolution.E_RAW,
+            AspectRatioPattern.E_RAW,
+            ResizeDesc.Pattern.E_RAW,
             [
-                AspectRatio.E_RAW,
-                AspectRatio.E_16_9,
-                AspectRatio.E_4_3,
-                AspectRatio.E_1_1,
+                AspectRatioPattern.E_RAW,
+                AspectRatioPattern.E_16_9,
+                AspectRatioPattern.E_4_3,
+                AspectRatioPattern.E_1_1,
             ],
             [
-                Resolution.E_RAW,
-                Resolution.E_HVGA,
-                Resolution.E_VGA,
-                Resolution.E_QHD,
-                Resolution.E_HD,
+                ResizeDesc.Pattern.E_RAW,
+                ResizeDesc.Pattern.E_HVGA,
+                ResizeDesc.Pattern.E_VGA,
+                ResizeDesc.Pattern.E_QHD,
+                ResizeDesc.Pattern.E_HD,
             ],
         )
         self._size_pattern_selection_frame.grid(
             row=1, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
+        )
+
+        # UI とモデルの解像度を揃える
+        self._model.video.set_size(
+            ImageLayer.NIME,
+            ResizeDesc.from_pattern(
+                self._size_pattern_selection_frame.aspect_ratio,
+                self._size_pattern_selection_frame.resolution,
+            ),
         )
 
         # フレームレート関係フレーム
@@ -117,11 +128,7 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
 
         # 折り返しチェックボックス
         self._reflect_checkbox = ctk.CTkCheckBox(
-            self._frame_rate_frame,
-            text="REFLECT",
-            width=80,
-            variable=self._reflect_var,
-            command=self._on_reflect_checkbox_toggle,
+            self._frame_rate_frame, text="REFLECT", width=80, variable=self._reflect_var
         )
         self._reflect_checkbox.grid(
             row=0, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
@@ -175,10 +182,20 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
 
         # フレームリスト
         self._frame_list_bar = ThumbnailBar(
-            self._input_kind_frame, 120, self._on_frame_list_change
+            self._input_kind_frame, self._model, THUMBNAIL_HEIGHT
         )
         self._frame_list_bar.grid(
             row=0, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
+        )
+
+        # サムネサイズを設定
+        self._model.video.set_size(
+            ImageLayer.THUMBNAIL,
+            ResizeDesc(
+                AspectRatioPattern.E_RAW,
+                None,
+                THUMBNAIL_HEIGHT,
+            ),
         )
 
         # キャプチャ操作フレーム
@@ -303,7 +320,9 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
         self.drop_target_register(DND_FILES)
         self.dnd_bind("<<Drop>>", self._on_drop_file)
 
-    def _on_resolution_changes(self, aspect_ratio: AspectRatio, resolution: Resolution):
+    def _on_resolution_changes(
+        self, aspect_ratio: AspectRatioPattern, resolution: ResizeDesc.Pattern
+    ):
         """
         解像度設定が変更された時に呼び出される
 
@@ -311,21 +330,11 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
             aspect_ratio (AspectRatio): アスペクト比
             resolution (Resolution): 解像度
         """
+        self._model.video.set_size(
+            ImageLayer.NIME, ResizeDesc.from_pattern(aspect_ratio, resolution)
+        )
         self._aspect_ratio = aspect_ratio
         self._resolution = resolution
-        self._update_preview()
-
-    def _on_frame_list_change(self):
-        """
-        アニメフレーム更新ハンドラ
-        """
-        self._update_preview()
-
-    def _on_reflect_checkbox_toggle(self):
-        """
-        「折り返し」チェックボックスハンドラ
-        """
-        self._update_preview()
 
     def _on_frame_rate_slider_changed(self, value: float):
         """
@@ -335,8 +344,7 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
             value (float): スライダー値
         """
         frame_rate_int = round(float(value))
-        self._frame_rate_label.configure(text=f"{frame_rate_int} FPS")
-        self._animation_preview_label.set_frame_rate(frame_rate_int)
+        self._model.video.set_frame_rate(frame_rate_int)
 
     def _on_record_length_slider_changed(self, value: float):
         """
@@ -359,16 +367,14 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
         セーブボタンクリックハンドラ
         """
         # 最低２フレーム必要
-        video = self._animation_preview_label.video
+        video = self._model.video
         if video.num_enable_frames < 2:
-            raise ValueError(f"# of frames less than 2(actual={len(video)})")
+            raise ValueError(
+                f"# of frames less than 2(actual={video.num_enable_frames})"
+            )
 
         # gif ファイルとして保存
-        # date_str = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        # gif_file_path = NIME_DIR_PATH / (date_str + ".gif")
-        gif_file_path = save_content_model(
-            video, self._animation_preview_label.interval_in_ms
-        )
+        gif_file_path = save_content_model(video)
         if not isinstance(gif_file_path, Path):
             raise TypeError(
                 f"Expected Path, but got {type(gif_file_path)}. "
@@ -385,7 +391,7 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
         """
         ワイプボタンクリックハンドラ
         """
-        self._frame_list_bar.clear_images()
+        self._model.video.clear_frames()
 
     def _on_dupe_threshold_slider_changed(self, value: float):
         """
@@ -401,36 +407,24 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
         """
         重複無効化ボタンハンドラ
         """
-        self._frame_list_bar.disable_dupe_images(self._dupe_threshold)
+        raise NotImplementedError()
 
     def _on_remove_disable_button_clicked(self):
         """
         無効画像削除ボタンハンドラ
         """
-        self._frame_list_bar.clear_disable_images()
+        # 無効なフレームを列挙
+        disabled_frame_indices = []
+        for frame_index in range(self._model.video.num_total_frames):
+            if not self._model.video.get_enable(frame_index):
+                disabled_frame_indices.append(frame_index)
 
-    def _update_preview(self):
-        """
-        現在の状態に基づいてアニメプレビューを更新する
-        """
-        # 初期化途中で来ちゃった場合は何もしない
-        if "_frame_list_bar" not in vars(self):
-            return
-
-        # エイリアス
-        video = self._frame_list_bar.video
-
-        # 「折り返し」の対応
+        # 無効なフレームを後ろから削除
         # NOTE
-        #   最終フレームまで再生したあと、先頭フレームへ向けて逆再生を行うことを「折り返し」と呼んでいる。
-        if self._reflect_checkbox.get():
-            if len(video) > 2:
-                extend_frames = video[1:-1]
-                extend_frames.reverse()
-                video = video + extend_frames
-
-        # プレビューウィジェットに設定
-        self._animation_preview_label.set_video(video)
+        #   前方のフレームを削除すると、それよりも後方のフレームがずれるので
+        disabled_frame_indices.sort(reverse=True)
+        for disabled_frame_index in disabled_frame_indices:
+            self._model.video.delete_frame(disabled_frame_index)
 
     def _record_handler(
         self, stop_time_in_sec: float, record_raw_images: List[Image.Image] = []
@@ -445,12 +439,18 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
         """
         # 所定の時間を経過してたら終了
         if time() > stop_time_in_sec:
-            self._frame_list_bar.add_image(record_raw_images)
+            self._model.video.set_time_stamp(None)
+            self._model.video.insert_frames(
+                [
+                    ImageModel(img, self._model.video.time_stamp)
+                    for img in record_raw_images
+                ]
+            )
             return
 
         # キャプチャ
         try:
-            new_image = self._model.capture()
+            new_image = self._model.capture.capture()
         except Exception as e:
             mb.showerror(
                 APP_NAME_JP,

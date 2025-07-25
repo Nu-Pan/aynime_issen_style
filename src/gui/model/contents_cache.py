@@ -12,6 +12,7 @@ from typing import (
     Tuple,
     Type,
     cast,
+    Dict,
 )
 from pathlib import Path
 from datetime import datetime
@@ -30,15 +31,13 @@ from PIL.ImageTk import PhotoImage
 
 # utils
 from utils.pil import (
-    AspectRatio,
-    Resolution,
-    SizePattern,
-    SizePixel,
+    AspectRatioPattern,
+    ResizeDesc,
     ResizeMode,
     resize,
     make_disabled_image,
 )
-from utils.constants import NIME_DIR_PATH, RAW_DIR_PATH
+from utils.constants import NIME_DIR_PATH, RAW_DIR_PATH, DEFAULT_FRAME_RATE
 
 
 _TIMESTAMP_FORMAT = "%Y-%m-%d_%H-%M-%S"
@@ -189,11 +188,13 @@ class CachedScalableImage(
 
         # 遅延変数
         self._is_dirty = False
-        self._size = SizePattern(AspectRatio.E_RAW, Resolution.E_RAW)
+        self._size = ResizeDesc.from_pattern(
+            AspectRatioPattern.E_RAW, ResizeDesc.Pattern.E_RAW
+        )
         self._output = None
 
-    def set_size(self, size: Union[SizePattern, SizePixel]) -> Self:
-        self._is_dirty = self._size != size
+    def set_size(self, size: ResizeDesc) -> Self:
+        self._is_dirty |= self._size != size
         self._size = size
         return self
 
@@ -231,7 +232,7 @@ class CachedScalableImage(
         return self
 
     @property
-    def size(self) -> Union[SizePattern, SizePixel, None]:
+    def size(self) -> Optional[ResizeDesc]:
         """
         目標サイズ
         """
@@ -416,7 +417,7 @@ class ImageModel:
         # 正常終了
         return self
 
-    def set_size(self, layer: ImageLayer, size: Union[SizePattern, SizePixel]) -> Self:
+    def set_size(self, layer: ImageLayer, size: ResizeDesc) -> Self:
         """
         指定 layer の画像のサイズを変更する。
         """
@@ -506,7 +507,30 @@ class VideoModel:
         """
         # 各メンバを初期化
         self._time_stamp = None
+        self._size: Dict[ImageLayer, ResizeDesc] = {
+            layer: ResizeDesc.from_pattern(
+                AspectRatioPattern.E_RAW, ResizeDesc.Pattern.E_RAW
+            )
+            for layer in ImageLayer
+        }
         self._frames: List[ImageModel] = []
+        self._frame_rate = DEFAULT_FRAME_RATE
+        self._notify_handlers: List[NotifyHandler] = []
+
+    def set_enable(self, frame_index: int, enable: bool) -> Self:
+        """
+        指定フレームの有効・無効を設定する
+        """
+        self._frames[frame_index].set_enable(enable)
+        for handler in self._notify_handlers:
+            handler()
+        return self
+
+    def get_enable(self, frame_index: int) -> bool:
+        """
+        指定フレームの有効・無効を取得する
+        """
+        return self._frames[frame_index].enable
 
     def set_time_stamp(self, time_stamp: Optional[str]) -> Self:
         """
@@ -537,6 +561,17 @@ class VideoModel:
         """
         return self._time_stamp
 
+    def set_size(self, layer: ImageLayer, size: ResizeDesc) -> Self:
+        """
+        各フレームサイズを設定する
+        """
+        self._size[layer] = size
+        for f in self._frames:
+            f.set_size(layer, size)
+        for handler in self._notify_handlers:
+            handler()
+        return self
+
     def insert_frames(
         self, new_frames: Union[ImageModel, List[ImageModel]], position: int = -1
     ) -> Self:
@@ -554,10 +589,44 @@ class VideoModel:
         if isinstance(new_frames, ImageModel):
             new_frames = [new_frames]
 
+        # サイズ情報を統一
+        for f in new_frames:
+            for l in ImageLayer:
+                if l != ImageLayer.RAW:
+                    f.set_size(l, self._size[l])
+
+        # タイムスタンプを統一
+        # NOTE
+        #   完全にコピーしたいので、メンバを直接書き換える。
+        for f in new_frames:
+            f._time_stamp = self._time_stamp
+
         # フレームリストに挿入
         self._frames = self._frames[:position] + new_frames + self._frames[position:]
 
+        # 通知
+        for handler in self._notify_handlers:
+            handler()
+
         # 正常終了
+        return self
+
+    def delete_frame(self, position: int) -> Self:
+        """
+        指定インデックスのフレームを削除する
+        """
+        self._frames.pop(position)
+        for handler in self._notify_handlers:
+            handler()
+        return self
+
+    def clear_frames(self) -> Self:
+        """
+        全フレームを削除する
+        """
+        self._frames.clear()
+        for handler in self._notify_handlers:
+            handler()
         return self
 
     @property
@@ -599,10 +668,28 @@ class VideoModel:
         """
         return self._frames[frame_index].get_image(layer)
 
+    def set_frame_rate(self, frame_rate: int) -> Self:
+        """
+        再生フレームレートを設定する
+        """
+        self._frame_rate = frame_rate
+        return self
 
-def save_content_model(
-    model: Union[ImageModel, VideoModel], interval_in_ms: int = 100
-) -> Path:
+    @property
+    def frame_rate(self) -> int:
+        """
+        再生フレームレート
+        """
+        return self._frame_rate
+
+    def register_notify_handler(self, handler: NotifyHandler):
+        """
+        通知ハンドラーを登録する
+        """
+        self._notify_handlers.append(handler)
+
+
+def save_content_model(model: Union[ImageModel, VideoModel]) -> Path:
     """
     model をファイル保存する。
     画像・動画の両方に対応している。
@@ -696,7 +783,7 @@ def save_content_model(
             str(gif_file_path),
             save_all=True,
             append_images=[f for f in nime_frames[1:]],
-            duration=interval_in_ms,
+            duration=1000 // model.frame_rate,
             loop=0,
             disposal=2,
             optimize=True,
@@ -710,7 +797,7 @@ def save_content_model(
 
 
 def load_content_model(
-    file_path: Path,
+    file_path: Path, default_duration_in_sec: int = DEFAULT_FRAME_RATE
 ) -> Union[ImageModel, VideoModel]:
     """
     file_path から画像を読み込む。
@@ -766,14 +853,18 @@ def load_content_model(
     elif actual_file_path.suffix.lower() in MOVIE_EXTENSIONS:
         # 動画ファイルの場合はフレームを全て読み込む
         video_model = VideoModel().set_time_stamp(time_stamp)
+        delays = []
         with Image.open(actual_file_path) as img:
             try:
                 while True:
                     pil_image = img.copy().convert("RGB")
                     video_model.insert_frames([ImageModel(pil_image, time_stamp)])
+                    delays.append(img.info.get("duration", default_duration_in_sec))
                     img.seek(img.tell() + 1)
             except EOFError:
                 pass
+        avg_delay = sum(delays) / len(delays)
+        video_model.set_frame_rate(int(1000 / avg_delay))
         return video_model
     elif actual_file_path.suffix.lower() == ".zip":
         # ZIP ファイルの場合は中身を読み込む

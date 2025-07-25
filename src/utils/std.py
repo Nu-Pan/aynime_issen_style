@@ -3,7 +3,8 @@ import sys
 from pathlib import Path
 from datetime import datetime
 import logging
-from typing import Any, List
+from typing import Any
+import math
 
 
 def redirect_to_file() -> None:

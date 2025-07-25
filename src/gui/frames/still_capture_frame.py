@@ -14,7 +14,7 @@ from tkinter import Event
 
 # utils
 from utils.constants import WIDGET_PADDING, DEFAULT_FONT_NAME
-from utils.pil import AspectRatio, Resolution, SizePattern
+from utils.pil import AspectRatioPattern, ResizeDesc
 from gui.model.contents_cache import (
     ImageModel,
     VideoModel,
@@ -74,15 +74,19 @@ class StillCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
         self._size_pattern_selection_frame = SizePatternSlectionFrame(
             self,
             self.on_resolution_changes,
-            AspectRatio.E_RAW,
-            Resolution.E_RAW,
-            [AspectRatio.E_RAW, AspectRatio.E_16_9, AspectRatio.E_4_3],
+            AspectRatioPattern.E_RAW,
+            ResizeDesc.Pattern.E_RAW,
             [
-                Resolution.E_RAW,
-                Resolution.E_VGA,
-                Resolution.E_HD,
-                Resolution.E_FHD,
-                Resolution.E_4K,
+                AspectRatioPattern.E_RAW,
+                AspectRatioPattern.E_16_9,
+                AspectRatioPattern.E_4_3,
+            ],
+            [
+                ResizeDesc.Pattern.E_RAW,
+                ResizeDesc.Pattern.E_VGA,
+                ResizeDesc.Pattern.E_HD,
+                ResizeDesc.Pattern.E_FHD,
+                ResizeDesc.Pattern.E_4K,
             ],
         )
         self._size_pattern_selection_frame.grid(
@@ -121,7 +125,9 @@ class StillCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
         #   明示的にエクスポートを呼び出す必要がある。
         self.export_image()
 
-    def on_resolution_changes(self, aspect_ratio: AspectRatio, resolution: Resolution):
+    def on_resolution_changes(
+        self, aspect_ratio: AspectRatioPattern, resolution: ResizeDesc.Pattern
+    ):
         """
         解像度が変更された時に呼び出される
 
@@ -133,7 +139,7 @@ class StillCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
         # NOTE
         #   リサイズさえすればコールバック経由でエクスポートまで走るはず
         self.model.still.set_size(
-            ImageLayer.NIME, SizePattern(aspect_ratio, resolution)
+            ImageLayer.NIME, ResizeDesc.from_pattern(aspect_ratio, resolution)
         ).notify(ImageLayer.NIME)
 
     def on_nime_changed(self):

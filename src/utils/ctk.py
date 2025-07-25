@@ -1,6 +1,9 @@
 # std
 import warnings
-from typing import Callable, Optional
+from typing import Callable, Optional, Union
+
+# PIL
+from PIL.ImageTk import PhotoImage
 
 # Tk/CTk
 import customtkinter as ctk
@@ -18,6 +21,19 @@ def silent_configure(widget: ctk.CTkBaseClass, **kwargs):
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", UserWarning)
         widget.configure(**kwargs)
+
+
+def configure_presence(widget: ctk.CTkBaseClass, content: Union[PhotoImage, str]):
+    """
+    widget に対して configure を呼び出して content を設定する。
+    ただし configure 内で発生した警告は抑制される。
+    """
+    if isinstance(content, PhotoImage):
+        silent_configure(widget, image=content, text="")
+    elif isinstance(content, str):
+        silent_configure(widget, image="", text=content)
+    else:
+        raise TypeError()
 
 
 def show_notify(

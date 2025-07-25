@@ -10,8 +10,8 @@ import customtkinter as ctk
 
 # utils
 from utils.constants import DEFAULT_FONT_NAME
-from utils.ctk import silent_configure
-from utils.pil import SizePixel
+from utils.ctk import silent_configure, configure_presence
+from utils.pil import ResizeDesc, AspectRatioPattern
 
 # model
 from gui.model.contents_cache import ImageModel, ImageLayer
@@ -35,6 +35,12 @@ class StillLabel(ctk.CTkLabel):
         """
         super().__init__(master, **kwargs)
 
+        # 現在表示している画像
+        # NOTE
+        #   現在表示している PhotoImage のインスタンスをウィジェットから取ることはできない。
+        #   そのため、この階層でキャッシュ情報を保持しておく
+        self._current_frame = None
+
         # モデル関係
         self._image_model = image_model
         self._image_model.register_notify_handler(
@@ -47,7 +53,7 @@ class StillLabel(ctk.CTkLabel):
 
         # ブランク表示
         self._blank_text = blank_text
-        silent_configure(self, image="", text=blank_text)
+        configure_presence(self, blank_text)
 
         # リサイズハンドラ
         self.bind("<Configure>", self._on_resize)
@@ -57,13 +63,14 @@ class StillLabel(ctk.CTkLabel):
         画像に変更があった際に呼び出されるハンドラ
         """
         # UI 的に反映
-        preview_image = self._image_model.get_image(ImageLayer.PREVIEW)
-        if isinstance(preview_image, PhotoImage):
-            silent_configure(self, image=preview_image, text="")
-        elif preview_image is None:
-            silent_configure(self, image="", text=self._blank_text)
-        else:
-            raise TypeError()
+        new_frame = self._image_model.get_image(ImageLayer.PREVIEW)
+        if new_frame != self._current_frame:
+            if isinstance(new_frame, PhotoImage):
+                configure_presence(self, new_frame)
+                self._current_frame = new_frame
+            else:
+                configure_presence(self, self._blank_text)
+                self._current_frame = None
 
     def _on_resize(self, _):
         """
@@ -73,5 +80,6 @@ class StillLabel(ctk.CTkLabel):
         actual_width = self.winfo_width()
         actual_height = self.winfo_height()
         self._image_model.set_size(
-            ImageLayer.PREVIEW, SizePixel(actual_width, actual_height)
+            ImageLayer.PREVIEW,
+            ResizeDesc(AspectRatioPattern.E_RAW, actual_width, actual_height),
         ).notify(ImageLayer.PREVIEW)

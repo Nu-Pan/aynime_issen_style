@@ -2,14 +2,18 @@
 from typing import List, Optional
 
 # PIL
-from PIL import Image, ImageTk
+from PIL.ImageTk import PhotoImage
 
 # Tk/CTk
 import customtkinter as ctk
 
 # utils
-from gui.model.contents_cache import ImageModel, VideoModel
-from utils.ctk import silent_configure
+from utils.ctk import configure_presence
+from utils.pil import ResizeDesc, AspectRatioPattern
+
+# gui
+from gui.model.aynime_issen_style import AynimeIssenStyleModel
+from gui.model.contents_cache import ImageLayer
 
 
 class AnimationLabel(ctk.CTkLabel):
@@ -18,16 +22,25 @@ class AnimationLabel(ctk.CTkLabel):
     """
 
     def __init__(
-        self, master: ctk.CTkBaseClass, blank_text: Optional[str] = None, **kwargs
+        self,
+        master: ctk.CTkBaseClass,
+        model: AynimeIssenStyleModel,
+        blank_text: Optional[str] = None,
+        **kwargs
     ):
         """
         コンストラクタ
         """
         super().__init__(master, **kwargs)
 
+        # 現在表示している画像
+        # NOTE
+        #   現在表示している PhotoImage のインスタンスをウィジェットから取ることはできない。
+        #   そのため、この階層でキャッシュ情報を保持しておく
+        self._current_frame = None
+
         # 内部状態を適当に初期化
-        self.set_video()
-        self.set_frame_rate(24)
+        self._model = model
         self._frame_index = 0
         if blank_text is None:
             self._blank_text = "Animation Preview"
@@ -40,63 +53,37 @@ class AnimationLabel(ctk.CTkLabel):
         # 更新処理をキック
         self._next_frame_handler()
 
-    def set_video(self, video: VideoModel):
-        """
-        アニメーション表示するフレーム（画像）群を設定する
-
-        Args:
-            frames (List[Union[Image.Image, ImageTk.PhotoImage]]): 表示したいフレーム（画像）群
-        """
-        # 全ての画像を PIL Image として保持
-        self._integrated_video = video
-
-        # ちょうどいいサイズにする
-        self._on_resize(None)
-
-    @property
-    def video(self) -> VideoModel:
-        """
-        設定されている動画を取得する
-
-        Returns:
-            IntegratedVideo: 設定されている動画
-        """
-        return self._integrated_video
-
-    def set_frame_rate(self, frame_rate: int):
-        """
-        アニメーションのフレームレートを設定
-
-        Args:
-            frame_rate (int): アニメーションのフレームレート
-        """
-        self._interval_in_ms = int(1000 / frame_rate)
-
-    @property
-    def interval_in_ms(self) -> int:
-        """
-        更新間隔（ミリ秒）
-
-        Returns:
-            int: 更新間隔（ミリ秒）
-        """
-        return self._interval_in_ms
-
     def _next_frame_handler(self):
         """
         表示状態を次のフレームに進めるハンドラ
         """
-        # 表示を更新
-        if len(self._preview_frames) == 0:
-            silent_configure(self, image="", text=self._blank_text)
+        # 有効なフレームの有無で分岐
+        if self._model.video.num_enable_frames == 0:
+            # 代替テキストを表示
+            configure_presence(self, self._blank_text)
         else:
-            self._frame_index = (self._frame_index + 1) % len(self._preview_frames)
-            silent_configure(
-                self, image=self._preview_frames[self._frame_index], text=""
+            # 次の有効フレームまでシーク
+            while True:
+                self._frame_index += 1
+                if self._frame_index >= self._model.video.num_total_frames:
+                    self._frame_index = 0
+                if self._model.video.get_enable(self._frame_index):
+                    break
+
+            # プレビュー画像を取得・表示
+            new_frame = self._model.video.get_frame(
+                ImageLayer.PREVIEW, self._frame_index
             )
+            if new_frame != self._current_frame:
+                if isinstance(new_frame, PhotoImage):
+                    configure_presence(self, new_frame)
+                    self._current_frame = new_frame
+                else:
+                    configure_presence(self, self._blank_text)
+                    self._current_frame = None
 
         # 次の更新処理をキック
-        self.after(self._interval_in_ms, self._next_frame_handler)
+        self.after(1000 // self._model.video.frame_rate, self._next_frame_handler)
 
     def _on_resize(self, _):
         """
@@ -105,10 +92,7 @@ class AnimationLabel(ctk.CTkLabel):
         # 適切なサイズを解決
         actual_width = self.winfo_width()
         actual_height = self.winfo_height()
-
-        # 表示用のサイズにリサイズ
-        self._preview_frames: List[ImageTk.PhotoImage] = []
-        for original_frame in self._integrated_video:
-            pil_frame = original_frame.preview(actual_width, actual_height)
-            tk_frame = ImageTk.PhotoImage(pil_frame)
-            self._preview_frames.append(tk_frame)
+        self._model.video.set_size(
+            ImageLayer.PREVIEW,
+            ResizeDesc(AspectRatioPattern.E_RAW, actual_width, actual_height),
+        )

@@ -1,6 +1,6 @@
 # model
 from gui.model.capture import CaptureModel
-from gui.model.contents_cache import ImageModel
+from gui.model.contents_cache import ImageModel, VideoModel
 
 
 class AynimeIssenStyleModel:
@@ -15,3 +15,4 @@ class AynimeIssenStyleModel:
         self.capture = CaptureModel()
         self.window_selection = ImageModel()
         self.still = ImageModel()
+        self.video = VideoModel()

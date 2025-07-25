@@ -75,11 +75,11 @@ class AynimeIssenStyleApp(ctk.CTk, TkinterDnD.DnDWrapper):
         self.still_capture_frame.pack(fill="both", expand=True)
 
         # # アニメキャプチャタブを追加
-        # self.tabview.add("gif")
-        # self.animation_capture_frame = AnimationCaptureFrame(
-        #     self.tabview.tab("gif"), self.model
-        # )
-        # self.animation_capture_frame.pack(fill="both", expand=True)
+        self.tabview.add("gif")
+        self.animation_capture_frame = AnimationCaptureFrame(
+            self.tabview.tab("gif"), self.model
+        )
+        self.animation_capture_frame.pack(fill="both", expand=True)
 
         # バージョン情報タブを追加
         self.tabview.add("バージョン")

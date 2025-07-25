@@ -4,6 +4,7 @@ import time
 
 # PIL
 from PIL import Image
+from PIL.ImageTk import PhotoImage
 
 # Tk/CTk
 from tkinter import Event
@@ -12,7 +13,11 @@ import customtkinter as ctk
 # utils
 from utils.constants import WIDGET_PADDING, DEFAULT_FONT_NAME
 from utils.pil import calc_ssim
-from gui.model.contents_cache import ImageModel, VideoModel
+from utils.ctk import silent_configure, configure_presence
+
+# gui
+from gui.model.contents_cache import ImageModel, VideoModel, ImageLayer
+from gui.model.aynime_issen_style import AynimeIssenStyleModel
 
 
 class SentinelItem(ctk.CTkFrame):
@@ -30,6 +35,7 @@ class SentinelItem(ctk.CTkFrame):
             thumbnail_height (int): サムネイルのサイズ（縦方向）
         """
         super().__init__(master)
+
         # フォントを生成
         default_font = ctk.CTkFont(DEFAULT_FONT_NAME)
 
@@ -55,169 +61,73 @@ class ThumbnailItem(ctk.CTkFrame):
     """
 
     def __init__(
-        self, master: "ThumbnailBar", image: ImageModel, thumbnail_height: int
+        self, master: "ThumbnailBar", model: AynimeIssenStyleModel, frame_index: int
     ):
         """
         コンストラクタ
-
-        Args:
-            master (ThumbnailBar): このアイテムが所属する ThumbnailBar
-            pil_image (str): このアイテムで保持する画像
-            thumbnail_height (int): サムネイルのサイズ（縦方向）
         """
         super().__init__(master)
 
+        # 現在表示している画像
+        # NOTE
+        #   現在表示している PhotoImage のインスタンスをウィジェットから取ることはできない。
+        #   そのため、この階層でキャッシュ情報を保持しておく
+        self._current_frame = None
+
         # 引数を保存
         self._master = master
-        self._image = image
+        self._model = model
+        self._frame_index = frame_index
 
-        # 内部状態
-        self._enabled = True
-        self._last_swap_time = 0.0
-        self._mlb_press_pos = (0, 0)
+        # プレビュー用画像を取得
+        thumbnail_image = self._model.video.get_frame(
+            ImageLayer.THUMBNAIL, self._frame_index
+        )
+        if not isinstance(thumbnail_image, PhotoImage):
+            raise TypeError()
 
-        # サムネイルサイズを解決
-        thumbnail_width = int(
-            image.raw_image().width * thumbnail_height / image.raw_image().height
-        )
-        pil_image = self._image.thumbnail(
-            self._enabled, thumbnail_width, thumbnail_height
-        )
-        ctk_image = ctk.CTkImage(
-            pil_image, pil_image, (pil_image.width, pil_image.height)
-        )
-
-        # ドラッグをハンドルするためのボタン
+        # クリック操作受付用のボタン
         self._button = ctk.CTkButton(
             self,
-            image=ctk_image,
+            image=thumbnail_image,
             text="",
-            width=thumbnail_width,
-            height=thumbnail_height,
+            width=thumbnail_image.width(),
+            height=thumbnail_image.height(),
             fg_color="transparent",
             hover=False,
         )
         self._button.pack()
 
         # マウスイベント
-        # NOTE
-        #   並び替え・有効無効切り替え・削除
-        self._button.bind("<ButtonPress-1>", self._begin_drag)
-        self._button.bind("<B1-Motion>", self._on_drag)
-        self._button.bind("<ButtonRelease-1>", self._end_drag)
+        self._button.bind("<Button-1>", self._on_click_left)
         self._button.bind("<Button-3>", self._on_click_right)
 
-    def _begin_drag(self, event: Event):
+    def update_image(self):
         """
-        ドラッグ開始
-
-        Args:
-            event (Event): イベント
+        サムネイルの更新が必要なときに呼び出すべき関数
+        ハンドラじゃない
         """
-        self._mlb_press_pos = (event.x_root, event.y_root)
+        new_frame = self._model.video.get_frame(ImageLayer.THUMBNAIL, self._frame_index)
+        if new_frame != self._current_frame:
+            if isinstance(new_frame, PhotoImage):
+                configure_presence(self._button, new_frame)
+                self._current_frame = new_frame
+            else:
+                configure_presence(self._button, "NO IMAGE")
+                self._current_frame = None
 
-    def _on_drag(self, event: Event):
+    def _on_click_left(self, event: Event):
         """
-        ドラッグ中
-
-        Args:
-            event (Event): イベント
+        マウスクリック（左ボタン）
         """
-        # 最後にスワップを行った直後なら無視
-        # NOTE
-        #   チャタリング防止用
-        #   汚い対処法だけど、問題は再現しなくなるのでヨシ
-        if (time.time() - self._last_swap_time) < 0.05:
-            return
-
-        # ドラッグ先のインデックスを解決
-        cur_idx = self._master._items.index(self)
-        if event.x < 0:
-            new_idx = cur_idx - 1
-        elif event.x > self._button.winfo_width():
-            new_idx = cur_idx + 1
-        else:
-            new_idx = cur_idx
-
-        # 不要 or 範囲外なら何もしない
-        if new_idx == cur_idx or new_idx < 0 or new_idx >= len(self._master._items):
-            return
-
-        # 自分自身の位置を移動させる
-        self._master.swap(cur_idx, new_idx)
-
-        # 最後にスワップを行った時刻を更新
-        self._last_swap_time = time.time()
-
-    def _end_drag(self, event: Event):
-        """
-        ドラッグ終了
-
-        Args:
-            event (Event): イベント
-        """
-        # ドラッグ挙動の場合は何もしない
-        mlb_current_pos = (event.x_root, event.y_root)
-        diff = max(
-            [abs(v1 - v2) for v1, v2 in zip(self._mlb_press_pos, mlb_current_pos)]
-        )
-        torelance = min(self._button.winfo_width(), self._button.winfo_height()) / 2
-        if diff < torelance:
-            self.set_enable(not self._enabled)
+        enable = self._model.video.get_enable(self._frame_index)
+        self._model.video.set_enable(self._frame_index, not enable)
 
     def _on_click_right(self, event: Event):
         """
         マウスクリック（右ボタン）
         """
-        self._master.delete_image(self)
-
-    @property
-    def image(self) -> ImageModel:
-        """
-        保持している画像を返す
-
-        Returns:
-            Image.Image: 保持している画像
-        """
-        return self._image
-
-    def set_enable(self, state: bool, does_notify: bool = True):
-        """
-        このアイテムの有効・無効を切り替える
-
-        Args:
-            state (bool): True なら有効
-            does_notify (bool): True なら親ウィジェットに変更を通知する
-        """
-        # 状態に変更が無い場合は何もしない
-        if state == self._enabled:
-            return
-
-        # 内部ステート更新
-        self._enabled = state
-
-        # CTkImage を生成
-        pil_image = self._image.thumbnail(state)
-        ctk_image = ctk.CTkImage(
-            pil_image, pil_image, (pil_image.width, pil_image.height)
-        )
-
-        # ウィジェットに CTkImage を設定
-        self._button.configure(image=ctk_image)
-
-        # 親ウィジェットに通知
-        if does_notify:
-            self._master._on_change()
-
-    @property
-    def enabled(self) -> bool:
-        """
-        このアイテムが有効であるかどうか
-
-        Returns:
-            bool: 有効なら True
-        """
-        return self._enabled
+        self._model.video.delete_frame(self._frame_index)
 
 
 class ThumbnailBar(ctk.CTkScrollableFrame):
@@ -228,9 +138,9 @@ class ThumbnailBar(ctk.CTkScrollableFrame):
     def __init__(
         self,
         master: ctk.CTkBaseClass,
+        model: AynimeIssenStyleModel,
         thumbnail_height: int,
-        on_change: Callable[[], None],
-        **kwargs
+        **kwargs,
     ):
         """
         コンストラクタ
@@ -242,215 +152,60 @@ class ThumbnailBar(ctk.CTkScrollableFrame):
         """
         super().__init__(master, orientation="horizontal", **kwargs)
 
+        # 引数保存
+        self._model = model
+
         # 高さを調整
         self.configure(height=thumbnail_height + 2 * WIDGET_PADDING)
 
         # 内部状態
         self._thumbnail_height = thumbnail_height
-        self._items: list[ctk.CTkFrame] = []
-        self._parent_on_change = on_change
+        self._items: list[ThumbnailItem] = []
 
         # 番兵アイテムを追加
-        sentinel_item = SentinelItem(self, thumbnail_height)
-        self._items.append(sentinel_item)
-        sentinel_item.grid(row=0, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING)
+        self._sentinel_item = SentinelItem(self, thumbnail_height)
+        self._sentinel_item.grid(
+            row=0, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING
+        )
 
         # マウスホイール横スクロール設定
         self._parent_canvas.bind("<Enter>", self._mouse_enter)
         self._parent_canvas.bind("<Leave>", self._mouse_leave)
 
-    def _on_change(self):
-        """
-        サムネリストに変更が合った時に呼び出されるハンドラ
-        """
-        # 親ウィジェットに通知
-        self._parent_on_change()
+        # コールバック設定
+        self._model.video.register_notify_handler(self._on_video_change)
 
-    def add_image(self, images: Iterable[ImageModel]):
+    def _on_video_change(self):
         """
-        画像（アイテム）を追加
+        動画に変更があった時に呼び出されるハンドラ
+        """
+        # UI 上とモデル上とでフレーム数をあわせる（ウィジェット削除）
+        while len(self._items) > self._model.video.num_total_frames:
+            self._items[-1].destroy()
+            self._items.pop()
 
-        Args:
-            image (Image): 追加したい PIL 画像（リサイズ前）
-        """
-        # 順番に追加
-        for image in images:
-            # アイテムを生成・GUI配置
-            item = ThumbnailItem(self, image, self._thumbnail_height)
-            item.grid(
+        # UI 上とモデル上とでフレーム数をあわせる（ウィジェット追加）
+        while len(self._items) < self._model.video.num_total_frames:
+            new_item = ThumbnailItem(self, self._model, len(self._items))
+            new_item.grid(
+                row=0, column=len(self._items), padx=WIDGET_PADDING, pady=WIDGET_PADDING
+            )
+            self._items.append(new_item)
+
+        # 番兵アイテムを移動
+        current_sentinel_column = self._sentinel_item.grid_info()["column"]
+        new_sentinel_column = len(self._items)
+        if current_sentinel_column != new_sentinel_column:
+            self._sentinel_item.grid(
                 row=0,
-                column=len(self._items) - 1,
+                column=new_sentinel_column,
                 padx=WIDGET_PADDING,
                 pady=WIDGET_PADDING,
             )
 
-            # アイテムリストに追加
-            self._items.insert(-1, item)
-
-            # 番兵をずらす
-            self._items[-1].grid(column=len(self._items))
-
-        # リスト変更をコールバックで通知
-        self._on_change()
-
-    def delete_image(self, removal_item: ctk.CTkFrame):
-        """
-        画像（アイテム）を削除
-
-        Args:
-            item (ThumbnailItem): 削除対象アイテム
-        """
-        # 番兵アイテムは削除不可
-        if isinstance(removal_item, SentinelItem):
-            return
-
-        # アイテムリストから除外
-        removal_index = self._items.index(removal_item)
-        self._items.pop(removal_index)
-
-        # アイテムを CTk 上から削除
-        removal_item.destroy()
-        del removal_item
-
-        # 削除したぶん GUI 上で詰める
-        for idx, item in enumerate(self._items):
-            if idx >= removal_index:
-                item.grid_configure(column=idx)
-
-        # リスト変更をコールバックで通知
-        self._on_change()
-
-    def swap(self, idx_A: int, idx_B: int):
-        """
-        要素の順序を入れ替える
-
-        Args:
-            idx_A (int): 入れ替え対象インデックス(A)
-            idx_B (int): 入れ替え対象インデックス(B)
-        """
-        # 番兵アイテムとの入れ替えは不可
-        is_sentinel_A = isinstance(self._items[idx_A], SentinelItem)
-        is_sentinel_B = isinstance(self._items[idx_B], SentinelItem)
-        if is_sentinel_A or is_sentinel_B:
-            return
-
-        # リスト上の順序を入れ替え
-        self._items[idx_A], self._items[idx_B] = (
-            self._items[idx_B],
-            self._items[idx_A],
-        )
-
-        # グリッド配置を修正
-        self._items[idx_A].grid_configure(column=idx_A)
-        self._items[idx_B].grid_configure(column=idx_B)
-
-        # リスト変更をコールバックで通知
-        self._on_change()
-
-    def clear_images(self):
-        """
-        保持している全ての画像を削除
-        """
-        # 新しい画像リストを構築＆サムネを解体
-        new_items = []
-        for item in self._items:
-            if isinstance(item, SentinelItem):
-                new_items.append(item)
-            elif isinstance(item, ThumbnailItem):
-                item.destroy()
-            else:
-                raise TypeError()
-
-        # 画像リストを更新
-        self._items = new_items
-
-        # リスト変更をコールバックで通知
-        self._on_change()
-
-    def clear_disable_images(self):
-        """
-        無効化されている画像を削除
-        """
-        # 新しい画像リストを構築＆サムネを解体
-        new_items = []
-        for item in self._items:
-            if isinstance(item, SentinelItem):
-                new_items.append(item)
-            elif isinstance(item, ThumbnailItem):
-                if item.enabled:
-                    new_items.append(item)
-                else:
-                    item.destroy()
-            else:
-                raise TypeError()
-
-        # 画像リストを更新
-        self._items = new_items
-
-        # リスト変更をコールバックで通知
-        self._on_change()
-
-    def disable_dupe_images(self, threshold: float):
-        """
-        重複する画像を無効化する
-        時間方向に１つ前のフレームとの類似度が threshold を超える画像が無効化される。
-        別の言い方をすれば N 枚連続する類似フレームの 1 枚目だけが残るということ。
-
-        Args:
-            threshold (float):
-                類似判定しきい値
-                値域は [0.0, 1.0]
-        """
-        # 一旦、全てのフレームを有効化
-        for item in self._items:
-            if isinstance(item, ThumbnailItem):
-                item.set_enable(True, False)
-
-        # 全フレームに対して個別に呼び出し
-        for idx_B in range(1, len(self._items)):
-            # 前方に向かって有効フレームを探索
-            idx_A = idx_B - 1
-            while idx_A > 0:
-                item_A = self._items[idx_A]
-                if isinstance(item_A, ThumbnailItem):
-                    if item_A.enabled:
-                        break
-                idx_A -= 1
-
-            # 前フレーム
-            item_A = self._items[idx_A]
-            if isinstance(item_A, ThumbnailItem):
-                image_A = item_A.image
-            else:
-                continue
-
-            # 次フレーム
-            item_B = self._items[idx_B]
-            if isinstance(item_B, ThumbnailItem):
-                image_B = item_B.image
-            else:
-                continue
-
-            # 類似度を元に有効・無効を設定
-            similarity = calc_ssim(image_A.nime(), image_B.nime())
-            item_B.set_enable(similarity < threshold, False)
-
-        # 変更を通知
-        self._on_change()
-
-    @property
-    def video(self) -> VideoModel:
-        """
-        格納している動画を得る
-
-        Returns:
-            IntegratedVideo: 格納している動画
-        """
-        return [
-            item.image
-            for item in self._items
-            if isinstance(item, ThumbnailItem) and item.enabled
-        ]
+        # # 全ウィジェットの表示を更新
+        # for item in self._items:
+        #     item.update_image()
 
     def _mouse_enter(self, _):
         """

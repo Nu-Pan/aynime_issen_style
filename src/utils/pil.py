@@ -1,8 +1,10 @@
 # std
-from typing import Tuple, Optional, Union
+from typing import Tuple, Optional, Union, Self, Any, cast
 from enum import Enum
 from dataclasses import dataclass
 from enum import Enum, auto
+from math import gcd
+from fractions import Fraction
 
 # PIL
 from PIL import Image, ImageDraw, ImageEnhance, ImageFont
@@ -13,10 +15,13 @@ import numpy as np
 # scikit
 from skimage.metrics import structural_similarity as ssim
 
+# util
+from utils.constants import THUMBNAIL_HEIGHT
 
-class AspectRatio(Enum):
+
+class AspectRatioPattern(Enum):
     """
-    アスペクト比を定義する列挙型
+    典型的なアスペクト比の列挙値
     """
 
     E_RAW = "RAW"  # オリジナルのアスペクト比をそのまま使う
@@ -24,141 +29,210 @@ class AspectRatio(Enum):
     E_4_3 = "4:3"
     E_1_1 = "1:1"
 
-    @property
-    def int_value(self) -> Optional[Tuple[int, int]]:
-        """
-        列挙値を数値に変換する
 
-        Args:
-            default_value (Tuple[int, int]): RAW だった場合のデフォルト値
+class AspectRatio:
+    """
+    アスペクト比を表すクラス
+    """
 
-        Returns:
-            Optional[Tuple[int, int]]:
-                アスペクト比（横：縦）
-                E_RAW の場合 None
+    def __init__(self, width: Optional[int], height: Optional[int]):
         """
-        if self == AspectRatio.E_RAW:
-            return None
-        elif self == AspectRatio.E_16_9:
-            return (16, 9)
-        elif self == AspectRatio.E_4_3:
-            return (4, 3)
-        elif self == AspectRatio.E_1_1:
-            return (1, 1)
+        コンストラクタ
+        指定されたアスペクト比を約分した状態で保持する
+        """
+        # アスペクト比
+        if width is None and height is None:
+            self._width = None
+            self._height = None
+        elif width is not None and height is not None:
+            den = gcd(width, height)
+            self._width = width // den
+            self._height = height // den
         else:
-            raise ValueError(f"Invalid AspectRatio({self})")
+            raise
 
+        # 名前
+        if self._width is None and self._height is None:
+            self._name = "RAW"
+        else:
+            self._name = f"{self._width}:{self._height}"
 
-class Resolution(Enum):
-    """
-    典型的な解像度を定義する列挙型
-    """
-
-    E_RAW = "RAW"  # オリジナルの解像度をそのまま使う
-    E_HVGA = "320"  # 320
-    E_VGA = "640"  # 640
-    E_QHD = "960"  # 960
-    E_HD = "1280"  # 1280
-    E_FHD = "1920"  # 1920
-    E_3K = "2880"  # 2880
-    E_4K = "3840"  # 3840
+    @classmethod
+    def from_pattern(cls, pattern: AspectRatioPattern) -> "AspectRatio":
+        """
+        パターン列挙値からインスタンスを生成する
+        """
+        if pattern == AspectRatioPattern.E_RAW:
+            return AspectRatio(None, None)
+        elif pattern == AspectRatioPattern.E_16_9:
+            return AspectRatio(16, 9)
+        elif pattern == AspectRatioPattern.E_4_3:
+            return AspectRatio(4, 3)
+        elif pattern == AspectRatioPattern.E_1_1:
+            return AspectRatio(1, 1)
+        else:
+            raise ValueError()
 
     @property
-    def int_value(self) -> Optional[int]:
+    def name(self) -> str:
         """
-        列挙値を数値に変換する
+        人間用の名前を返す
+        """
+        return self._name
 
-        Returns:
-            Optional[Tuple[int, int]]:
-                解像度（横：縦）
-                E_RAW の場合 None
+    @property
+    def width(self) -> Optional[int]:
         """
-        if self == Resolution.E_RAW:
-            return None
-        elif self == Resolution.E_HVGA:
-            return 320
-        elif self == Resolution.E_VGA:
-            return 640
-        elif self == Resolution.E_QHD:
-            return 960
-        elif self == Resolution.E_HD:
-            return 1280
-        elif self == Resolution.E_FHD:
-            return 1920
-        elif self == Resolution.E_3K:
-            return 2880
-        elif self == Resolution.E_4K:
-            return 3840
+        アスペクト比の水平方向成分
+        """
+        return self._width
+
+    @property
+    def height(self) -> Optional[int]:
+        """
+        アスペクト比の垂直方向成分
+        """
+        return self._height
+
+    @property
+    def size(self) -> Optional[Tuple[int, int]]:
+        """
+        スペクト比の水平・垂直方向成分を返す
+        """
+        if self._width is not None and self._height is not None:
+            return (self._width, self._height)
         else:
-            raise ValueError(f"Invalid Resolution({self})")
+            return None
+
+    def __eq__(self, other: Any) -> bool:
+        """
+        比較演算子
+        """
+        if isinstance(other, AspectRatio):
+            return self.width == other.width and self.height == other.height
+        else:
+            raise TypeError()
 
 
-def resolve_target_size(
-    source_width: int,
-    source_height: int,
-    aspect_ratio: AspectRatio,
-    resolution: Resolution,
-) -> Tuple[int, int]:
+class ResizeDesc:
     """
-    サイズ (source_width, source_height) の画像を
-    aspect_ratio, resolution にリサイズする場合の適切な目標サイズを解決する。
-
-    Args:
-        source_width (int): 元画像のサイズ（横）
-        source_height (int): 元画像のサイズ（縦）
-        aspect_ratio (AspectRatio): 目標アスペクト比（パターン）
-        resolution (Resolution): 目標解像度（パターン）
-
-    Returns:
-        Tuple[int, int]: 目標サイズ（横：縦）
+    リサイズの挙動を記述するクラス。
     """
-    # アスペクト比を解決
-    aspect_ratio_int = aspect_ratio.int_value
-    if aspect_ratio_int is None:
-        aspect_ratio_int = (source_width, source_height)
 
-    # 幅を解決
-    target_width = resolution.int_value
-    if target_width is None:
-        target_width = source_width
+    class Pattern(Enum):
+        """
+        典型的な解像度を定義する列挙型
+        横幅だけを定義する
+        """
 
-    # 高さを解決
-    target_height = target_width * aspect_ratio_int[1] // aspect_ratio_int[0]
+        E_RAW = "RAW"  # オリジナルの解像度をそのまま使う
+        E_HVGA = "320"  # 320
+        E_VGA = "640"  # 640
+        E_QHD = "960"  # 960
+        E_HD = "1280"  # 1280
+        E_FHD = "1920"  # 1920
+        E_3K = "2880"  # 2880
+        E_4K = "3840"  # 3840
 
-    # 正常終了
-    return (target_width, target_height)
+    def __init__(
+        self,
+        aspect_ratio: Union[AspectRatioPattern, AspectRatio],
+        width: Optional[int],
+        height: Optional[int],
+    ):
+        """
+        コンストラクタ
+        """
+        # アス比をインスタンスで統一
+        if isinstance(aspect_ratio, AspectRatioPattern):
+            aspect_ratio = AspectRatio.from_pattern(aspect_ratio)
 
+        # メンバー保存
+        self._aspect_ratio = aspect_ratio
+        self._width = width
+        self._height = height
 
-@dataclass
-class SizePattern:
-    aspect_ratio: AspectRatio
-    resolution: Resolution
+    @classmethod
+    def from_pattern(
+        cls,
+        aspect_ratio: Union[AspectRatioPattern, AspectRatio],
+        pattern: "ResizeDesc.Pattern",
+    ) -> "ResizeDesc":
+        """
+        パターン列挙値からインスタンスを生成する。
+        記述を簡略化するためのヘルパー関数。
+        """
+        # アス比をインスタンスで統一
+        if isinstance(aspect_ratio, AspectRatioPattern):
+            aspect_ratio = AspectRatio.from_pattern(aspect_ratio)
+
+        # ResizeDesc のインスタンスを生成
+        if pattern == ResizeDesc.Pattern.E_RAW:
+            return ResizeDesc(aspect_ratio, None, None)
+        else:
+            return ResizeDesc(aspect_ratio, int(pattern.value), None)
+
+    def resolve(self, source_width: int, source_height: int) -> Tuple[int, int]:
+        """
+        サイズ (source_width, source_height) の画像をリサイズする場合の適切な目標サイズを解決する。
+
+        指定アスペクト比、指定サイズ、入力サイズの３種類の情報を統合する必要がある。
+        基本的なルールは
+        矛盾する指定が来た場合は例外を投げる。
+        """
+        # エイリアス
+        desc_ar = self._aspect_ratio.size
+        desc_width = self._width
+        desc_height = self._height
+
+        # 実際のアスペクト比を解決する
+        if desc_ar is not None:
+            actual_ar = AspectRatio(*desc_ar)
+        elif desc_width is not None and desc_height is not None:
+            actual_ar = AspectRatio(desc_width, desc_height)
+        else:
+            actual_ar = AspectRatio(source_width, source_height)
+
+        # 外枠のサイズを解決する
+        actual_ar_width = cast(int, actual_ar.width)
+        actual_ar_height = cast(int, actual_ar.height)
+        if desc_width is not None and desc_height is not None:
+            actual_width = desc_width
+            actual_height = desc_height
+        elif desc_width is not None and desc_height is None:
+            actual_width = desc_width
+            actual_height = round(desc_width * actual_ar_height / actual_ar_width)
+        elif desc_width is None and desc_height is not None:
+            actual_width = round(desc_height * actual_ar_width / actual_ar_height)
+            actual_height = desc_height
+        elif desc_width is None and desc_height is None:
+            actual_width = source_width
+            actual_height = source_height
+        else:
+            raise RuntimeError("Logic Error")
+
+        # アス比に矛盾がある場合はエラー
+        if actual_ar != AspectRatio(actual_width, actual_height):
+            raise ValueError("AspectRatio Miss Match")
+
+        # 正常終了
+        return (actual_width, actual_height)
 
     def __eq__(self, other):
-        if isinstance(other, SizePattern):
+        """
+        中身で一致を判定する
+        """
+        if isinstance(other, ResizeDesc):
             return (
-                self.aspect_ratio == other.aspect_ratio
-                and self.resolution == other.resolution
+                self._aspect_ratio == other._aspect_ratio
+                and self._width == other._width
+                and self._height == other._height
             )
         else:
             return NotImplemented
 
 
-@dataclass
-class SizePixel:
-    width: int
-    height: int
-
-    def __eq__(self, other):
-        if isinstance(other, SizePixel):
-            return self.width == other.width and self.height == other.height
-        else:
-            return NotImplemented
-
-
-def resize_contain(
-    image: Image.Image, target_size: Union[SizePixel, SizePattern]
-) -> Image.Image:
+def resize_contain(image: Image.Image, resize_desc: ResizeDesc) -> Image.Image:
     """
     (width, height) のボックス内に image 全体が収まるようにリサイズする。
     リサイズ前後でアスペクト比は維持される。
@@ -172,16 +246,8 @@ def resize_contain(
     Returns:
         Image.Image: リサイズ後の画像
     """
-    # サイズ情報を width, height に展開
-    if isinstance(target_size, SizePixel):
-        target_width = target_size.width
-        target_height = target_size.height
-    elif isinstance(target_size, SizePattern):
-        target_width, target_height = resolve_target_size(
-            image.width, image.height, target_size.aspect_ratio, target_size.resolution
-        )
-    else:
-        raise TypeError(target_size)
+    # 目標サイズを解決
+    target_width, target_height = resize_desc.resolve(image.width, image.height)
 
     # スケール後のサイズを解決
     width_scale = target_width / image.width
@@ -191,9 +257,9 @@ def resize_contain(
         actual_height = image.height
     elif width_scale < height_scale:
         actual_width = target_width
-        actual_height = image.height * target_width // image.width
+        actual_height = int(image.height * target_width / image.width + 0.5)
     else:
-        actual_width = image.width * target_height // image.height
+        actual_width = int(image.width * target_height / image.height + 0.5)
         actual_height = target_height
 
     # スケール不要ならコピーを返す
@@ -206,9 +272,7 @@ def resize_contain(
     )
 
 
-def resize_cover(
-    image: Image.Image, target_size: Union[SizePixel, SizePattern]
-) -> Image.Image:
+def resize_cover(image: Image.Image, resize_desc: ResizeDesc) -> Image.Image:
     """
     image の範囲内に (width, height) のボックスがちょうど収まるように image をリサイズする。
     リサイズ前後でアスペクト比は維持される。
@@ -223,16 +287,8 @@ def resize_cover(
     Returns:
         Image.Image: リサイズ後の画像
     """
-    # サイズ情報を width, height に展開
-    if isinstance(target_size, SizePixel):
-        target_width = target_size.width
-        target_height = target_size.height
-    elif isinstance(target_size, SizePattern):
-        target_width, target_height = resolve_target_size(
-            image.width, image.height, target_size.aspect_ratio, target_size.resolution
-        )
-    else:
-        raise TypeError(target_size)
+    # 目標サイズを解決
+    target_width, target_height = resize_desc.resolve(image.width, image.height)
 
     # スケール後のサイズを解決
     width_scale = target_width / image.width
@@ -284,7 +340,7 @@ class ResizeMode(Enum):
 
 
 def resize(
-    image: Image.Image, target_size: Union[SizePixel, SizePattern], mode: ResizeMode
+    image: Image.Image, resize_desc: ResizeDesc, mode: ResizeMode
 ) -> Image.Image:
     """
     image を target_size にリサイズする
@@ -299,9 +355,9 @@ def resize(
         Image.Image: リサイズ済み画像
     """
     if mode == ResizeMode.CONTAIN:
-        return resize_contain(image, target_size)
+        return resize_contain(image, resize_desc)
     elif mode == ResizeMode.COVER:
-        return resize_cover(image, target_size)
+        return resize_cover(image, resize_desc)
     else:
         raise ValueError(mode)
 
@@ -376,10 +432,14 @@ def calc_ssim(image_A: Image.Image, image_B: Image.Image) -> float:
         actual_width = min(image_A.width, image_B.width)
         actual_height = min(image_A.height, image_B.height)
         image_A = resize(
-            image_A, SizePixel(actual_width, actual_height), ResizeMode.COVER
+            image_A,
+            ResizeDesc(AspectRatioPattern.E_RAW, actual_width, actual_height),
+            ResizeMode.COVER,
         )
         image_B = resize(
-            image_B, SizePixel(actual_width, actual_height), ResizeMode.COVER
+            image_B,
+            ResizeDesc(AspectRatioPattern.E_RAW, actual_width, actual_height),
+            ResizeMode.COVER,
         )
 
     # ndarray 化

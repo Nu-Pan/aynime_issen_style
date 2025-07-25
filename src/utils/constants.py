@@ -28,3 +28,12 @@ VERSION_FILE_PATH = Path("src\\utils\\version_constants.py")
 #   raw は処理適用前のオリジナルのキャプチャ画像の保存先
 NIME_DIR_PATH = Path.cwd() / "nime"
 RAW_DIR_PATH = Path.cwd() / "raw"
+
+# デフォルトのフレームレート
+DEFAULT_FRAME_RATE = 15
+
+# サムネイルの高さ方向のサイズ
+# NOTE
+#   本当は DPI に応じてスケールすべき値
+#   なんだけど、対応ダルいので定数にしている
+THUMBNAIL_HEIGHT = 135
