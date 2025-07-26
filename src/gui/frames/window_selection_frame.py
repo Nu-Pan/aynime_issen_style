@@ -188,12 +188,12 @@ class WindowSelectionFrame(ctk.CTkFrame):
         try:
             self.model.window_selection.set_raw_image(
                 self.model.capture.capture(), None
-            ).notify(ImageLayer.RAW)
+            )
         except Exception as e:
-            self.model.window_selection.set_raw_image(None, None).notify(ImageLayer.RAW)
+            self.model.window_selection.set_raw_image(None, None)
 
     def clear_capture_target_preview(self) -> None:
         """
         プレビューの表示状態をクリアする。
         """
-        self.model.window_selection.set_raw_image(None, None).notify(ImageLayer.RAW)
+        self.model.window_selection.set_raw_image(None, None)

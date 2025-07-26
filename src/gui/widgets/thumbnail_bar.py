@@ -173,9 +173,11 @@ class ThumbnailBar(ctk.CTkScrollableFrame):
         self._parent_canvas.bind("<Leave>", self._mouse_leave)
 
         # コールバック設定
-        self._model.video.register_notify_handler(self._on_video_change)
+        self._model.video.register_notify_handler(
+            ImageLayer.THUMBNAIL, self._on_thumbnail_change
+        )
 
-    def _on_video_change(self):
+    def _on_thumbnail_change(self):
         """
         動画に変更があった時に呼び出されるハンドラ
         """
@@ -203,9 +205,9 @@ class ThumbnailBar(ctk.CTkScrollableFrame):
                 pady=WIDGET_PADDING,
             )
 
-        # # 全ウィジェットの表示を更新
-        # for item in self._items:
-        #     item.update_image()
+        # 全ウィジェットの表示を更新
+        for item in self._items:
+            item.update_image()
 
     def _mouse_enter(self, _):
         """

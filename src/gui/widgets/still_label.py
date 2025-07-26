@@ -82,4 +82,4 @@ class StillLabel(ctk.CTkLabel):
         self._image_model.set_size(
             ImageLayer.PREVIEW,
             ResizeDesc(AspectRatioPattern.E_RAW, actual_width, actual_height),
-        ).notify(ImageLayer.PREVIEW)
+        )

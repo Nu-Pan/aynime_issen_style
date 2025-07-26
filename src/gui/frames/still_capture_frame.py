@@ -115,9 +115,7 @@ class StillCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
             return
 
         # モデルに反映
-        self.model.still.set_raw_image(pil_raw_capture_image, None).notify(
-            ImageLayer.RAW
-        )
+        self.model.still.set_raw_image(pil_raw_capture_image, None)
 
         # エクスポート処理
         # NOTE
@@ -140,7 +138,7 @@ class StillCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
         #   リサイズさえすればコールバック経由でエクスポートまで走るはず
         self.model.still.set_size(
             ImageLayer.NIME, ResizeDesc.from_pattern(aspect_ratio, resolution)
-        ).notify(ImageLayer.NIME)
+        )
 
     def on_nime_changed(self):
         """
@@ -220,4 +218,4 @@ class StillCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
             return
 
         # モデルに設定
-        self.model.still.set_raw_image(image, time_stamp).notify(ImageLayer.RAW)
+        self.model.still.set_raw_image(image, time_stamp)

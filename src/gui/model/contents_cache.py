@@ -85,41 +85,51 @@ class CachedContent(Generic[Content, ParentContent], ABC):
         # メンバ初期化
         self._parent = parent
         self._known_parent_output: Any = None
+        self._is_dirty = False
 
-    def check_parent(self) -> Tuple[bool, Optional[ParentContent]]:
-        """
-        自身の記憶（上の親の出力はこうだったはず）と実際の親の出力とを比較した上で、自身の記憶を更新する。
-        親の出力が変わった場合は True を返す。
-        また、実際の親の出力も返す。
-        """
-        # 親がいない場合は False
+    @property
+    def parent_output(self) -> Optional[ParentContent]:
         if self._parent is None:
-            raise ValueError("No parent content available.")
+            return None
+        else:
+            return self._parent.output
 
-        # 親の出力を取得
-        parent_output = self._parent.output
-
-        # 変化があった場合、更新して True を返す
-        if parent_output != self._known_parent_output:
-            self._known_parent_output = parent_output
-            return True, parent_output
-
-        # 変化がなかった場合は False を返す
-        return False, parent_output
-
-    @abstractmethod
-    def resolve_dirty(self) -> Self:
+    def set_dirty(self, does_set: bool = True) -> Self:
         """
-        ダーティー状態を解消する
+        ダーティフラグを立てる
+        立てるかどうかを source_state で指定可能
         """
-        pass
+        self._is_dirty |= does_set
+        return self
+
+    def reset_dirty(self) -> Self:
+        """
+        ダーティフラグを下げる
+        """
+        self._is_dirty = False
+        return self
+
+    @property
+    def is_dirty(self) -> bool:
+        """
+        ダーティー状態なら True を返す
+        """
+        # 親の変化の有無を自身のダーティフラグに反映
+        if self._parent is not None:
+            parent_output = self.parent_output
+            if parent_output != self._known_parent_output:
+                self._known_parent_output = parent_output
+                self.set_dirty()
+
+        # 内部状態を返す
+        return self._is_dirty
 
     @property
     @abstractmethod
     def output(self) -> Optional[Content]:
         """
         出力を取得する
-        apply は暗黙に呼び出される
+        ダーティー状態は暗黙に解決される。
         """
         pass
 
@@ -142,22 +152,21 @@ class CachedSourceImage(CachedContent[Image.Image, Any]):
         """
         ソース画像を設定する
         """
-        self._source = source
-        return self
-
-    def resolve_dirty(self) -> Self:
-        """
-        ダーティー状態を解消する
-        """
-        # NOTE ソースを素通しなのですることがない
+        if self._source != source:
+            self.set_dirty()
+            self._source = source
         return self
 
     @property
     def output(self) -> Optional[Image.Image]:
         """
         出力を取得する
-        apply は暗黙に呼び出される
+        ダーティー状態は暗黙に解決される。
         """
+        # NOTE
+        #   ソースを素通しなので画像処理は不要
+        #   ダーティフラグを下げてソース画像をそのまま返す
+        self.reset_dirty()
         return self._source
 
 
@@ -187,54 +196,24 @@ class CachedScalableImage(
         self._aux_process = aux_process
 
         # 遅延変数
-        self._is_dirty = False
         self._size = ResizeDesc.from_pattern(
             AspectRatioPattern.E_RAW, ResizeDesc.Pattern.E_RAW
         )
         self._output = None
 
     def set_size(self, size: ResizeDesc) -> Self:
-        self._is_dirty |= self._size != size
-        self._size = size
-        return self
-
-    def resolve_dirty(self) -> Self:
         """
-        ダーティー状態を解消する
+        スケーリング後のサイズを設定
         """
-        # 親の出力を取り込んでダーティフラグに反映
-        # NOTE
-        #   check_parent は再帰的に実行されるので、
-        #   ルートまで変更の有無を見に行くことになる。
-        is_parent_changed, parent_content = self.check_parent()
-        self._is_dirty |= is_parent_changed
-
-        # ダーティーじゃない場合、何もしない
-        if not self._is_dirty:
-            return self
-
-        # 必要なものが…
-        if parent_content is not None and self._size is not None:
-            # 揃っている場合、更新
-            if isinstance(parent_content, Image.Image):
-                self._output = resize(parent_content, self._size, self._mode)
-            else:
-                raise TypeError(type(parent_content))
-            if self._aux_process is not None:
-                self._output = self._aux_process(self._output)
-            self._is_dirty = False
-        else:
-            # 揃っていない場合、単にクリア
-            self._output = None
-            self._is_dirty = False
-
-        # 正常終了
+        if self._size != size:
+            self.set_dirty()
+            self._size = size
         return self
 
     @property
-    def size(self) -> Optional[ResizeDesc]:
+    def size(self) -> ResizeDesc:
         """
-        目標サイズ
+        スケーリング後のサイズを取得
         """
         return self._size
 
@@ -242,8 +221,27 @@ class CachedScalableImage(
     def output(self) -> Optional[Image.Image]:
         """
         スケーリング済み画像
+        ダーティー状態は暗黙に解決される。
         """
-        self.resolve_dirty()
+        # ダーティ状態を解消
+        if self.is_dirty:
+            # 必要なものが…
+            parent_output = self.parent_output
+            if parent_output is not None and self._size is not None:
+                # 揃っている場合、更新
+                if isinstance(parent_output, Image.Image):
+                    self._output = resize(parent_output, self._size, self._mode)
+                else:
+                    raise TypeError(type(parent_output))
+                if self._aux_process is not None:
+                    self._output = self._aux_process(self._output)
+                self.reset_dirty()
+            else:
+                # 揃っていない場合、単にクリア
+                self._output = None
+                self.reset_dirty()
+
+        # 正常終了
         return self._output
 
 
@@ -264,46 +262,30 @@ class CachedPhotoImage(
         super().__init__(parent)
 
         # 遅延変数
-        self._is_dirty = False
         self._output = None
-
-    def resolve_dirty(self) -> Self:
-        """
-        ダーティー状態を解消する
-        """
-        # 親の出力を取り込んでダーティフラグに反映
-        # NOTE
-        #   check_parent は再帰的に実行されるので、
-        #   ルートまで変更の有無を見に行くことになる。
-        is_parent_changed, parent_content = self.check_parent()
-        self._is_dirty |= is_parent_changed
-
-        # ダーティーじゃない場合、何もしない
-        if not self._is_dirty:
-            return self
-
-        # 必要なものが…
-        if isinstance(parent_content, Image.Image):
-            # 揃っている場合、更新
-            self._output = PhotoImage(parent_content)
-            self._is_dirty = False
-        elif parent_content is None:
-            # 揃っていない場合、単にクリア
-            self._output = None
-            self._is_dirty = False
-        else:
-            # 型が違う場合はエラー
-            raise TypeError(type(parent_content))
-
-        # 正常終了
-        return self
 
     @property
     def output(self) -> Optional[PhotoImage]:
         """
         PIL.ImageTk.PhotoImage
         """
-        self.resolve_dirty()
+        # ダーティ状態を解決
+        if self.is_dirty:
+            # 必要なものが…
+            parent_output = self.parent_output
+            if isinstance(parent_output, Image.Image):
+                # 揃っている場合、更新
+                self._output = PhotoImage(parent_output)
+                self.reset_dirty()
+            elif parent_output is None:
+                # 揃っていない場合、単にクリア
+                self._output = None
+                self.reset_dirty()
+            else:
+                # 型が違う場合はエラー
+                raise TypeError(type(parent_output))
+
+        # 正常終了
         return self._output
 
 
@@ -345,13 +327,13 @@ class ImageModel:
         )
         self._preview_photo_image = CachedPhotoImage(self._preview_pil_image)
         self._thumbnail_pil_image_enable = CachedScalableImage(
-            self._nime_image, ResizeMode.CONTAIN
+            self._raw_image, ResizeMode.CONTAIN
         )
         self._thumbnail_photo_image_enable = CachedPhotoImage(
             self._thumbnail_pil_image_enable
         )
         self._thumbnail_pil_image_disable = CachedScalableImage(
-            self._nime_image, ResizeMode.CONTAIN, aux_process=make_disabled_image
+            self._raw_image, ResizeMode.CONTAIN, aux_process=make_disabled_image
         )
         self._thumbnail_photo_image_disable = CachedPhotoImage(
             self._thumbnail_pil_image_disable
@@ -369,7 +351,11 @@ class ImageModel:
         """
         モデルの有効・無効を切り替える
         """
-        self._enable = enable
+        if self._enable != enable:
+            self._enable = enable
+            self._thumbnail_pil_image_enable.set_dirty()
+            self._thumbnail_pil_image_disable.set_dirty()
+            self._notify(ImageLayer.THUMBNAIL)
         return self
 
     @property
@@ -392,6 +378,7 @@ class ImageModel:
         """
         RAW 画像を設定する。
         それまでの全ては吹き飛ぶ。
+        タイムスタンプも強制的に更新される。
 
         Args:
             raw_image (Image.Image): 新しい RAW 画像
@@ -403,7 +390,21 @@ class ImageModel:
         # RAW 画像に反映
         self._raw_image.set_source(raw_image)
 
-        # タイムスタンプを決定
+        # タイムスタンプを更新
+        self.set_time_stamp(time_stamp)
+
+        # 通知
+        self._notify(ImageLayer.RAW)
+
+        # 正常終了
+        return self
+
+    def set_time_stamp(self, time_stamp: Optional[str]) -> Self:
+        """
+        タイムスタンプを設定する
+        RAW 画像は更新されない。
+        """
+        # タイムスタンプ更新
         if isinstance(time_stamp, str):
             if is_time_stamp(time_stamp):
                 self._time_stamp = time_stamp
@@ -419,41 +420,62 @@ class ImageModel:
 
     def set_size(self, layer: ImageLayer, size: ResizeDesc) -> Self:
         """
-        指定 layer の画像のサイズを変更する。
+        指定 layer のリサイズ挙動を設定する。
         """
         # layer 分岐
-        if layer == ImageLayer.RAW:
-            raise ValueError("RAW set_size NOT supported.")
-        elif layer == ImageLayer.NIME:
-            self._nime_image.set_size(size)
-        elif layer == ImageLayer.PREVIEW:
-            self._preview_pil_image.set_size(size)
-        elif layer == ImageLayer.THUMBNAIL:
-            self._thumbnail_pil_image_enable.set_size(size)
-            self._thumbnail_pil_image_disable.set_size(size)
-        else:
-            raise ValueError(layer)
+        match layer:
+            case ImageLayer.RAW:
+                raise ValueError("RAW set_size NOT supported.")
+            case ImageLayer.NIME:
+                self._nime_image.set_size(size)
+            case ImageLayer.PREVIEW:
+                self._preview_pil_image.set_size(size)
+            case ImageLayer.THUMBNAIL:
+                self._thumbnail_pil_image_enable.set_size(size)
+                self._thumbnail_pil_image_disable.set_size(size)
+            case _:
+                raise ValueError(layer)
+
+        # 通知
+        self._notify(layer)
 
         # 正常終了
         return self
+
+    def get_size(self, layer: ImageLayer) -> ResizeDesc:
+        """
+        指定 layer のリサイズ挙動を取得する。
+        """
+        match layer:
+            case ImageLayer.RAW:
+                raise ValueError("RAW set_size NOT supported.")
+            case ImageLayer.NIME:
+                return self._nime_image.size
+            case ImageLayer.PREVIEW:
+                return self._preview_pil_image.size
+            case ImageLayer.THUMBNAIL:
+                return self._thumbnail_pil_image_enable.size
+            case _:
+                raise ValueError(layer)
 
     def get_image(self, layer: ImageLayer) -> Union[Image.Image, PhotoImage, None]:
         """
         指定 layer の画像を取得する。
         """
-        if layer == ImageLayer.RAW:
-            return self._raw_image.output
-        elif layer == ImageLayer.NIME:
-            return self._nime_image.output
-        elif layer == ImageLayer.PREVIEW:
-            return self._preview_photo_image.output
-        elif layer == ImageLayer.THUMBNAIL:
-            if self._enable:
-                return self._thumbnail_photo_image_enable.output
-            else:
-                return self._thumbnail_photo_image_disable.output
-        else:
-            raise ValueError(layer)
+        match layer:
+            case ImageLayer.RAW:
+                return self._raw_image.output
+            case ImageLayer.NIME:
+                return self._nime_image.output
+            case ImageLayer.PREVIEW:
+                return self._preview_photo_image.output
+            case ImageLayer.THUMBNAIL:
+                if self._enable:
+                    return self._thumbnail_photo_image_enable.output
+                else:
+                    return self._thumbnail_photo_image_disable.output
+            case _:
+                raise ValueError(layer)
 
     def register_notify_handler(
         self, layer: ImageLayer, handler: NotifyHandler
@@ -465,31 +487,43 @@ class ImageModel:
         self._notify_handlers[layer].append(handler)
         return self
 
-    def notify(self, layer: ImageLayer) -> Self:
+    def _notify(self, layer: ImageLayer) -> Self:
         """
-        あらかじめ登録しておいた通知ハンドラが呼び出される。
+        あらかじめ登録しておいた通知ハンドラを呼び出す。
         layer と、その影響受けるすべてのレイヤーの通知ハンドラが呼び出される。
         画像がダーティー化した時の通知に使われることを想定。
         """
+        # ダーティフラグを解決
+        match layer:
+            case ImageLayer.RAW:
+                is_dirty = self._raw_image.is_dirty
+            case ImageLayer.NIME:
+                is_dirty = self._nime_image.is_dirty
+            case ImageLayer.PREVIEW:
+                is_dirty = self._preview_pil_image.is_dirty
+            case ImageLayer.THUMBNAIL:
+                is_dirty = self._thumbnail_pil_image_enable.is_dirty
+            case _:
+                raise ValueError(f"Invalid ImageLayer(={layer})")
 
-        # レイヤー１つの処理を関数化
-        def notify_single(force: bool, target: ImageLayer) -> bool:
-            is_target_layer = layer == target
-            if force or is_target_layer:
-                for handler in self._notify_handlers[target]:
-                    handler()
-                return is_target_layer
-            else:
-                return False
+        # ダーティ状態ならハンドラを呼び出す
+        if is_dirty:
+            for handler in self._notify_handlers[layer]:
+                handler()
 
-        # 上流側から順番に処理
-        # NOTE
-        #   要するに、上流でヒットしたら、その下流もヒット扱いにするということ。
-        force = False
-        force |= notify_single(force, ImageLayer.RAW)
-        force |= notify_single(force, ImageLayer.NIME)
-        force |= notify_single(force, ImageLayer.PREVIEW)
-        force |= notify_single(force, ImageLayer.THUMBNAIL)
+        # 影響先のレイヤーの通知ハンドラを再帰的に呼び出す
+        match layer:
+            case ImageLayer.RAW:
+                self._notify(ImageLayer.NIME)
+                self._notify(ImageLayer.THUMBNAIL)
+            case ImageLayer.NIME:
+                self._notify(ImageLayer.PREVIEW)
+            case ImageLayer.PREVIEW:
+                pass
+            case ImageLayer.THUMBNAIL:
+                pass
+            case _:
+                raise ValueError(f"Invalid ImageLayer(={layer})")
 
         # 正常終了
         return self
@@ -506,24 +540,32 @@ class VideoModel:
         コンストラクタ
         """
         # 各メンバを初期化
-        self._time_stamp = None
-        self._size: Dict[ImageLayer, ResizeDesc] = {
-            layer: ResizeDesc.from_pattern(
-                AspectRatioPattern.E_RAW, ResizeDesc.Pattern.E_RAW
-            )
-            for layer in ImageLayer
-        }
+        # NOTE
+        #   サイズとかの全フレーム共通の情報は self._global_model をマスターとして管理する
+        #   フレーム個別の情報は self._frame で管理する
+        self._global_model = ImageModel()
         self._frames: List[ImageModel] = []
         self._frame_rate = DEFAULT_FRAME_RATE
-        self._notify_handlers: List[NotifyHandler] = []
 
     def set_enable(self, frame_index: int, enable: bool) -> Self:
         """
         指定フレームの有効・無効を設定する
         """
-        self._frames[frame_index].set_enable(enable)
-        for handler in self._notify_handlers:
-            handler()
+        # フレームに有効・無効を反映
+        frame = self._frames[frame_index]
+        does_change = frame.enable != enable
+        if does_change:
+            frame.set_enable(enable)
+
+        # 全体通知を呼び出す
+        # NOTE
+        #   原則として、１フレームでも変更があれば動画全体として通知が飛ぶ
+        #   よって、グローバルモデルに対して変化を発生させる
+        #   グローバルモデルの enable の値そのものは整合する必要がなくて、変化させることが重要
+        if does_change:
+            self._global_model.set_enable(not self._global_model.enable)
+
+        # 正常終了
         return self
 
     def get_enable(self, frame_index: int) -> bool:
@@ -535,41 +577,27 @@ class VideoModel:
     def set_time_stamp(self, time_stamp: Optional[str]) -> Self:
         """
         動画のタイムスタンプを設定する。
-
-        Args:
-            time_stamp (Optional[str]): 新しいタイムスタンプ
-
-        Returns:
-            VideoModel: 自分自身
         """
-        if isinstance(time_stamp, str):
-            if is_time_stamp(time_stamp):
-                self._time_stamp = time_stamp
-            else:
-                raise ValueError(time_stamp)
-        elif time_stamp is None:
-            self._time_stamp = current_time_stamp()
-        else:
-            TypeError(time_stamp)
-
+        # NOTE
+        #   タイムスタンプはグローバルモデルで一元管理
+        #   個別のフレームは触らない
+        self._global_model.set_time_stamp(time_stamp)
         return self
 
     @property
     def time_stamp(self) -> Optional[str]:
         """
-        この画像の撮影日時を表すタイムスタンプ
+        この動画の撮影日時を表すタイムスタンプ
         """
-        return self._time_stamp
+        return self._global_model.time_stamp
 
     def set_size(self, layer: ImageLayer, size: ResizeDesc) -> Self:
         """
         各フレームサイズを設定する
         """
-        self._size[layer] = size
+        self._global_model.set_size(layer, size)
         for f in self._frames:
             f.set_size(layer, size)
-        for handler in self._notify_handlers:
-            handler()
         return self
 
     def insert_frames(
@@ -590,23 +618,26 @@ class VideoModel:
             new_frames = [new_frames]
 
         # サイズ情報を統一
-        for f in new_frames:
-            for l in ImageLayer:
-                if l != ImageLayer.RAW:
-                    f.set_size(l, self._size[l])
+        for new_frame in new_frames:
+            for layer in ImageLayer:
+                if layer != ImageLayer.RAW:
+                    new_frame.set_size(layer, self._global_model.get_size(layer))
 
         # タイムスタンプを統一
-        # NOTE
-        #   完全にコピーしたいので、メンバを直接書き換える。
-        for f in new_frames:
-            f._time_stamp = self._time_stamp
+        for new_frame in new_frames:
+            new_frame.set_time_stamp(self._global_model.time_stamp)
 
         # フレームリストに挿入
         self._frames = self._frames[:position] + new_frames + self._frames[position:]
 
-        # 通知
-        for handler in self._notify_handlers:
-            handler()
+        # 全体通知を呼び出す
+        # NOTE
+        #   原則、１フレームでも変更があれば動画全体として通知が飛ぶ
+        #   フレームの追加・削除については RAW レイヤーでの変更とみなす
+        #   よってグローバルモデルに新規生成した画像を渡して強制的に通知を発生させる
+        self._global_model.set_raw_image(
+            Image.new("RGBA", (8, 8), None), self._global_model.time_stamp
+        )
 
         # 正常終了
         return self
@@ -615,18 +646,30 @@ class VideoModel:
         """
         指定インデックスのフレームを削除する
         """
+        # 指定フレームを削除
         self._frames.pop(position)
-        for handler in self._notify_handlers:
-            handler()
+
+        # 全体通知を呼び出す
+        self._global_model.set_raw_image(
+            Image.new("RGBA", (8, 8), None), self._global_model.time_stamp
+        )
+
+        # 正常終了
         return self
 
     def clear_frames(self) -> Self:
         """
         全フレームを削除する
         """
+        # 全フレームを削除
         self._frames.clear()
-        for handler in self._notify_handlers:
-            handler()
+
+        # 全体通知を呼び出す
+        self._global_model.set_raw_image(
+            Image.new("RGBA", (8, 8), None), self._global_model.time_stamp
+        )
+
+        # 正常終了
         return self
 
     @property
@@ -682,11 +725,11 @@ class VideoModel:
         """
         return self._frame_rate
 
-    def register_notify_handler(self, handler: NotifyHandler):
+    def register_notify_handler(self, layer: ImageLayer, handler: NotifyHandler):
         """
         通知ハンドラーを登録する
         """
-        self._notify_handlers.append(handler)
+        self._global_model.register_notify_handler(layer, handler)
 
 
 def save_content_model(model: Union[ImageModel, VideoModel]) -> Path:
