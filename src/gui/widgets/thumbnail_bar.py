@@ -3,7 +3,6 @@ from typing import Callable, List, Iterable
 import time
 
 # PIL
-from PIL import Image
 from PIL.ImageTk import PhotoImage
 
 # Tk/CTk
@@ -12,11 +11,11 @@ import customtkinter as ctk
 
 # utils
 from utils.constants import WIDGET_PADDING, DEFAULT_FONT_NAME
-from utils.pil import calc_ssim
+from utils.image import calc_ssim
 from utils.ctk import silent_configure, configure_presence
 
 # gui
-from gui.model.contents_cache import ImageModel, VideoModel, ImageLayer
+from gui.model.contents_cache import ResizeDesc, ImageLayer, AspectRatioPattern
 from gui.model.aynime_issen_style import AynimeIssenStyleModel
 
 
@@ -26,7 +25,7 @@ class SentinelItem(ctk.CTkFrame):
     ドロップ可能であることをユーザーに伝えるためだけに存在
     """
 
-    def __init__(self, master: "ThumbnailBar", thumbnail_height: int):
+    def __init__(self, master: "ThumbnailBar"):
         """
         コンストラクタ
 
@@ -45,8 +44,6 @@ class SentinelItem(ctk.CTkFrame):
         self._text_label = ctk.CTkLabel(
             self,
             text="Drop image file(s) HERE",
-            width=thumbnail_height * 16 // 9,
-            height=thumbnail_height,
             bg_color="transparent",
             font=default_font,
         )
@@ -102,6 +99,9 @@ class ThumbnailItem(ctk.CTkFrame):
         self._button.bind("<Button-1>", self._on_click_left)
         self._button.bind("<Button-3>", self._on_click_right)
 
+        # リサイズハンドラ
+        self.bind("<Configure>", self._on_resize)
+
     def update_image(self):
         """
         サムネイルの更新が必要なときに呼び出すべき関数
@@ -129,6 +129,19 @@ class ThumbnailItem(ctk.CTkFrame):
         """
         self._model.video.delete_frame(self._frame_index)
 
+    def _on_resize(self, _):
+        """
+        リサイズハンドラ
+        """
+        # 適切なサイズを解決
+        actual_width = self.winfo_width()
+        actual_height = self.winfo_height()
+        print(f"set_size: {actual_height}")
+        self._model.video.set_size(
+            ImageLayer.THUMBNAIL,
+            ResizeDesc(AspectRatioPattern.E_RAW, None, actual_height),
+        )
+
 
 class ThumbnailBar(ctk.CTkScrollableFrame):
     """
@@ -150,20 +163,24 @@ class ThumbnailBar(ctk.CTkScrollableFrame):
             thumbnail_height (int): サムネイルの大きさ（縦方向）
             on_change (Callable): サムネイルに変化があった場合に呼び出されるハンドラ
         """
-        super().__init__(master, orientation="horizontal", **kwargs)
+        super().__init__(
+            master,
+            height=thumbnail_height,
+            orientation="horizontal",
+            **kwargs,
+        )
 
         # 引数保存
         self._model = model
 
-        # 高さを調整
-        self.configure(height=thumbnail_height + 2 * WIDGET_PADDING)
-
         # 内部状態
-        self._thumbnail_height = thumbnail_height
         self._items: list[ThumbnailItem] = []
 
+        # 高さ方向はいっぱいまで拡大
+        self.grid_rowconfigure(0, weight=1)
+
         # 番兵アイテムを追加
-        self._sentinel_item = SentinelItem(self, thumbnail_height)
+        self._sentinel_item = SentinelItem(self)
         self._sentinel_item.grid(
             row=0, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING
         )
@@ -193,6 +210,8 @@ class ThumbnailBar(ctk.CTkScrollableFrame):
                 row=0, column=len(self._items), padx=WIDGET_PADDING, pady=WIDGET_PADDING
             )
             self._items.append(new_item)
+
+        pass
 
         # 番兵アイテムを移動
         current_sentinel_column = self._sentinel_item.grid_info()["column"]

@@ -3,9 +3,6 @@ from pathlib import Path
 from typing import cast, Tuple, List, Any
 from time import time
 
-# PIL
-from PIL import Image
-
 # Tk/CTk
 import customtkinter as ctk
 from tkinterdnd2 import TkinterDnD, DND_FILES
@@ -14,7 +11,7 @@ import tkinter.messagebox as mb
 
 # utils
 from utils.constants import WIDGET_PADDING, DEFAULT_FONT_NAME
-from utils.pil import AspectRatioPattern, ResizeDesc
+from utils.image import AspectRatioPattern, ResizeDesc, AISImage
 from utils.constants import APP_NAME_JP, THUMBNAIL_HEIGHT
 from utils.windows import file_to_clipboard
 from utils.ctk import show_notify
@@ -427,7 +424,7 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
             self._model.video.delete_frame(disabled_frame_index)
 
     def _record_handler(
-        self, stop_time_in_sec: float, record_raw_images: List[Image.Image] = []
+        self, stop_time_in_sec: float, record_raw_images: List[AISImage] = []
     ):
         """
         レコード処理を実際に担うハンドラ
@@ -435,7 +432,7 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
 
         Args:
             stop_time_in_sec (float): レコード処理終了時刻
-            record_frames (Optional[Image.Image]): 今までに記録したフレーム
+            record_frames (Optional[AISImage]): 今までに記録したフレーム
         """
         # 所定の時間を経過してたら終了
         if time() > stop_time_in_sec:

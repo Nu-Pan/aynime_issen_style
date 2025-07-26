@@ -2,7 +2,6 @@
 from typing import Optional
 
 # PIL
-from PIL import Image, ImageTk
 from PIL.ImageTk import PhotoImage
 
 # TK/CTk
@@ -11,7 +10,7 @@ import customtkinter as ctk
 # utils
 from utils.constants import DEFAULT_FONT_NAME
 from utils.ctk import silent_configure, configure_presence
-from utils.pil import ResizeDesc, AspectRatioPattern
+from utils.image import ResizeDesc, AspectRatioPattern
 
 # model
 from gui.model.contents_cache import ImageModel, ImageLayer

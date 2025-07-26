@@ -2,9 +2,6 @@
 from typing import List, Tuple, cast
 from pathlib import Path
 
-# PIL
-from PIL import Image
-
 # Tk/CTk
 import customtkinter as ctk
 from tkinterdnd2 import TkinterDnD, DND_FILES
@@ -14,7 +11,7 @@ from tkinter import Event
 
 # utils
 from utils.constants import WIDGET_PADDING, DEFAULT_FONT_NAME
-from utils.pil import AspectRatioPattern, ResizeDesc
+from utils.image import AspectRatioPattern, ResizeDesc, AISImage
 from gui.model.contents_cache import (
     ImageModel,
     VideoModel,
@@ -209,7 +206,7 @@ class StillCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
                 exceptions.append(e)
 
         # 読み込めてない場合はここでおしまい
-        if not isinstance(image, Image.Image) or not isinstance(time_stamp, str):
+        if not isinstance(image, AISImage) or not isinstance(time_stamp, str):
             if len(exceptions) > 0:
                 mb.showerror(
                     APP_NAME_JP,

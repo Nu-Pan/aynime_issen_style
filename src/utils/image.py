@@ -4,10 +4,9 @@ from enum import Enum
 from dataclasses import dataclass
 from enum import Enum, auto
 from math import gcd
-from fractions import Fraction
 
 # PIL
-from PIL import Image, ImageDraw, ImageEnhance, ImageFont
+from PIL import Image
 
 # numpy
 import numpy as np
@@ -211,10 +210,6 @@ class ResizeDesc:
         else:
             raise RuntimeError("Logic Error")
 
-        # アス比に矛盾がある場合はエラー
-        if actual_ar != AspectRatio(actual_width, actual_height):
-            raise ValueError("AspectRatio Miss Match")
-
         # 正常終了
         return (actual_width, actual_height)
 
@@ -232,101 +227,6 @@ class ResizeDesc:
             return NotImplemented
 
 
-def resize_contain(image: Image.Image, resize_desc: ResizeDesc) -> Image.Image:
-    """
-    (width, height) のボックス内に image 全体が収まるようにリサイズする。
-    リサイズ前後でアスペクト比は維持される。
-    拡大は行われない。
-
-    Args:
-        image (Image.Image): 元画像
-        target_width (int): リサイズ後のサイズ（横）
-        target_height (int): リサイズ後のサイズ（縦）
-
-    Returns:
-        Image.Image: リサイズ後の画像
-    """
-    # 目標サイズを解決
-    target_width, target_height = resize_desc.resolve(image.width, image.height)
-
-    # スケール後のサイズを解決
-    width_scale = target_width / image.width
-    height_scale = target_height / image.height
-    if min(width_scale, height_scale) > 1.0:
-        actual_width = image.width
-        actual_height = image.height
-    elif width_scale < height_scale:
-        actual_width = target_width
-        actual_height = int(image.height * target_width / image.width + 0.5)
-    else:
-        actual_width = int(image.width * target_height / image.height + 0.5)
-        actual_height = target_height
-
-    # スケール不要ならコピーを返す
-    if actual_width == image.width and actual_height == image.height:
-        return image.copy()
-
-    # リサイズして返す
-    return image.resize(
-        (actual_width, actual_height), Image.Resampling.LANCZOS, reducing_gap=2.0
-    )
-
-
-def resize_cover(image: Image.Image, resize_desc: ResizeDesc) -> Image.Image:
-    """
-    image の範囲内に (width, height) のボックスがちょうど収まるように image をリサイズする。
-    リサイズ前後でアスペクト比は維持される。
-    はみ出た分はカットされる。
-    拡大・縮小両方が行われる。
-
-    Args:
-        image (Image.Image): 元画像
-        target_width (int): リサイズ後のサイズ（横）
-        target_height (int): リサイズ後のサイズ（縦）
-
-    Returns:
-        Image.Image: リサイズ後の画像
-    """
-    # 目標サイズを解決
-    target_width, target_height = resize_desc.resolve(image.width, image.height)
-
-    # スケール後のサイズを解決
-    width_scale = target_width / image.width
-    height_scale = target_height / image.height
-    if width_scale > height_scale:
-        pre_crop_width = target_width
-        pre_crop_height = image.height * target_width // image.width
-    else:
-        pre_crop_width = image.width * target_height // image.height
-        pre_crop_height = target_height
-
-    # スケーリング
-    # NOTE
-    #   まずはアスペクト比を維持したスケーリングを行う
-    #   スケール不要ならコピーを返す
-    if pre_crop_width == image.width and pre_crop_height == image.height:
-        scaled_image = image
-    else:
-        scaled_image = image.resize(
-            (pre_crop_width, pre_crop_height),
-            Image.Resampling.LANCZOS,
-            reducing_gap=2.0,
-        )
-
-    # 切り取り
-    croped_image = scaled_image.crop(
-        (
-            scaled_image.width // 2 - target_width // 2,
-            scaled_image.height // 2 - target_height // 2,
-            scaled_image.width // 2 + target_width // 2,
-            scaled_image.height // 2 + target_height // 2,
-        )
-    )
-
-    # 正常終了
-    return croped_image
-
-
 class ResizeMode(Enum):
     """
     リサイズの挙動を表す列挙値
@@ -339,90 +239,195 @@ class ResizeMode(Enum):
     COVER = auto()
 
 
-def resize(
-    image: Image.Image, resize_desc: ResizeDesc, mode: ResizeMode
-) -> Image.Image:
+class AISImage:
     """
-    image を target_size にリサイズする
-    リサイズの挙動は mode に従う
-
-    Args:
-        image (Image.Image): リサイズ元画像
-        target_size (Union[SizePixel, SizePattern]): リサイズ先サイズ
-        mode (ResizeMode): リサイズ挙動
-
-    Returns:
-        Image.Image: リサイズ済み画像
+    えぃにめ一閃流画像クラス
+    PIL.Image.Image が使いづらすぎなので、その代替となる画像クラス。
     """
-    if mode == ResizeMode.CONTAIN:
-        return resize_contain(image, resize_desc)
-    elif mode == ResizeMode.COVER:
-        return resize_cover(image, resize_desc)
-    else:
-        raise ValueError(mode)
+
+    def __init__(self, source: Image.Image):
+        """
+        コンストラクタ
+        """
+        self._pil_image = source
+
+    @classmethod
+    def empty(cls, mode: str, width: int, height: int) -> "AISImage":
+        """
+        空の画像を生成する
+        """
+        return AISImage(Image.new(mode, (width, height)))
+
+    @property
+    def width(self) -> int:
+        """
+        画像の横幅
+        """
+        return self._pil_image.width
+
+    @property
+    def height(self) -> int:
+        """
+        画像の高さ
+        """
+        return self._pil_image.height
+
+    @property
+    def pil_image(self) -> Image.Image:
+        """
+        中身の PIL 画像を取得
+        """
+        return self._pil_image
+
+    def __eq__(self, other: Any) -> bool:
+        """
+        他画像と「一致」するなら True
+        画像同士の比較はオブジェクト ID の一致で代替
+        """
+        if isinstance(other, AISImage):
+            return self._pil_image is other._pil_image
+        elif isinstance(other, Image.Image):
+            return self._pil_image is other
+        elif other is None:
+            return False
+        else:
+            raise TypeError(f"Invalid type {type(other)}")
+
+    def resize_contain(self, resize_desc: ResizeDesc) -> "AISImage":
+        """
+        (width, height) のボックス内に image 全体が収まるようにリサイズする。
+        リサイズ前後でアスペクト比は維持される。
+        拡大は行われない。
+
+        Args:
+            target_width (int): リサイズ後のサイズ（横）
+            target_height (int): リサイズ後のサイズ（縦）
+
+        Returns:
+            AISImage: リサイズ後の画像
+        """
+        # エイリアス
+        image = self._pil_image
+
+        # 目標サイズを解決
+        target_width, target_height = resize_desc.resolve(image.width, image.height)
+
+        # スケール後のサイズを解決
+        width_scale = target_width / image.width
+        height_scale = target_height / image.height
+        if min(width_scale, height_scale) > 1.0:
+            actual_width = image.width
+            actual_height = image.height
+        elif width_scale < height_scale:
+            actual_width = target_width
+            actual_height = int(image.height * target_width / image.width + 0.5)
+        else:
+            actual_width = int(image.width * target_height / image.height + 0.5)
+            actual_height = target_height
+
+        # スケール不要ならコピーを返す
+        if actual_width == image.width and actual_height == image.height:
+            return AISImage(image.copy())
+
+        # リサイズして返す
+        return AISImage(
+            image.resize(
+                (actual_width, actual_height),
+                Image.Resampling.LANCZOS,
+                reducing_gap=2.0,
+            )
+        )
+
+    def resize_cover(self, resize_desc: ResizeDesc) -> "AISImage":
+        """
+        self の範囲内に (width, height) のボックスがちょうど収まるように self をリサイズする。
+        リサイズ前後でアスペクト比は維持される。
+        はみ出た分はカットされる。
+        拡大・縮小両方が行われる。
+
+        Args:
+            target_width (int): リサイズ後のサイズ（横）
+            target_height (int): リサイズ後のサイズ（縦）
+
+        Returns:
+            AISImage: リサイズ後の画像
+        """
+        # エイリアス
+        image = self._pil_image
+
+        # 目標サイズを解決
+        target_width, target_height = resize_desc.resolve(image.width, image.height)
+
+        # スケール後のサイズを解決
+        width_scale = target_width / image.width
+        height_scale = target_height / image.height
+        if width_scale > height_scale:
+            pre_crop_width = target_width
+            pre_crop_height = image.height * target_width // image.width
+        else:
+            pre_crop_width = image.width * target_height // image.height
+            pre_crop_height = target_height
+
+        # スケーリング
+        # NOTE
+        #   まずはアスペクト比を維持したスケーリングを行う
+        #   スケール不要ならコピーを返す
+        if pre_crop_width == image.width and pre_crop_height == image.height:
+            scaled_image = image
+        else:
+            scaled_image = image.resize(
+                (pre_crop_width, pre_crop_height),
+                Image.Resampling.LANCZOS,
+                reducing_gap=2.0,
+            )
+
+        # 切り取り
+        croped_image = scaled_image.crop(
+            (
+                scaled_image.width // 2 - target_width // 2,
+                scaled_image.height // 2 - target_height // 2,
+                scaled_image.width // 2 + target_width // 2,
+                scaled_image.height // 2 + target_height // 2,
+            )
+        )
+
+        # 正常終了
+        return AISImage(croped_image)
+
+    def resize(self, resize_desc: ResizeDesc, mode: ResizeMode) -> "AISImage":
+        """
+        image を target_size にリサイズする
+        リサイズの挙動は mode に従う
+
+        Args:
+            target_size (Union[SizePixel, SizePattern]): リサイズ先サイズ
+            mode (ResizeMode): リサイズ挙動
+
+        Returns:
+            AISImage: リサイズ済み画像
+        """
+        if mode == ResizeMode.CONTAIN:
+            return self.resize_contain(resize_desc)
+        elif mode == ResizeMode.COVER:
+            return self.resize_cover(resize_desc)
+        else:
+            raise ValueError(mode)
+
+    @property
+    def grayscale(self) -> "AISImage":
+        """
+        グレースケール画像を生成
+        """
+        return AISImage(self._pil_image.convert("L"))
 
 
-def get_text_bbox_size(
-    draw: ImageDraw.ImageDraw, text: str, font: ImageFont.FreeTypeFont
-) -> Tuple[float, float]:
-    """
-    指定された条件でのテキストバウンディングボックスのサイズを返す
-
-    Args:
-        draw (ImageDraw.ImageDraw): 描画コンテキスト
-        text (str): テキスト
-        font (ImageFont.FreeTypeFont): フォント
-
-    Returns:
-        Tuple[int, int]: バウンディングボックスの幅・高さ
-    """
-    x0, y0, x1, y1 = draw.textbbox((0, 0), text, font=font, anchor=None)
-    return x1 - x0, y1 - y0
-
-
-def make_disabled_image(
-    source_image: Image.Image, text="DISABLED", darkness=0.35
-) -> Image.Image:
-    """
-    source_image を元に「無効っぽい見た目の画像」を生成する
-
-    Args:
-        source_image (Image.Image): 元画像
-        text (str, optional): オーバーレイする文字列
-        darkness (float, optional): 画像の暗さ
-
-    Returns:
-        Image.Image: 無効っぽい見た目の画像
-    """
-    # 輝度を割合で下げる
-    enhancer = ImageEnhance.Brightness(source_image.convert("RGBA"))
-    dark_image = enhancer.enhance(darkness)
-
-    # 黒画像を半透明合成して更に暗くする
-    w, h = dark_image.size
-    overlay = Image.new("RGBA", (w, h), (0, 0, 0, 120))
-    dark_image.alpha_composite(overlay)
-
-    # テキストを描画
-    draw = ImageDraw.Draw(dark_image)
-    font = ImageFont.truetype("arial.ttf", size=h // 8)
-    tw, th = get_text_bbox_size(draw, text, font)
-    center_w = (w - tw) / 2
-    center_h = (h - th) / 2
-    center_pos = (center_w, center_h)
-    draw.text(center_pos, text, font=font, fill=(255, 255, 255, 230))
-
-    # 正常終了
-    return dark_image.convert("RGB")
-
-
-def calc_ssim(image_A: Image.Image, image_B: Image.Image) -> float:
+def calc_ssim(image_A: AISImage, image_B: AISImage) -> float:
     """
     ２枚の画像の差分を撮って、１ピクセルあたりの輝度誤差を計算する
 
     Args:
-        image_A (Image.Image): 比較対象 A
-        image_B (Image.Image): 比較対象 B
+        image_A (AISImage): 比較対象 A
+        image_B (AISImage): 比較対象 B
 
     Returns:
         float: 平均ピクセル誤差
@@ -431,20 +436,18 @@ def calc_ssim(image_A: Image.Image, image_B: Image.Image) -> float:
     if image_A.width != image_B.width or image_A.height != image_B.height:
         actual_width = min(image_A.width, image_B.width)
         actual_height = min(image_A.height, image_B.height)
-        image_A = resize(
-            image_A,
+        image_A = image_A.resize(
             ResizeDesc(AspectRatioPattern.E_RAW, actual_width, actual_height),
             ResizeMode.COVER,
         )
-        image_B = resize(
-            image_B,
+        image_B = image_B.resize(
             ResizeDesc(AspectRatioPattern.E_RAW, actual_width, actual_height),
             ResizeMode.COVER,
         )
 
     # ndarray 化
-    np_image_A = np.array(image_A.convert("L"))
-    np_image_B = np.array(image_B.convert("L"))
+    np_image_A = np.array(image_A.grayscale)
+    np_image_B = np.array(image_B.grayscale)
 
     # ssim の計算処理を呼び出す
     ssim_result = ssim(np_image_A, np_image_B, full=True)

@@ -24,19 +24,11 @@ from abc import ABC, abstractmethod
 from enum import Enum
 
 # PIL
-from PIL import Image
-
-# Tk/CTk
+from PIL import Image, ImageDraw, ImageFont, ImageEnhance
 from PIL.ImageTk import PhotoImage
 
 # utils
-from utils.pil import (
-    AspectRatioPattern,
-    ResizeDesc,
-    ResizeMode,
-    resize,
-    make_disabled_image,
-)
+from utils.image import AspectRatioPattern, ResizeDesc, ResizeMode, AISImage
 from utils.constants import NIME_DIR_PATH, RAW_DIR_PATH, DEFAULT_FRAME_RATE
 
 
@@ -67,10 +59,10 @@ def is_time_stamp(text: str) -> bool:
     return dt.strftime(_TIMESTAMP_FORMAT) == text
 
 
-type AuxProcess = Callable[[Image.Image], Image.Image]
+type AuxProcess = Callable[[AISImage], AISImage]
 type NotifyHandler = Callable[[], None]
-Content = TypeVar("Content", Image.Image, PhotoImage)
-ParentContent = TypeVar("ParentContent", Image.Image, PhotoImage)
+Content = TypeVar("Content", AISImage, PhotoImage)
+ParentContent = TypeVar("ParentContent", AISImage, PhotoImage)
 
 
 class CachedContent(Generic[Content, ParentContent], ABC):
@@ -134,12 +126,12 @@ class CachedContent(Generic[Content, ParentContent], ABC):
         pass
 
 
-class CachedSourceImage(CachedContent[Image.Image, Any]):
+class CachedSourceImage(CachedContent[AISImage, Any]):
     """
     キャッシュツリーに画像を流し込むための「源泉」に当たるクラス。
     """
 
-    type Output = Image.Image
+    type Output = AISImage
 
     def __init__(self):
         """
@@ -148,7 +140,7 @@ class CachedSourceImage(CachedContent[Image.Image, Any]):
         super().__init__(None)
         self._source = None
 
-    def set_source(self, source: Optional[Image.Image]) -> Self:
+    def set_source(self, source: Optional[AISImage]) -> Self:
         """
         ソース画像を設定する
         """
@@ -158,7 +150,7 @@ class CachedSourceImage(CachedContent[Image.Image, Any]):
         return self
 
     @property
-    def output(self) -> Optional[Image.Image]:
+    def output(self) -> Optional[AISImage]:
         """
         出力を取得する
         ダーティー状態は暗黙に解決される。
@@ -171,13 +163,13 @@ class CachedSourceImage(CachedContent[Image.Image, Any]):
 
 
 class CachedScalableImage(
-    Generic[ParentContent], CachedContent[Image.Image, ParentContent]
+    Generic[ParentContent], CachedContent[AISImage, ParentContent]
 ):
     """
     拡大縮小とそのキャッシュ機能を持つ画像クラス
     """
 
-    type Output = Image.Image
+    type Output = AISImage
 
     def __init__(
         self,
@@ -218,7 +210,7 @@ class CachedScalableImage(
         return self._size
 
     @property
-    def output(self) -> Optional[Image.Image]:
+    def output(self) -> Optional[AISImage]:
         """
         スケーリング済み画像
         ダーティー状態は暗黙に解決される。
@@ -229,8 +221,8 @@ class CachedScalableImage(
             parent_output = self.parent_output
             if parent_output is not None and self._size is not None:
                 # 揃っている場合、更新
-                if isinstance(parent_output, Image.Image):
-                    self._output = resize(parent_output, self._size, self._mode)
+                if isinstance(parent_output, AISImage):
+                    self._output = parent_output.resize(self._size, self._mode)
                 else:
                     raise TypeError(type(parent_output))
                 if self._aux_process is not None:
@@ -249,7 +241,7 @@ class CachedPhotoImage(
     Generic[ParentContent], CachedContent[PhotoImage, ParentContent]
 ):
     """
-    PIL.Image.Image を PIL.ImageTk.PhotoImage に変換してキャッシュするクラス
+    PIL.AISImage を PIL.ImageTk.PhotoImage に変換してキャッシュするクラス
     """
 
     type Output = PhotoImage
@@ -273,9 +265,9 @@ class CachedPhotoImage(
         if self.is_dirty:
             # 必要なものが…
             parent_output = self.parent_output
-            if isinstance(parent_output, Image.Image):
+            if isinstance(parent_output, AISImage):
                 # 揃っている場合、更新
-                self._output = PhotoImage(parent_output)
+                self._output = PhotoImage(parent_output.pil_image)
                 self.reset_dirty()
             elif parent_output is None:
                 # 揃っていない場合、単にクリア
@@ -300,6 +292,62 @@ class ImageLayer(Enum):
     THUMBNAIL = "THUMBNAIL"
 
 
+def get_text_bbox_size(
+    draw: ImageDraw.ImageDraw, text: str, font: ImageFont.FreeTypeFont
+) -> Tuple[float, float]:
+    """
+    指定された条件でのテキストバウンディングボックスのサイズを返す
+
+    Args:
+        draw (ImageDraw.ImageDraw): 描画コンテキスト
+        text (str): テキスト
+        font (ImageFont.FreeTypeFont): フォント
+
+    Returns:
+        Tuple[int, int]: バウンディングボックスの幅・高さ
+    """
+    x0, y0, x1, y1 = draw.textbbox((0, 0), text, font=font, anchor=None)
+    return x1 - x0, y1 - y0
+
+
+def make_disabled_image(
+    source_image: AISImage, text="DISABLED", darkness=0.35
+) -> "AISImage":
+    """
+    self を元に「無効っぽい見た目の画像」を生成する
+
+    Args:
+        text (str, optional): オーバーレイする文字列
+        darkness (float, optional): 画像の暗さ
+
+    Returns:
+        AISImage: 無効っぽい見た目の画像
+    """
+    # エイリアス
+    source_pil_image = source_image.pil_image
+
+    # 輝度を割合で下げる
+    enhancer = ImageEnhance.Brightness(source_pil_image.convert("RGBA"))
+    dark_image = enhancer.enhance(darkness)
+
+    # 黒画像を半透明合成して更に暗くする
+    w, h = dark_image.size
+    overlay = Image.new("RGBA", (w, h), (0, 0, 0, 120))
+    dark_image.alpha_composite(overlay)
+
+    # テキストを描画
+    draw = ImageDraw.Draw(dark_image)
+    font = ImageFont.truetype("arial.ttf", size=h // 8)
+    tw, th = get_text_bbox_size(draw, text, font)
+    center_w = (w - tw) / 2
+    center_h = (h - th) / 2
+    center_pos = (center_w, center_h)
+    draw.text(center_pos, text, font=font, fill=(255, 255, 255, 230))
+
+    # 正常終了
+    return AISImage(dark_image.convert("RGB"))
+
+
 class ImageModel:
     """
     画像を表すクラス
@@ -307,13 +355,13 @@ class ImageModel:
     """
 
     def __init__(
-        self, raw_image: Optional[Image.Image] = None, time_stamp: Optional[str] = None
+        self, raw_image: Optional[AISImage] = None, time_stamp: Optional[str] = None
     ):
         """
         コンストラクタ
 
         Args:
-            raw_image (Image.Image): 元画像
+            raw_image (AISImage): 元画像
         """
         # メタデータ
         self._enable = True
@@ -373,7 +421,7 @@ class ImageModel:
         return self._time_stamp
 
     def set_raw_image(
-        self, raw_image: Optional[Image.Image], time_stamp: Optional[str]
+        self, raw_image: Optional[AISImage], time_stamp: Optional[str]
     ) -> Self:
         """
         RAW 画像を設定する。
@@ -381,7 +429,7 @@ class ImageModel:
         タイムスタンプも強制的に更新される。
 
         Args:
-            raw_image (Image.Image): 新しい RAW 画像
+            raw_image (AISImage): 新しい RAW 画像
             time_stamp (Optional[str]): 新しいタイムスタンプ
 
         Returns:
@@ -458,7 +506,7 @@ class ImageModel:
             case _:
                 raise ValueError(layer)
 
-    def get_image(self, layer: ImageLayer) -> Union[Image.Image, PhotoImage, None]:
+    def get_image(self, layer: ImageLayer) -> Union[AISImage, PhotoImage, None]:
         """
         指定 layer の画像を取得する。
         """
@@ -636,7 +684,7 @@ class VideoModel:
         #   フレームの追加・削除については RAW レイヤーでの変更とみなす
         #   よってグローバルモデルに新規生成した画像を渡して強制的に通知を発生させる
         self._global_model.set_raw_image(
-            Image.new("RGBA", (8, 8), None), self._global_model.time_stamp
+            AISImage.empty("RGB", 8, 8), self._global_model.time_stamp
         )
 
         # 正常終了
@@ -651,7 +699,7 @@ class VideoModel:
 
         # 全体通知を呼び出す
         self._global_model.set_raw_image(
-            Image.new("RGBA", (8, 8), None), self._global_model.time_stamp
+            AISImage.empty("RGB", 8, 8), self._global_model.time_stamp
         )
 
         # 正常終了
@@ -666,7 +714,7 @@ class VideoModel:
 
         # 全体通知を呼び出す
         self._global_model.set_raw_image(
-            Image.new("RGBA", (8, 8), None), self._global_model.time_stamp
+            AISImage.empty("RGB", 8, 8), self._global_model.time_stamp
         )
 
         # 正常終了
@@ -694,7 +742,7 @@ class VideoModel:
 
     def iter_frames(
         self, layer: ImageLayer, enable_only: bool = True
-    ) -> Generator[Union[Image.Image, PhotoImage, None], None, None]:
+    ) -> Generator[Union[AISImage, PhotoImage, None], None, None]:
         """
         全てのフレームをイテレートする
         """
@@ -704,7 +752,7 @@ class VideoModel:
 
     def get_frame(
         self, layer: ImageLayer, frame_index: int
-    ) -> Union[Image.Image, PhotoImage, None]:
+    ) -> Union[AISImage, PhotoImage, None]:
         """
         指定レイヤー・インデックスのフレームを取得する。
         インデックスは有効・無効を考慮しないトータルの番号。
@@ -756,12 +804,12 @@ def save_content_model(model: Union[ImageModel, VideoModel]) -> Path:
     if isinstance(model, ImageModel):
         # raw 画像は必須
         raw_image = model.get_image(ImageLayer.RAW)
-        if not isinstance(raw_image, Image.Image):
+        if not isinstance(raw_image, AISImage):
             raise ValueError("Invalid RAW Image")
 
         # nime 画像は必須
         nime_image = model.get_image(ImageLayer.NIME)
-        if not isinstance(nime_image, Image.Image):
+        if not isinstance(nime_image, AISImage):
             raise ValueError("Invalid NIME Image")
 
         # raw png ファイルの保存が必要か判定
@@ -773,7 +821,7 @@ def save_content_model(model: Union[ImageModel, VideoModel]) -> Path:
 
         # raw ディレクトリに png 画像を保存
         if save_png:
-            raw_image.convert("RGB").save(
+            raw_image.pil_image.convert("RGB").save(
                 str(png_file_path),
                 format="PNG",
                 optimize=True,
@@ -785,7 +833,7 @@ def save_content_model(model: Union[ImageModel, VideoModel]) -> Path:
         # NOTE
         #   NIME 画像はサイズ変更がかかっている可能性があるので、必ず保存処理を通す。
         jpeg_file_path = NIME_DIR_PATH / (model.time_stamp + ".jpg")
-        nime_image.convert("RGB").save(
+        nime_image.pil_image.convert("RGB").save(
             str(jpeg_file_path),
             format="JPEG",
             quality=92,
@@ -807,11 +855,11 @@ def save_content_model(model: Union[ImageModel, VideoModel]) -> Path:
         with ZipFile(zip_file_path, "w") as zip_file:
             for idx, img in enumerate(model.iter_frames(ImageLayer.RAW, False)):
                 # 無効なフレームはスキップ
-                if not isinstance(img, Image.Image):
+                if not isinstance(img, AISImage):
                     continue
                 # png ファイルメモリに書き出し
                 buf = BytesIO()
-                img.save(buf, format="PNG", optimize=True)
+                img.pil_image.save(buf, format="PNG", optimize=True)
                 buf.seek(0)
                 # png メモリイメージを zip ファイルに書き出し
                 png_file_name = f"{model.time_stamp}_{idx:03d}.png"
@@ -820,9 +868,9 @@ def save_content_model(model: Union[ImageModel, VideoModel]) -> Path:
         # nime ディレクトリに gif アニメーションを保存
         gif_file_path = NIME_DIR_PATH / (model.time_stamp + ".gif")
         nime_frames = [
-            f for f in model.iter_frames(ImageLayer.NIME) if isinstance(f, Image.Image)
+            f for f in model.iter_frames(ImageLayer.NIME) if isinstance(f, AISImage)
         ]
-        nime_frames[0].save(
+        nime_frames[0].pil_image.save(
             str(gif_file_path),
             save_all=True,
             append_images=[f for f in nime_frames[1:]],
@@ -855,7 +903,7 @@ def load_content_model(
         file_path (Path): 読み込み元ファイルパス
 
     Returns:
-        Image.Image: 読み込んだ画像
+        AISImage: 読み込んだ画像
     """
     # 実際に読み込むべきファイルパスを解決する
     IMAGE_EXTENSIONS = (".png", ".jpg", ".jpeg", ".bmp")
@@ -891,7 +939,7 @@ def load_content_model(
     if actual_file_path.suffix.lower() in IMAGE_EXTENSIONS:
         # 画像ファイルの場合はそのまま読み込む
         pil_image = Image.open(actual_file_path).convert("RGB")
-        image_model = ImageModel(pil_image, time_stamp)
+        image_model = ImageModel(AISImage(pil_image), time_stamp)
         return image_model
     elif actual_file_path.suffix.lower() in MOVIE_EXTENSIONS:
         # 動画ファイルの場合はフレームを全て読み込む
@@ -901,7 +949,9 @@ def load_content_model(
             try:
                 while True:
                     pil_image = img.copy().convert("RGB")
-                    video_model.insert_frames([ImageModel(pil_image, time_stamp)])
+                    video_model.insert_frames(
+                        [ImageModel(AISImage(pil_image), time_stamp)]
+                    )
                     delays.append(img.info.get("duration", default_duration_in_sec))
                     img.seek(img.tell() + 1)
             except EOFError:
@@ -920,7 +970,8 @@ def load_content_model(
             video_model.insert_frames(
                 [
                     ImageModel(
-                        Image.open(zip_file.open(file_name)).convert("RGB"), time_stamp
+                        AISImage(Image.open(zip_file.open(file_name)).convert("RGB")),
+                        time_stamp,
                     )
                     for file_name in file_list
                 ]

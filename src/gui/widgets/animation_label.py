@@ -9,7 +9,7 @@ import customtkinter as ctk
 
 # utils
 from utils.ctk import configure_presence
-from utils.pil import ResizeDesc, AspectRatioPattern
+from utils.image import ResizeDesc, AspectRatioPattern
 
 # gui
 from gui.model.aynime_issen_style import AynimeIssenStyleModel

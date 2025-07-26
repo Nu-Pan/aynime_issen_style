@@ -13,6 +13,7 @@ import dxcam_cpp as dxcam
 
 # utils
 from utils.windows import enumerate_dxgi_outputs
+from utils.image import AISImage
 
 
 @dataclass
@@ -70,7 +71,7 @@ class CaptureContext(ABC):
         ...
 
     @abstractmethod
-    def capture(self, capture_target_info: CaptureTargetInfo) -> Image.Image:
+    def capture(self, capture_target_info: CaptureTargetInfo) -> AISImage:
         """
         キャプチャを実行する
 
@@ -78,7 +79,7 @@ class CaptureContext(ABC):
             capture_target_info (CaptureTargetInfo): キャプチャ対象の情報
 
         Returns:
-            Image.Image: キャプチャした画像
+            AISImage: キャプチャした画像
         """
         ...
 
@@ -117,7 +118,7 @@ class CaptureContextDXCam(CaptureContext):
                 str(dxgi_output_info),
             )
 
-    def capture(self, capture_target_info: CaptureTargetInfo) -> Image.Image:
+    def capture(self, capture_target_info: CaptureTargetInfo) -> AISImage:
         # 引数の型チェック
         if not isinstance(capture_target_info.id, MonitorIdentifier):
             raise TypeError("Invalid capture target info type.")
@@ -175,7 +176,7 @@ class CaptureContextDXCam(CaptureContext):
             raise ValueError("np_image is None")
 
         # 正常終了
-        return Image.fromarray(np_image)
+        return AISImage(Image.fromarray(np_image))
 
     def release(self) -> None:
         if self._dxcamera is not None:
@@ -218,7 +219,7 @@ class CaptureContextPyWin32(CaptureContext):
             # ウィンドウ情報を生成して返す
             yield CaptureTargetInfo(WindowIdentifier(hwnd), title)
 
-    def capture(self, capture_target_info: CaptureTargetInfo) -> Image.Image:
+    def capture(self, capture_target_info: CaptureTargetInfo) -> AISImage:
         # ウィンドウハンドルを解決
         if isinstance(capture_target_info.id, WindowIdentifier):
             hwnd = capture_target_info.id.hwnd
@@ -262,7 +263,7 @@ class CaptureContextPyWin32(CaptureContext):
                 win32gui.ReleaseDC(hwnd, hwndDC)
 
         # 正常終了
-        return pil_image
+        return AISImage(pil_image)
 
     def release(self) -> None:
         # NOTE pywin32 の場合は何もしなくて良い
