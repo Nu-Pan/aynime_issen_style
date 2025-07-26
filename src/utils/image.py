@@ -7,6 +7,7 @@ from math import gcd
 
 # PIL
 from PIL import Image
+from PIL.ImageTk import PhotoImage
 
 # numpy
 import numpy as np
@@ -250,6 +251,7 @@ class AISImage:
         コンストラクタ
         """
         self._pil_image = source
+        self._photo_image = None
 
     @classmethod
     def empty(cls, mode: str, width: int, height: int) -> "AISImage":
@@ -276,8 +278,21 @@ class AISImage:
     def pil_image(self) -> Image.Image:
         """
         中身の PIL 画像を取得
+        中身に対する in-place 処理は禁止なので注意
         """
         return self._pil_image
+
+    @property
+    def photo_image(self) -> PhotoImage:
+        """
+        中身の PhotoImage を取得
+        """
+        # 無ければ生成
+        if self._photo_image is None:
+            self._photo_image = PhotoImage(self._pil_image)
+
+        # 正常終了
+        return self._photo_image
 
     def __eq__(self, other: Any) -> bool:
         """

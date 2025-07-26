@@ -25,7 +25,6 @@ from enum import Enum
 
 # PIL
 from PIL import Image, ImageDraw, ImageFont, ImageEnhance
-from PIL.ImageTk import PhotoImage
 
 # utils
 from utils.image import AspectRatioPattern, ResizeDesc, ResizeMode, AISImage
@@ -61,16 +60,14 @@ def is_time_stamp(text: str) -> bool:
 
 type AuxProcess = Callable[[AISImage], AISImage]
 type NotifyHandler = Callable[[], None]
-Content = TypeVar("Content", AISImage, PhotoImage)
-ParentContent = TypeVar("ParentContent", AISImage, PhotoImage)
 
 
-class CachedContent(Generic[Content, ParentContent], ABC):
+class CachedContent(ABC):
     """
     キャッシュツリーの基底クラス
     """
 
-    def __init__(self, parent: Optional["CachedContent[ParentContent, Any]"]):
+    def __init__(self, parent: Optional["CachedContent"]):
         """
         コンストラクタ
         """
@@ -80,7 +77,7 @@ class CachedContent(Generic[Content, ParentContent], ABC):
         self._is_dirty = False
 
     @property
-    def parent_output(self) -> Optional[ParentContent]:
+    def parent_output(self) -> Optional[AISImage]:
         if self._parent is None:
             return None
         else:
@@ -118,7 +115,7 @@ class CachedContent(Generic[Content, ParentContent], ABC):
 
     @property
     @abstractmethod
-    def output(self) -> Optional[Content]:
+    def output(self) -> Optional[AISImage]:
         """
         出力を取得する
         ダーティー状態は暗黙に解決される。
@@ -126,7 +123,7 @@ class CachedContent(Generic[Content, ParentContent], ABC):
         pass
 
 
-class CachedSourceImage(CachedContent[AISImage, Any]):
+class CachedSourceImage(CachedContent):
     """
     キャッシュツリーに画像を流し込むための「源泉」に当たるクラス。
     """
@@ -162,9 +159,7 @@ class CachedSourceImage(CachedContent[AISImage, Any]):
         return self._source
 
 
-class CachedScalableImage(
-    Generic[ParentContent], CachedContent[AISImage, ParentContent]
-):
+class CachedScalableImage(CachedContent):
     """
     拡大縮小とそのキャッシュ機能を持つ画像クラス
     """
@@ -173,7 +168,7 @@ class CachedScalableImage(
 
     def __init__(
         self,
-        parent: CachedContent[ParentContent, Any],
+        parent: CachedContent,
         mode: ResizeMode,
         aux_process: Optional[AuxProcess] = None,
     ):
@@ -232,50 +227,6 @@ class CachedScalableImage(
                 # 揃っていない場合、単にクリア
                 self._output = None
                 self.reset_dirty()
-
-        # 正常終了
-        return self._output
-
-
-class CachedPhotoImage(
-    Generic[ParentContent], CachedContent[PhotoImage, ParentContent]
-):
-    """
-    PIL.AISImage を PIL.ImageTk.PhotoImage に変換してキャッシュするクラス
-    """
-
-    type Output = PhotoImage
-
-    def __init__(self, parent: CachedContent[ParentContent, Any]):
-        """
-        コンストラクタ
-        """
-        # 基底クラス初期化
-        super().__init__(parent)
-
-        # 遅延変数
-        self._output = None
-
-    @property
-    def output(self) -> Optional[PhotoImage]:
-        """
-        PIL.ImageTk.PhotoImage
-        """
-        # ダーティ状態を解決
-        if self.is_dirty:
-            # 必要なものが…
-            parent_output = self.parent_output
-            if isinstance(parent_output, AISImage):
-                # 揃っている場合、更新
-                self._output = PhotoImage(parent_output.pil_image)
-                self.reset_dirty()
-            elif parent_output is None:
-                # 揃っていない場合、単にクリア
-                self._output = None
-                self.reset_dirty()
-            else:
-                # 型が違う場合はエラー
-                raise TypeError(type(parent_output))
 
         # 正常終了
         return self._output
@@ -373,18 +324,13 @@ class ImageModel:
         self._preview_pil_image = CachedScalableImage(
             self._nime_image, ResizeMode.CONTAIN
         )
-        self._preview_photo_image = CachedPhotoImage(self._preview_pil_image)
         self._thumbnail_pil_image_enable = CachedScalableImage(
-            self._raw_image, ResizeMode.CONTAIN
-        )
-        self._thumbnail_photo_image_enable = CachedPhotoImage(
-            self._thumbnail_pil_image_enable
+            self._nime_image, ResizeMode.CONTAIN
         )
         self._thumbnail_pil_image_disable = CachedScalableImage(
-            self._raw_image, ResizeMode.CONTAIN, aux_process=make_disabled_image
-        )
-        self._thumbnail_photo_image_disable = CachedPhotoImage(
-            self._thumbnail_pil_image_disable
+            self._thumbnail_pil_image_enable,
+            ResizeMode.CONTAIN,
+            aux_process=make_disabled_image,
         )
 
         # 通知ハンドラ
@@ -506,7 +452,7 @@ class ImageModel:
             case _:
                 raise ValueError(layer)
 
-    def get_image(self, layer: ImageLayer) -> Union[AISImage, PhotoImage, None]:
+    def get_image(self, layer: ImageLayer) -> Optional[AISImage]:
         """
         指定 layer の画像を取得する。
         """
@@ -516,12 +462,12 @@ class ImageModel:
             case ImageLayer.NIME:
                 return self._nime_image.output
             case ImageLayer.PREVIEW:
-                return self._preview_photo_image.output
+                return self._preview_pil_image.output
             case ImageLayer.THUMBNAIL:
                 if self._enable:
-                    return self._thumbnail_photo_image_enable.output
+                    return self._thumbnail_pil_image_enable.output
                 else:
-                    return self._thumbnail_photo_image_disable.output
+                    return self._thumbnail_pil_image_disable.output
             case _:
                 raise ValueError(layer)
 
@@ -742,7 +688,7 @@ class VideoModel:
 
     def iter_frames(
         self, layer: ImageLayer, enable_only: bool = True
-    ) -> Generator[Union[AISImage, PhotoImage, None], None, None]:
+    ) -> Generator[Optional[AISImage], None, None]:
         """
         全てのフレームをイテレートする
         """
@@ -750,9 +696,7 @@ class VideoModel:
             if not enable_only or f.enable:
                 yield f.get_image(layer)
 
-    def get_frame(
-        self, layer: ImageLayer, frame_index: int
-    ) -> Union[AISImage, PhotoImage, None]:
+    def get_frame(self, layer: ImageLayer, frame_index: int) -> Optional[AISImage]:
         """
         指定レイヤー・インデックスのフレームを取得する。
         インデックスは有効・無効を考慮しないトータルの番号。

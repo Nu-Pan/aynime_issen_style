@@ -1,15 +1,12 @@
 # std
 from typing import List, Optional
 
-# PIL
-from PIL.ImageTk import PhotoImage
-
 # Tk/CTk
 import customtkinter as ctk
 
 # utils
 from utils.ctk import configure_presence
-from utils.image import ResizeDesc, AspectRatioPattern
+from utils.image import ResizeDesc, AspectRatioPattern, AISImage
 
 # gui
 from gui.model.aynime_issen_style import AynimeIssenStyleModel
@@ -35,7 +32,7 @@ class AnimationLabel(ctk.CTkLabel):
 
         # 現在表示している画像
         # NOTE
-        #   現在表示している PhotoImage のインスタンスをウィジェットから取ることはできない。
+        #   現在表示している画像のインスタンスをウィジェットから取ることはできない。
         #   そのため、この階層でキャッシュ情報を保持しておく
         self._current_frame = None
 
@@ -75,8 +72,8 @@ class AnimationLabel(ctk.CTkLabel):
                 ImageLayer.PREVIEW, self._frame_index
             )
             if new_frame != self._current_frame:
-                if isinstance(new_frame, PhotoImage):
-                    configure_presence(self, new_frame)
+                if isinstance(new_frame, AISImage):
+                    configure_presence(self, new_frame.photo_image)
                     self._current_frame = new_frame
                 else:
                     configure_presence(self, self._blank_text)

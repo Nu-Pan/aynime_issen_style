@@ -2,17 +2,14 @@
 from typing import Callable, List, Iterable
 import time
 
-# PIL
-from PIL.ImageTk import PhotoImage
-
 # Tk/CTk
 from tkinter import Event
 import customtkinter as ctk
 
 # utils
 from utils.constants import WIDGET_PADDING, DEFAULT_FONT_NAME
-from utils.image import calc_ssim
-from utils.ctk import silent_configure, configure_presence
+from utils.ctk import configure_presence
+from utils.image import AISImage
 
 # gui
 from gui.model.contents_cache import ResizeDesc, ImageLayer, AspectRatioPattern
@@ -67,7 +64,7 @@ class ThumbnailItem(ctk.CTkFrame):
 
         # 現在表示している画像
         # NOTE
-        #   現在表示している PhotoImage のインスタンスをウィジェットから取ることはできない。
+        #   現在表示している AISImage のインスタンスをウィジェットから取ることはできない。
         #   そのため、この階層でキャッシュ情報を保持しておく
         self._current_frame = None
 
@@ -80,16 +77,16 @@ class ThumbnailItem(ctk.CTkFrame):
         thumbnail_image = self._model.video.get_frame(
             ImageLayer.THUMBNAIL, self._frame_index
         )
-        if not isinstance(thumbnail_image, PhotoImage):
+        if not isinstance(thumbnail_image, AISImage):
             raise TypeError()
 
         # クリック操作受付用のボタン
         self._button = ctk.CTkButton(
             self,
-            image=thumbnail_image,
+            image=thumbnail_image.photo_image,
             text="",
-            width=thumbnail_image.width(),
-            height=thumbnail_image.height(),
+            width=thumbnail_image.width,
+            height=thumbnail_image.height,
             fg_color="transparent",
             hover=False,
         )
@@ -109,8 +106,8 @@ class ThumbnailItem(ctk.CTkFrame):
         """
         new_frame = self._model.video.get_frame(ImageLayer.THUMBNAIL, self._frame_index)
         if new_frame != self._current_frame:
-            if isinstance(new_frame, PhotoImage):
-                configure_presence(self._button, new_frame)
+            if isinstance(new_frame, AISImage):
+                configure_presence(self._button, new_frame.photo_image)
                 self._current_frame = new_frame
             else:
                 configure_presence(self._button, "NO IMAGE")

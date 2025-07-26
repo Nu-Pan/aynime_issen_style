@@ -33,7 +33,7 @@ def configure_presence(widget: ctk.CTkBaseClass, content: Union[PhotoImage, str]
     elif isinstance(content, str):
         silent_configure(widget, image="", text=content)
     else:
-        raise TypeError()
+        raise TypeError(f"Invalid type({type(content)})")
 
 
 def show_notify(

@@ -1,16 +1,13 @@
 # std
 from typing import Optional
 
-# PIL
-from PIL.ImageTk import PhotoImage
-
 # TK/CTk
 import customtkinter as ctk
 
 # utils
 from utils.constants import DEFAULT_FONT_NAME
 from utils.ctk import silent_configure, configure_presence
-from utils.image import ResizeDesc, AspectRatioPattern
+from utils.image import ResizeDesc, AspectRatioPattern, AISImage
 
 # model
 from gui.model.contents_cache import ImageModel, ImageLayer
@@ -36,7 +33,7 @@ class StillLabel(ctk.CTkLabel):
 
         # 現在表示している画像
         # NOTE
-        #   現在表示している PhotoImage のインスタンスをウィジェットから取ることはできない。
+        #   現在表示している画像のインスタンスをウィジェットから取ることはできない。
         #   そのため、この階層でキャッシュ情報を保持しておく
         self._current_frame = None
 
@@ -64,8 +61,8 @@ class StillLabel(ctk.CTkLabel):
         # UI 的に反映
         new_frame = self._image_model.get_image(ImageLayer.PREVIEW)
         if new_frame != self._current_frame:
-            if isinstance(new_frame, PhotoImage):
-                configure_presence(self, new_frame)
+            if isinstance(new_frame, AISImage):
+                configure_presence(self, new_frame.photo_image)
                 self._current_frame = new_frame
             else:
                 configure_presence(self, self._blank_text)
