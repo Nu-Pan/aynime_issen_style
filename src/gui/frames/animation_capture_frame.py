@@ -446,6 +446,10 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
             return
 
         # 新しいフレームで差分が発生している場合のみ追加する
+        # NOTE
+        #   完全に同一なフレーム
+        #   PIL.Image.Image 同士の == での比較は、ピクセル値も含めた完全一致の場合のみ True になる
+        #   AISImage 同士の == での比較は
         if len(record_raw_images) == 0:
             next_frames = [new_image]
         else:
