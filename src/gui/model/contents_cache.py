@@ -325,11 +325,11 @@ class ImageModel:
             self._nime_image, ResizeMode.CONTAIN
         )
         self._thumbnail_pil_image_enable = CachedScalableImage(
-            self._nime_image, ResizeMode.CONTAIN
+            self._nime_image, ResizeMode.COVER
         )
         self._thumbnail_pil_image_disable = CachedScalableImage(
             self._thumbnail_pil_image_enable,
-            ResizeMode.CONTAIN,
+            ResizeMode.COVER,
             aux_process=make_disabled_image,
         )
 
@@ -426,7 +426,6 @@ class ImageModel:
                 self._preview_pil_image.set_size(size)
             case ImageLayer.THUMBNAIL:
                 self._thumbnail_pil_image_enable.set_size(size)
-                self._thumbnail_pil_image_disable.set_size(size)
             case _:
                 raise ValueError(layer)
 
@@ -496,7 +495,10 @@ class ImageModel:
             case ImageLayer.PREVIEW:
                 is_dirty = self._preview_pil_image.is_dirty
             case ImageLayer.THUMBNAIL:
-                is_dirty = self._thumbnail_pil_image_enable.is_dirty
+                is_dirty = (
+                    self._thumbnail_pil_image_enable.is_dirty
+                    or self._thumbnail_pil_image_disable
+                )
             case _:
                 raise ValueError(f"Invalid ImageLayer(={layer})")
 
@@ -509,9 +511,9 @@ class ImageModel:
         match layer:
             case ImageLayer.RAW:
                 self._notify(ImageLayer.NIME)
-                self._notify(ImageLayer.THUMBNAIL)
             case ImageLayer.NIME:
                 self._notify(ImageLayer.PREVIEW)
+                self._notify(ImageLayer.THUMBNAIL)
             case ImageLayer.PREVIEW:
                 pass
             case ImageLayer.THUMBNAIL:
@@ -587,12 +589,23 @@ class VideoModel:
 
     def set_size(self, layer: ImageLayer, size: ResizeDesc) -> Self:
         """
-        各フレームサイズを設定する
+        フレームサイズを設定する
         """
-        self._global_model.set_size(layer, size)
+        # 個別のフレームにサイズを設定
         for f in self._frames:
             f.set_size(layer, size)
+
+        # グローバルモデルにサイズを設定
+        # NOTE
+        #   通知を最後に回したいので _global_model の処理が後
+        self._global_model.set_size(layer, size)
         return self
+
+    def get_size(self, layer: ImageLayer) -> ResizeDesc:
+        """
+        フレームサイズを取得する
+        """
+        return self._global_model.get_size(layer)
 
     def insert_frames(
         self, new_frames: Union[ImageModel, List[ImageModel]], position: int = -1

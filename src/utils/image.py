@@ -172,6 +172,27 @@ class ResizeDesc:
         else:
             return ResizeDesc(aspect_ratio, int(pattern.value), None)
 
+    @property
+    def aspect_ratio(self) -> AspectRatio:
+        """
+        アスペクト比を取得する
+        """
+        return self._aspect_ratio
+
+    @property
+    def width(self) -> Optional[int]:
+        """
+        目標横幅を取得する
+        """
+        return self._width
+
+    @property
+    def height(self) -> Optional[int]:
+        """
+        目標高さを取得する
+        """
+        return self._height
+
     def resolve(self, source_width: int, source_height: int) -> Tuple[int, int]:
         """
         サイズ (source_width, source_height) の画像をリサイズする場合の適切な目標サイズを解決する。

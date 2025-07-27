@@ -16,13 +16,16 @@ from gui.model.contents_cache import ResizeDesc, ImageLayer, AspectRatioPattern
 from gui.model.aynime_issen_style import AynimeIssenStyleModel
 
 
+THUMBNAIL_KIND_PADDING = 1
+
+
 class SentinelItem(ctk.CTkFrame):
     """
     サムネイルリスト上の「番兵」的なアイテム
     ドロップ可能であることをユーザーに伝えるためだけに存在
     """
 
-    def __init__(self, master: "ThumbnailBar"):
+    def __init__(self, master: "ThumbnailBar", model: AynimeIssenStyleModel):
         """
         コンストラクタ
 
@@ -35,17 +38,45 @@ class SentinelItem(ctk.CTkFrame):
         # フォントを生成
         default_font = ctk.CTkFont(DEFAULT_FONT_NAME)
 
+        # 引数を保存
+        self._model = model
+
         # 通知ラベルを生成
         # NOTE
         #   ラベルの四隅の外側はテーマ色でフィルされてしまうので、角丸のないラベルを使用する(corner_radius=0)。
+        # NOTE
+        #   tk.Canvas のサイズ上限回避のために、パディングもケチる。
         self._text_label = ctk.CTkLabel(
             self,
             text="Drop image file(s) HERE",
             bg_color="transparent",
             font=default_font,
+            padx=THUMBNAIL_KIND_PADDING,
+            pady=THUMBNAIL_KIND_PADDING,
         )
-        self._text_label.pack(fill="both", expand=True)
-        self._text_label.configure(padx=WIDGET_PADDING, pady=WIDGET_PADDING)
+        self._text_label.pack(
+            fill="both",
+            expand=True,
+            padx=THUMBNAIL_KIND_PADDING,
+            pady=THUMBNAIL_KIND_PADDING,
+        )
+
+        # リサイズハンドラ
+        self.bind("<Configure>", self._on_resize)
+
+    def _on_resize(self, _):
+        """
+        リサイズハンドラ
+        """
+        # NOTE
+        #   サムネイルアイテムの指定サイズと実際のサイズは違う
+        #   そのため、番兵アイテムでサイズ変更をハンドルしてモデルに反映する
+        actual_height = self.winfo_height()
+        aspect_ratio = self._model.video.get_size(ImageLayer.THUMBNAIL).aspect_ratio
+        self._model.video.set_size(
+            ImageLayer.THUMBNAIL,
+            ResizeDesc(aspect_ratio, None, actual_height),
+        )
 
 
 class ThumbnailItem(ctk.CTkFrame):
@@ -61,6 +92,9 @@ class ThumbnailItem(ctk.CTkFrame):
         コンストラクタ
         """
         super().__init__(master)
+
+        # フォントを生成
+        default_font = ctk.CTkFont(DEFAULT_FONT_NAME)
 
         # 現在表示している画像
         # NOTE
@@ -81,23 +115,26 @@ class ThumbnailItem(ctk.CTkFrame):
             raise TypeError()
 
         # クリック操作受付用のボタン
-        self._button = ctk.CTkButton(
+        # NOTE
+        #   tk.Canvas のサイズ上限回避のために、パディングもケチる。
+        self._button = ctk.CTkLabel(
             self,
-            image=thumbnail_image.photo_image,
-            text="",
-            width=thumbnail_image.width,
-            height=thumbnail_image.height,
             fg_color="transparent",
-            hover=False,
+            font=default_font,
+            padx=THUMBNAIL_KIND_PADDING,
+            pady=THUMBNAIL_KIND_PADDING,
         )
-        self._button.pack()
+        configure_presence(self._button, thumbnail_image.photo_image)
+        self._button.pack(
+            fill="both",
+            expand=True,
+            padx=THUMBNAIL_KIND_PADDING,
+            pady=THUMBNAIL_KIND_PADDING,
+        )
 
         # マウスイベント
         self._button.bind("<Button-1>", self._on_click_left)
         self._button.bind("<Button-3>", self._on_click_right)
-
-        # リサイズハンドラ
-        self.bind("<Configure>", self._on_resize)
 
     def update_image(self):
         """
@@ -110,8 +147,7 @@ class ThumbnailItem(ctk.CTkFrame):
                 configure_presence(self._button, new_frame.photo_image)
                 self._current_frame = new_frame
             else:
-                configure_presence(self._button, "NO IMAGE")
-                self._current_frame = None
+                raise TypeError()
 
     def _on_click_left(self, event: Event):
         """
@@ -125,19 +161,6 @@ class ThumbnailItem(ctk.CTkFrame):
         マウスクリック（右ボタン）
         """
         self._model.video.delete_frame(self._frame_index)
-
-    def _on_resize(self, _):
-        """
-        リサイズハンドラ
-        """
-        # 適切なサイズを解決
-        actual_width = self.winfo_width()
-        actual_height = self.winfo_height()
-        print(f"set_size: {actual_height}")
-        self._model.video.set_size(
-            ImageLayer.THUMBNAIL,
-            ResizeDesc(AspectRatioPattern.E_RAW, None, actual_height),
-        )
 
 
 class ThumbnailBar(ctk.CTkScrollableFrame):
@@ -176,11 +199,24 @@ class ThumbnailBar(ctk.CTkScrollableFrame):
         # 高さ方向はいっぱいまで拡大
         self.grid_rowconfigure(0, weight=1)
 
-        # 番兵アイテムを追加
-        self._sentinel_item = SentinelItem(self)
-        self._sentinel_item.grid(
-            row=0, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING
+        # サムネイル画像のアスペクト比を設定
+        self._model.video.set_size(
+            ImageLayer.THUMBNAIL,
+            ResizeDesc(AspectRatioPattern.E_RAW, None, None),
         )
+
+        # 番兵アイテムを追加
+        # NOTE
+        #   tk.Canvas のサイズ上限回避のために、パディングもケチる。
+        self._sentinel_item = SentinelItem(self, self._model)
+        self._sentinel_item.grid(
+            row=0,
+            column=0,
+            padx=THUMBNAIL_KIND_PADDING,
+            pady=THUMBNAIL_KIND_PADDING,
+            sticky="nswe",
+        )
+        self.grid_columnconfigure(0, pad=0)
 
         # マウスホイール横スクロール設定
         self._parent_canvas.bind("<Enter>", self._mouse_enter)
@@ -201,25 +237,35 @@ class ThumbnailBar(ctk.CTkScrollableFrame):
             self._items.pop()
 
         # UI 上とモデル上とでフレーム数をあわせる（ウィジェット追加）
+        # NOTE
+        #   tk.Canvas のサイズ上限回避のために、パディングもケチる。
         while len(self._items) < self._model.video.num_total_frames:
+            new_column = len(self._items)
             new_item = ThumbnailItem(self, self._model, len(self._items))
             new_item.grid(
-                row=0, column=len(self._items), padx=WIDGET_PADDING, pady=WIDGET_PADDING
+                row=0,
+                column=new_column,
+                padx=THUMBNAIL_KIND_PADDING,
+                pady=THUMBNAIL_KIND_PADDING,
+                sticky="nswe",
             )
+            self.grid_columnconfigure(new_column, pad=THUMBNAIL_KIND_PADDING)
             self._items.append(new_item)
 
-        pass
-
         # 番兵アイテムを移動
+        # NOTE
+        #   tk.Canvas のサイズ上限回避のために、パディングもケチる。
         current_sentinel_column = self._sentinel_item.grid_info()["column"]
         new_sentinel_column = len(self._items)
         if current_sentinel_column != new_sentinel_column:
             self._sentinel_item.grid(
                 row=0,
                 column=new_sentinel_column,
-                padx=WIDGET_PADDING,
-                pady=WIDGET_PADDING,
+                padx=THUMBNAIL_KIND_PADDING,
+                pady=THUMBNAIL_KIND_PADDING,
+                sticky="nswe",
             )
+            self.grid_columnconfigure(new_sentinel_column, pad=THUMBNAIL_KIND_PADDING)
 
         # 全ウィジェットの表示を更新
         for item in self._items:

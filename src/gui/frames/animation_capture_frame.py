@@ -185,16 +185,6 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
             row=0, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
         )
 
-        # サムネサイズを設定
-        self._model.video.set_size(
-            ImageLayer.THUMBNAIL,
-            ResizeDesc(
-                AspectRatioPattern.E_RAW,
-                None,
-                THUMBNAIL_HEIGHT,
-            ),
-        )
-
         # キャプチャ操作フレーム
         self._capture_ctrl_frame = ctk.CTkFrame(
             self._input_kind_frame, width=0, height=0
