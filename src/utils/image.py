@@ -114,6 +114,18 @@ class AspectRatio:
             raise TypeError()
 
 
+class ResizeMode(Enum):
+    """
+    リサイズの挙動を表す列挙値
+    """
+
+    # (width, height) のボックス内に image 全体が収まるように image をリサイズする
+    CONTAIN = auto()
+
+    # image の範囲内に (width, height) のボックスがちょうど収まるように image をリサイズする
+    COVER = auto()
+
+
 class ResizeDesc:
     """
     リサイズの挙動を記述するクラス。
@@ -193,7 +205,9 @@ class ResizeDesc:
         """
         return self._height
 
-    def resolve(self, source_width: int, source_height: int) -> Tuple[int, int]:
+    def resolve(
+        self, source_width: int, source_height: int, mode: ResizeMode
+    ) -> Tuple[int, int]:
         """
         サイズ (source_width, source_height) の画像をリサイズする場合の適切な目標サイズを解決する。
 
@@ -218,8 +232,11 @@ class ResizeDesc:
         actual_ar_width = cast(int, actual_ar.width)
         actual_ar_height = cast(int, actual_ar.height)
         if desc_width is not None and desc_height is not None:
-            actual_width = desc_width
-            actual_height = desc_height
+            if desc_ar is None:
+                actual_width = desc_width
+                actual_height = desc_height
+            else:
+                raise ValueError("Aspect Ratio and size collision")
         elif desc_width is not None and desc_height is None:
             actual_width = desc_width
             actual_height = round(desc_width * actual_ar_height / actual_ar_width)
@@ -227,8 +244,33 @@ class ResizeDesc:
             actual_width = round(desc_height * actual_ar_width / actual_ar_height)
             actual_height = desc_height
         elif desc_width is None and desc_height is None:
-            actual_width = source_width
-            actual_height = source_height
+            # TODO アス比指定を無視してる
+            if desc_ar is None:
+                actual_width = source_width
+                actual_height = source_height
+            else:
+                actual_width_from_width = round(
+                    source_height * actual_ar_width / actual_ar_height
+                )
+                actual_height_from_width = round(
+                    source_width * actual_ar_height / actual_ar_width
+                )
+                if mode == ResizeMode.CONTAIN:
+                    if actual_width_from_width > source_width:
+                        actual_width = actual_width_from_width
+                        actual_height = source_height
+                    else:
+                        actual_width = source_width
+                        actual_height = actual_height_from_width
+                elif mode == ResizeMode.COVER:
+                    if actual_width_from_width > source_width:
+                        actual_width = source_width
+                        actual_height = actual_height_from_width
+                    else:
+                        actual_width = actual_width_from_width
+                        actual_height = source_height
+                else:
+                    raise ValueError("Logic Error")
         else:
             raise RuntimeError("Logic Error")
 
@@ -247,18 +289,6 @@ class ResizeDesc:
             )
         else:
             return NotImplemented
-
-
-class ResizeMode(Enum):
-    """
-    リサイズの挙動を表す列挙値
-    """
-
-    # (width, height) のボックス内に image 全体が収まるように image をリサイズする
-    CONTAIN = auto()
-
-    # image の範囲内に (width, height) のボックスがちょうど収まるように image をリサイズする
-    COVER = auto()
 
 
 class AISImage:
@@ -346,7 +376,9 @@ class AISImage:
         image = self._pil_image
 
         # 目標サイズを解決
-        target_width, target_height = resize_desc.resolve(image.width, image.height)
+        target_width, target_height = resize_desc.resolve(
+            image.width, image.height, ResizeMode.CONTAIN
+        )
 
         # スケール後のサイズを解決
         width_scale = target_width / image.width
@@ -392,7 +424,9 @@ class AISImage:
         image = self._pil_image
 
         # 目標サイズを解決
-        target_width, target_height = resize_desc.resolve(image.width, image.height)
+        target_width, target_height = resize_desc.resolve(
+            image.width, image.height, ResizeMode.COVER
+        )
 
         # スケール後のサイズを解決
         width_scale = target_width / image.width
