@@ -147,7 +147,7 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
 
         # フレームレートラベル
         self._frame_rate_label = ctk.CTkLabel(
-            self._frame_rate_frame, text=f"-- FPS", font=default_font, width=80
+            self._frame_rate_frame, text="-- FPS", font=default_font, width=80
         )
         self._frame_rate_label.grid(
             row=0, column=2, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
@@ -331,6 +331,7 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
             value (float): スライダー値
         """
         frame_rate_int = round(float(value))
+        self._frame_rate_label.configure(text=f"{frame_rate_int} FPS")
         self._model.video.set_frame_rate(frame_rate_int)
 
     def _on_record_length_slider_changed(self, value: float):
@@ -356,9 +357,8 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
         # 最低２フレーム必要
         video = self._model.video
         if video.num_enable_frames < 2:
-            raise ValueError(
-                f"# of frames less than 2(actual={video.num_enable_frames})"
-            )
+            mb.showerror(APP_NAME_JP, "gif の保存には最低でも 2 フレーム必要だよ")
+            return
 
         # gif ファイルとして保存
         gif_file_path = save_content_model(video)
