@@ -307,7 +307,10 @@ class ImageModel:
     """
 
     def __init__(
-        self, raw_image: Optional[AISImage] = None, time_stamp: Optional[str] = None
+        self,
+        raw_image: Optional[AISImage] = None,
+        time_stamp: Optional[str] = None,
+        enable: bool = True,
     ):
         """
         コンストラクタ
@@ -315,8 +318,8 @@ class ImageModel:
         Args:
             raw_image (AISImage): 元画像
         """
-        # メタデータ
-        self._enable = True
+        # 画像以外のステート
+        self._enable = enable
         self._time_stamp = None
 
         # 各画像メンバ
@@ -967,18 +970,29 @@ def load_content_model(
         # NOTE
         #   ZIP ファイルはこのアプリによって出力されたものであることを前提としている
         #   その中身は .png であることを前提としている
+        # NOTE
+        #   各フレームの有効・無効はファイル名から解決する
+        #   なんかおかしい時は何も言わずに有効扱いする
         video_model = VideoModel().set_time_stamp(time_stamp)
         with ZipFile(actual_file_path, "r") as zip_file:
             file_list = zip_file.namelist()
-            video_model.append_frames(
-                [
+            for file_name in file_list:
+                enable_match = re.search(r"_([de])\.png$", file_name)
+                if enable_match is None:
+                    enable = True
+                else:
+                    enable_str = enable_match.group(1)
+                    if enable_str == "d":
+                        enable = False
+                    else:
+                        enable = True
+                video_model.append_frames(
                     ImageModel(
                         AISImage(Image.open(zip_file.open(file_name)).convert("RGB")),
                         time_stamp,
+                        enable,
                     )
-                    for file_name in file_list
-                ]
-            )
+                )
             return video_model
     else:
         raise ValueError("Logic Error")
