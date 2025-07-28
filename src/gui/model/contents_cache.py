@@ -914,6 +914,7 @@ def load_content_model(
     # 実際に読み込むべきファイルパスを解決する
     IMAGE_EXTENSIONS = (".png", ".jpg", ".jpeg", ".bmp")
     MOVIE_EXTENSIONS = (".gif",)
+    RAW_ZIP_EXTENSIONS = (".zip",)
     if file_path.suffix.lower() in IMAGE_EXTENSIONS:
         raw_png_file_path = RAW_DIR_PATH / (file_path.stem + ".png")
         if raw_png_file_path.exists():
@@ -930,6 +931,11 @@ def load_content_model(
             actual_file_path = file_path
         else:
             raise FileNotFoundError(f"{raw_zip_file_path} or {file_path}")
+    elif file_path.suffix.lower() in RAW_ZIP_EXTENSIONS:
+        if file_path.exists():
+            actual_file_path = file_path
+        else:
+            raise FileNotFoundError(f"{file_path}")
     else:
         raise ValueError(
             f"Unsuported file type. Only extensions {IMAGE_EXTENSIONS + MOVIE_EXTENSIONS} are supported."
@@ -965,7 +971,7 @@ def load_content_model(
         avg_delay = sum(delays) / len(delays)
         video_model.set_frame_rate(int(1000 / avg_delay))
         return video_model
-    elif actual_file_path.suffix.lower() == ".zip":
+    elif actual_file_path.suffix.lower() in RAW_ZIP_EXTENSIONS:
         # ZIP ファイルの場合は中身を読み込む
         # NOTE
         #   ZIP ファイルはこのアプリによって出力されたものであることを前提としている
