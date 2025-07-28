@@ -83,7 +83,7 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
             self._output_kind_frame,
             self._on_resolution_changes,
             AspectRatioPattern.E_RAW,
-            ResizeDesc.Pattern.E_RAW,
+            ResizeDesc.Pattern.E_VGA,
             [
                 AspectRatioPattern.E_RAW,
                 AspectRatioPattern.E_16_9,
