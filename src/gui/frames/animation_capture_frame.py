@@ -10,7 +10,7 @@ from tkinterdnd2.TkinterDnD import DnDEvent
 
 # utils
 from utils.constants import WIDGET_PADDING, DEFAULT_FONT_NAME
-from utils.image import AspectRatioPattern, ResizeDesc, AISImage
+from utils.image import AspectRatioPattern, ResizeDesc, AISImage, GIF_DURATION_MAP
 from utils.constants import THUMBNAIL_HEIGHT
 from utils.windows import file_to_clipboard
 from utils.ctk import show_notify, show_error_dialog
@@ -83,7 +83,7 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
             self._output_kind_frame,
             self._on_resolution_changes,
             AspectRatioPattern.E_RAW,
-            ResizeDesc.Pattern.E_RAW,
+            ResizeDesc.Pattern.E_VGA,
             [
                 AspectRatioPattern.E_RAW,
                 AspectRatioPattern.E_16_9,
@@ -152,13 +152,11 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
         self._frame_rate_frame.columnconfigure(0, weight=1)
 
         # フレームレートスライダー
-        MIN_FRAME_RATE = 1
-        MAX_FRAME_RATE = 24
         self._frame_rate_slider = ctk.CTkSlider(
             self._frame_rate_frame,
-            from_=MIN_FRAME_RATE,
-            to=MAX_FRAME_RATE,
-            number_of_steps=MAX_FRAME_RATE - MIN_FRAME_RATE,
+            from_=0,
+            to=len(GIF_DURATION_MAP) - 1,
+            number_of_steps=len(GIF_DURATION_MAP) - 1,
             command=self._on_frame_rate_slider_changed,
         )
         self._frame_rate_slider.grid(
@@ -174,12 +172,11 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
         )
 
         # 初期フレームレートを設定
-        INITIAL_FRAME_RATE = MAX_FRAME_RATE
-        self._frame_rate_slider.set(INITIAL_FRAME_RATE)
-        self._on_frame_rate_slider_changed(INITIAL_FRAME_RATE)
+        self._frame_rate_slider.set(GIF_DURATION_MAP.default_entry.index)
+        self._on_frame_rate_slider_changed(GIF_DURATION_MAP.default_entry.index)
 
         # ビデオモデルフレームレート変更ハンドラを登録
-        self._model.video.register_frame_rate_change_handler(
+        self._model.video.register_furation_change_handler(
             self._on_model_frame_rate_changed
         )
 
@@ -362,17 +359,24 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
         Args:
             value (float): スライダー値
         """
-        frame_rate_int = round(float(value))
-        self._frame_rate_label.configure(text=f"{frame_rate_int} FPS")
-        self._model.video.set_frame_rate(frame_rate_int)
+        gif_duration_entry = GIF_DURATION_MAP[round(value)]
+        self._frame_rate_label.configure(
+            text=f"{gif_duration_entry.frame_rate_float:4.1f} FPS"
+        )
+        self._model.video.set_duration_in_msec(gif_duration_entry.gif_duration_in_msec)
 
     def _on_model_frame_rate_changed(self):
         """
         ビデオモデルフレームレート変更ハンドラ
         """
-        frame_rate = self._model.video.frame_rate
-        self._frame_rate_slider.set(frame_rate)
-        self._frame_rate_label.configure(text=f"{frame_rate} FPS")
+        duration_in_msec = self._model.video.duration_in_msec
+        gif_duration_entry = GIF_DURATION_MAP.from_gif_duration_in_msec(
+            duration_in_msec
+        )
+        self._frame_rate_slider.set(gif_duration_entry.index)
+        self._frame_rate_label.configure(
+            text=f"{gif_duration_entry.frame_rate_float:4.1f} FPS"
+        )
 
     def _on_record_length_slider_changed(self, value: float):
         """
@@ -518,21 +522,25 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
         paths = self.tk.splitlist(event_data)
         failed_names = []
         new_models = []
-        new_frame_rate = None
+        new_time_stamp = None
+        new_duration_in_msec = None
         for path_str in paths:
             path = Path(path_str)
             try:
                 new_model = load_content_model(path)
                 new_models.append(new_model)
                 if isinstance(new_model, VideoModel):
-                    new_frame_rate = new_model.frame_rate
+                    new_time_stamp = new_model.time_stamp
+                    new_duration_in_msec = new_model.duration_in_msec
             except Exception as e:
                 failed_names.append(path.name)
 
         # モデルに反映
         self._model.video.append_frames(new_models)
-        if new_frame_rate is not None:
-            self._model.video.set_frame_rate(new_frame_rate)
+        if new_time_stamp is not None:
+            self._model.video.set_time_stamp(new_time_stamp)
+        if new_duration_in_msec is not None:
+            self._model.video.set_duration_in_msec(new_duration_in_msec)
 
         # 問題が起きていればダイアログを出す
         if len(failed_names) > 0:
