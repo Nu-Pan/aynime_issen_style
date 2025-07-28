@@ -20,8 +20,7 @@ from gui.model.contents_cache import (
 )
 from utils.windows import file_to_clipboard, register_global_hotkey_handler
 from utils.constants import APP_NAME_JP, NIME_DIR_PATH
-from utils.ctk import show_notify
-from utils.std import flatten
+from utils.ctk import show_notify, show_error_dialog
 
 # gui
 from gui.widgets.still_label import StillLabel
@@ -105,9 +104,9 @@ class StillCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
         try:
             pil_raw_capture_image = self.model.capture.capture()
         except Exception as e:
-            mb.showerror(
-                APP_NAME_JP,
-                f"キャプチャに失敗。多分キャプチャ対象のディスプレイ・ウィンドウの選択を忘れてるよ。\n{e.args}",
+            show_error_dialog(
+                "キャプチャに失敗。多分キャプチャ対象のディスプレイ・ウィンドウの選択を忘れてるよ。",
+                e,
             )
             return
 
@@ -208,10 +207,7 @@ class StillCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
         # 読み込めてない場合はここでおしまい
         if not isinstance(image, AISImage) or not isinstance(time_stamp, str):
             if len(exceptions) > 0:
-                mb.showerror(
-                    APP_NAME_JP,
-                    f"画像・動画の読み込みに失敗。\n{[str(e.args) for e in exceptions]}",
-                )
+                show_error_dialog("画像・動画の読み込みに失敗。", exceptions)
             return
 
         # モデルに設定

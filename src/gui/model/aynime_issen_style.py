@@ -1,6 +1,6 @@
 # model
 from gui.model.capture import CaptureModel
-from gui.model.contents_cache import ImageModel, VideoModel
+from gui.model.contents_cache import ImageModel, VideoModel, PlaybackMode
 
 
 class AynimeIssenStyleModel:
@@ -16,3 +16,4 @@ class AynimeIssenStyleModel:
         self.window_selection = ImageModel()
         self.still = ImageModel()
         self.video = VideoModel()
+        self.playback_mode = PlaybackMode.FORWARD

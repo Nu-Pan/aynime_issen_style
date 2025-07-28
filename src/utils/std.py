@@ -4,7 +4,7 @@ from pathlib import Path
 from datetime import datetime
 import logging
 from typing import Any
-import math
+import traceback
 
 
 def redirect_to_file() -> None:
@@ -61,3 +61,12 @@ def flatten(source: Any) -> Any:
             yield from flatten(item)
     else:
         yield source
+
+
+def traceback_str(exception: Exception) -> str:
+    """
+    excetpion からトレースバック文字列を生成する
+    """
+    return "".join(
+        traceback.format_exception(type(exception), exception, exception.__traceback__)
+    )

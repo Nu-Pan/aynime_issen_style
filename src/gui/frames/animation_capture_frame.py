@@ -1,20 +1,19 @@
 # std
 from pathlib import Path
-from typing import cast, Tuple, List, Any
+from typing import List
 from time import time
 
 # Tk/CTk
 import customtkinter as ctk
 from tkinterdnd2 import TkinterDnD, DND_FILES
 from tkinterdnd2.TkinterDnD import DnDEvent
-import tkinter.messagebox as mb
 
 # utils
 from utils.constants import WIDGET_PADDING, DEFAULT_FONT_NAME
 from utils.image import AspectRatioPattern, ResizeDesc, AISImage
-from utils.constants import APP_NAME_JP, THUMBNAIL_HEIGHT
+from utils.constants import THUMBNAIL_HEIGHT
 from utils.windows import file_to_clipboard
-from utils.ctk import show_notify
+from utils.ctk import show_notify, show_error_dialog
 from utils.std import flatten
 
 # gui
@@ -24,6 +23,8 @@ from gui.widgets.size_pattern_selection_frame import SizePatternSlectionFrame
 from gui.model.contents_cache import (
     ImageLayer,
     ImageModel,
+    VideoModel,
+    PlaybackMode,
     save_content_model,
     load_content_model,
 )
@@ -110,26 +111,45 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
             ),
         )
 
+        # 再生モード関係フレーム
+        self._playback_mode_frame = ctk.CTkFrame(
+            self._output_kind_frame, width=0, height=0
+        )
+        self._playback_mode_frame.grid(
+            row=2, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
+        )
+        self._playback_mode_frame.rowconfigure(0, weight=1)
+
+        # 再生モード変数
+        self._playback_mode_var = ctk.StringVar(value=self._model.playback_mode.value)
+
+        # 再生モードラジオボタン
+        self._playback_mode_radios: List[ctk.CTkRadioButton] = []
+        for i, playback_mode in enumerate(PlaybackMode):
+            playback_mode_radio = ctk.CTkRadioButton(
+                self._playback_mode_frame,
+                text=playback_mode.value,
+                variable=self._playback_mode_var,
+                value=playback_mode.value,
+                command=self._on_playback_mode_radio_change,
+                width=0,
+                font=default_font,
+            )
+            playback_mode_radio.grid(
+                row=0, column=i, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="ns"
+            )
+            self._playback_mode_frame.columnconfigure(i, weight=1)
+            self._playback_mode_radios.append(playback_mode_radio)
+
         # フレームレート関係フレーム
         self._frame_rate_frame = ctk.CTkFrame(
             self._output_kind_frame, width=0, height=0
         )
         self._frame_rate_frame.grid(
-            row=2, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
+            row=3, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
         )
         self._frame_rate_frame.rowconfigure(0, weight=1)
-        self._frame_rate_frame.columnconfigure(1, weight=1)
-
-        # 折り返し変数
-        self._reflect_var = ctk.BooleanVar(value=False)
-
-        # 折り返しチェックボックス
-        self._reflect_checkbox = ctk.CTkCheckBox(
-            self._frame_rate_frame, text="REFLECT", width=80, variable=self._reflect_var
-        )
-        self._reflect_checkbox.grid(
-            row=0, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
-        )
+        self._frame_rate_frame.columnconfigure(0, weight=1)
 
         # フレームレートスライダー
         MIN_RECORD_LENGTH = 1
@@ -142,7 +162,7 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
             command=self._on_frame_rate_slider_changed,
         )
         self._frame_rate_slider.grid(
-            row=0, column=1, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
+            row=0, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
         )
 
         # フレームレートラベル
@@ -150,7 +170,7 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
             self._frame_rate_frame, text="-- FPS", font=default_font, width=80
         )
         self._frame_rate_label.grid(
-            row=0, column=2, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
+            row=0, column=1, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
         )
 
         # 初期フレームレートを設定
@@ -165,7 +185,7 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
             command=self._on_save_button_clicked,
         )
         self._save_button.grid(
-            row=0, column=3, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
+            row=0, column=2, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
         )
 
         # 入力関係フレーム
@@ -323,6 +343,12 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
         self._aspect_ratio = aspect_ratio
         self._resolution = resolution
 
+    def _on_playback_mode_radio_change(self):
+        """
+        再生モードラジオボタンに変化があった時に呼び出されるハンドラ
+        """
+        self._model.playback_mode = PlaybackMode(self._playback_mode_var.get())
+
     def _on_frame_rate_slider_changed(self, value: float):
         """
         フレームレートスライダーハンドラ
@@ -357,16 +383,16 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
         # 最低２フレーム必要
         video = self._model.video
         if video.num_enable_frames < 2:
-            mb.showerror(APP_NAME_JP, "gif の保存には最低でも 2 フレーム必要だよ")
+            show_error_dialog("gif の保存には最低でも 2 フレーム必要だよ")
             return
 
         # gif ファイルとして保存
-        gif_file_path = save_content_model(video)
-        if not isinstance(gif_file_path, Path):
-            raise TypeError(
-                f"Expected Path, but got {type(gif_file_path)}. "
-                "This is a bug, please report it."
-            )
+        playback_mode = PlaybackMode(self._playback_mode_var.get())
+        try:
+            gif_file_path = save_content_model(video, playback_mode)
+        except Exception as e:
+            show_error_dialog("gif ファイルの保存に失敗", e)
+            return
 
         # クリップボードに転送
         file_to_clipboard(gif_file_path)
@@ -427,7 +453,7 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
         # 所定の時間を経過してたら終了
         if time() > stop_time_in_sec:
             self._model.video.set_time_stamp(None)
-            self._model.video.insert_frames(
+            self._model.video.append_frames(
                 [
                     ImageModel(img, self._model.video.time_stamp)
                     for img in record_raw_images
@@ -439,9 +465,9 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
         try:
             new_image = self._model.capture.capture()
         except Exception as e:
-            mb.showerror(
-                APP_NAME_JP,
-                f"キャプチャに失敗。多分キャプチャ対象のディスプレイ・ウィンドウの選択を忘れてるよ。\n{e.args}",
+            show_error_dialog(
+                "キャプチャに失敗。多分キャプチャ対象のディスプレイ・ウィンドウの選択を忘れてるよ。",
+                e,
             )
             return
 
@@ -475,20 +501,37 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
             return
 
         # 動画・画像で分岐
-        try:
-            paths = cast(Tuple[str], self.tk.splitlist(event_data))
-            video_models = cast(
-                List[Any],
-                flatten([load_content_model(Path(p)) for p in paths]),
-            )
-            # TODO 実装
-            raise NotImplementedError()
-        except Exception as e:
-            mb.showerror(
-                APP_NAME_JP,
-                f"画像・動画の読み込みに失敗。\n{e.args}",
-            )
-            return
+        paths = self.tk.splitlist(event_data)
+        failed_names = []
+        new_models = []
+        for path_str in paths:
+            path = Path(path_str)
+            try:
+                new_models.append(load_content_model(path))
+            except Exception as e:
+                failed_names.append(path.name)
 
-        # フレームリストに追加
-        self._frame_list_bar.add_image(frames)
+        # モデルに反映
+        self._model.video.append_frames(new_models)
+
+        # 問題が起きていればダイアログを出す
+        if len(failed_names) > 0:
+            # 基本メッセージ
+            message_lines = []
+            if len(new_models) > 0:
+                message_lines.append(
+                    "ドロップされた画像・動画のうち、一部の読み込みに失敗。"
+                )
+            else:
+                message_lines.append(
+                    "ドロップされたすべての画像・動画の読み込みに失敗。"
+                )
+
+            # 読み込み失敗リスト
+            TOP_N = 5
+            message_lines.extend(failed_names[:TOP_N])
+            if len(failed_names) > TOP_N:
+                message_lines.append("...")
+
+            # ダイアログ表示
+            show_error_dialog("\n".join(message_lines))

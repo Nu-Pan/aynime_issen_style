@@ -13,6 +13,7 @@ from typing import (
     Type,
     cast,
     Dict,
+    Iterable,
 )
 from pathlib import Path
 from datetime import datetime
@@ -607,44 +608,67 @@ class VideoModel:
         """
         return self._global_model.get_size(layer)
 
-    def insert_frames(
-        self, new_frames: Union[ImageModel, List[ImageModel]], position: int = -1
+    def append_frames(
+        self,
+        new_obj: Union[
+            AISImage,
+            Iterable[AISImage],
+            ImageModel,
+            Iterable[ImageModel],
+            "VideoModel",
+            Iterable["VideoModel"],
+        ],
+        *,
+        _does_notify: bool = True,
     ) -> Self:
         """
-        動画のフレームを挿入する
+        動画フレームを末尾に追加する
 
         Args:
             frames (List[ImageModel]): 挿入するフレーム
-            position (int, optional): 挿入位置。-1 の場合は末尾に挿入
 
         Returns:
             VideoModel: 自分自身
         """
-        # リストで統一
-        if isinstance(new_frames, ImageModel):
-            new_frames = [new_frames]
+        # 追加フレームが…
+        if isinstance(new_obj, ImageModel):
+            # ImageModel の場合、通常の追加フロー
 
-        # サイズ情報を統一
-        for new_frame in new_frames:
+            # サイズを統一
             for layer in ImageLayer:
                 if layer != ImageLayer.RAW:
-                    new_frame.set_size(layer, self._global_model.get_size(layer))
+                    new_obj.set_size(layer, self._global_model.get_size(layer))
 
-        # タイムスタンプを統一
-        for new_frame in new_frames:
-            new_frame.set_time_stamp(self._global_model.time_stamp)
+            # タイムスタンプを統一
+            new_obj.set_time_stamp(self._global_model.time_stamp)
 
-        # フレームリストに挿入
-        self._frames = self._frames[:position] + new_frames + self._frames[position:]
+            # フレームリストに挿入
+            self._frames.append(new_obj)
+        else:
+            # ImageModel ではない場合、 ImageModel の呼び出しに変換
+            if isinstance(new_obj, Iterable):
+                for new_frame in new_obj:
+                    self.append_frames(new_frame, _does_notify=False)
+            elif isinstance(new_obj, AISImage):
+                self.append_frames(
+                    ImageModel(new_obj, self.time_stamp), _does_notify=False
+                )
+            elif isinstance(new_obj, VideoModel):
+                for new_frame in new_obj._frames:
+                    self.append_frames(new_frame, _does_notify=False)
+
+            else:
+                raise TypeError(f"Invalid type {type(new_obj)}")
 
         # 全体通知を呼び出す
         # NOTE
         #   原則、１フレームでも変更があれば動画全体として通知が飛ぶ
         #   フレームの追加・削除については RAW レイヤーでの変更とみなす
         #   よってグローバルモデルに新規生成した画像を渡して強制的に通知を発生させる
-        self._global_model.set_raw_image(
-            AISImage.empty("RGB", 8, 8), self._global_model.time_stamp
-        )
+        if _does_notify:
+            self._global_model.set_raw_image(
+                AISImage.empty("RGB", 8, 8), self._global_model.time_stamp
+            )
 
         # 正常終了
         return self
@@ -737,14 +761,23 @@ class VideoModel:
         self._global_model.register_notify_handler(layer, handler)
 
 
-def save_content_model(model: Union[ImageModel, VideoModel]) -> Path:
+class PlaybackMode(Enum):
+    FORWARD = "FORWARD"
+    BACKWARD = "BACKWARD"
+    REFLECT = "REFLECT"
+
+
+def save_content_model(
+    model: Union[ImageModel, VideoModel],
+    playback_mode: PlaybackMode = PlaybackMode.FORWARD,
+) -> Path:
     """
     model をファイル保存する。
     画像・動画の両方に対応している。
 
     Args:
         model (Union[IntegratedImage, IntegratedVideo]): 保存したいモデル
-        interval_in_ms (int, optional): gif アニメーションのフレーム間隔（ミリ秒）
+        palyback_mode (PlaybackMode):
 
     Return:
         Path: 保存先ファイルパス
@@ -808,6 +841,8 @@ def save_content_model(model: Union[ImageModel, VideoModel]) -> Path:
         #   なので、妥協して毎回保存する。
         # NOTE
         #   raw フレームは enable かどうかを問わずに保存する。
+        # NOTE
+        #
         zip_file_path = RAW_DIR_PATH / (model.time_stamp + ".zip")
         with ZipFile(zip_file_path, "w") as zip_file:
             for idx, img in enumerate(model.iter_frames(ImageLayer.RAW, False)):
@@ -819,7 +854,8 @@ def save_content_model(model: Union[ImageModel, VideoModel]) -> Path:
                 img.pil_image.save(buf, format="PNG", optimize=True)
                 buf.seek(0)
                 # png メモリイメージを zip ファイルに書き出し
-                png_file_name = f"{model.time_stamp}_{idx:03d}.png"
+                enable_suffix = "e" if model.get_enable(idx) else "d"
+                png_file_name = f"{model.time_stamp}_{idx:03d}_{enable_suffix}.png"
                 zip_file.writestr(png_file_name, buf.read())
 
         # nime ディレクトリに gif アニメーションを保存
@@ -827,10 +863,20 @@ def save_content_model(model: Union[ImageModel, VideoModel]) -> Path:
         nime_frames = [
             f for f in model.iter_frames(ImageLayer.NIME) if isinstance(f, AISImage)
         ]
+        match playback_mode:
+            case PlaybackMode.FORWARD:
+                pass
+            case PlaybackMode.BACKWARD:
+                nime_frames.reverse()
+            case PlaybackMode.REFLECT:
+                if len(nime_frames) >= 3:
+                    nime_frames = nime_frames + [f for f in reversed(nime_frames)][1:-1]
+            case _:
+                raise RuntimeError()
         nime_frames[0].pil_image.save(
             str(gif_file_path),
             save_all=True,
-            append_images=[f for f in nime_frames[1:]],
+            append_images=[f.pil_image for f in nime_frames[1:]],
             duration=1000 // model.frame_rate,
             loop=0,
             disposal=2,
@@ -873,7 +919,7 @@ def load_content_model(
             actual_file_path = file_path
         else:
             raise FileNotFoundError(f"{raw_png_file_path} or {file_path}")
-    elif file_path.suffix.lower in MOVIE_EXTENSIONS:
+    elif file_path.suffix.lower() in MOVIE_EXTENSIONS:
         raw_zip_file_path = RAW_DIR_PATH / (file_path.stem + ".zip")
         if raw_zip_file_path.exists():
             actual_file_path = raw_zip_file_path
@@ -906,7 +952,7 @@ def load_content_model(
             try:
                 while True:
                     pil_image = img.copy().convert("RGB")
-                    video_model.insert_frames(
+                    video_model.append_frames(
                         [ImageModel(AISImage(pil_image), time_stamp)]
                     )
                     delays.append(img.info.get("duration", default_duration_in_sec))
@@ -924,7 +970,7 @@ def load_content_model(
         video_model = VideoModel().set_time_stamp(time_stamp)
         with ZipFile(actual_file_path, "r") as zip_file:
             file_list = zip_file.namelist()
-            video_model.insert_frames(
+            video_model.append_frames(
                 [
                     ImageModel(
                         AISImage(Image.open(zip_file.open(file_name)).convert("RGB")),

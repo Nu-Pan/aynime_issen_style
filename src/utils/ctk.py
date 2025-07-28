@@ -1,6 +1,6 @@
 # std
 import warnings
-from typing import Callable, Optional, Union
+from typing import Callable, Optional, Union, List
 
 # PIL
 from PIL.ImageTk import PhotoImage
@@ -8,9 +8,11 @@ from PIL.ImageTk import PhotoImage
 # Tk/CTk
 import customtkinter as ctk
 from tkinter import Event
+import tkinter.messagebox as mb
 
-# local
-from utils.constants import DEFAULT_FONT_NAME, WIDGET_PADDING
+# utils
+from utils.constants import DEFAULT_FONT_NAME, WIDGET_PADDING, APP_NAME_JP
+from utils.std import traceback_str
 
 
 def silent_configure(widget: ctk.CTkBaseClass, **kwargs):
@@ -73,3 +75,32 @@ def show_notify(
 
     # 通知ラベルは一定時間後に自動破棄
     widget.after(duration_ms, status_label.destroy)
+
+
+def show_error_dialog(
+    message: str, exception: Union[Exception, List[Exception], None] = None
+):
+    """
+    エラーダイアログを表示する。
+    デバッグ情報として e の説明文字列を添付する
+    """
+    # 例外文字列を生成
+    if exception is None:
+        tb_str = ""
+    elif isinstance(exception, Exception):
+        tb_str = traceback_str(exception)
+    elif isinstance(exception, list):
+        tb_str = ""
+        for e in exception:
+            if isinstance(e, Exception):
+                tb_str += traceback_str(e)
+            else:
+                tb_str += str(e)
+    else:
+        tb_str = str(e)
+
+    # エラーダイアログを表示
+    mb.showerror(
+        APP_NAME_JP,
+        f"{message}\n{tb_str}",
+    )
