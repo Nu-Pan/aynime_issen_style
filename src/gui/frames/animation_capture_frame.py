@@ -152,13 +152,13 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
         self._frame_rate_frame.columnconfigure(0, weight=1)
 
         # フレームレートスライダー
-        MIN_RECORD_LENGTH = 1
-        MAX_RECORD_LENGTH = 24
+        MIN_FRAME_RATE = 1
+        MAX_FRAME_RATE = 24
         self._frame_rate_slider = ctk.CTkSlider(
             self._frame_rate_frame,
-            from_=MIN_RECORD_LENGTH,
-            to=MAX_RECORD_LENGTH,
-            number_of_steps=MAX_RECORD_LENGTH - MIN_RECORD_LENGTH,
+            from_=MIN_FRAME_RATE,
+            to=MAX_FRAME_RATE,
+            number_of_steps=MAX_FRAME_RATE - MIN_FRAME_RATE,
             command=self._on_frame_rate_slider_changed,
         )
         self._frame_rate_slider.grid(
@@ -174,8 +174,14 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
         )
 
         # 初期フレームレートを設定
-        self._frame_rate_slider.set(10)
-        self._on_frame_rate_slider_changed(10)
+        INITIAL_FRAME_RATE = MAX_FRAME_RATE
+        self._frame_rate_slider.set(INITIAL_FRAME_RATE)
+        self._on_frame_rate_slider_changed(INITIAL_FRAME_RATE)
+
+        # ビデオモデルフレームレート変更ハンドラを登録
+        self._model.video.register_frame_rate_change_handler(
+            self._on_model_frame_rate_changed
+        )
 
         # セーブボタン
         self._save_button = ctk.CTkButton(
@@ -360,6 +366,14 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
         self._frame_rate_label.configure(text=f"{frame_rate_int} FPS")
         self._model.video.set_frame_rate(frame_rate_int)
 
+    def _on_model_frame_rate_changed(self):
+        """
+        ビデオモデルフレームレート変更ハンドラ
+        """
+        frame_rate = self._model.video.frame_rate
+        self._frame_rate_slider.set(frame_rate)
+        self._frame_rate_label.configure(text=f"{frame_rate} FPS")
+
     def _on_record_length_slider_changed(self, value: float):
         """
         レコード秒数スライダーハンドラ
@@ -504,15 +518,21 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
         paths = self.tk.splitlist(event_data)
         failed_names = []
         new_models = []
+        new_frame_rate = None
         for path_str in paths:
             path = Path(path_str)
             try:
-                new_models.append(load_content_model(path))
+                new_model = load_content_model(path)
+                new_models.append(new_model)
+                if isinstance(new_model, VideoModel):
+                    new_frame_rate = new_model.frame_rate
             except Exception as e:
                 failed_names.append(path.name)
 
         # モデルに反映
         self._model.video.append_frames(new_models)
+        if new_frame_rate is not None:
+            self._model.video.set_frame_rate(new_frame_rate)
 
         # 問題が起きていればダイアログを出す
         if len(failed_names) > 0:

@@ -546,6 +546,7 @@ class VideoModel:
         self._global_model = ImageModel()
         self._frames: List[ImageModel] = []
         self._frame_rate = DEFAULT_FRAME_RATE
+        self._frame_rate_change_handlers: List[NotifyHandler] = []
 
     def set_enable(self, frame_index: int, enable: bool) -> Self:
         """
@@ -747,7 +748,10 @@ class VideoModel:
         """
         再生フレームレートを設定する
         """
-        self._frame_rate = frame_rate
+        if self._frame_rate != frame_rate:
+            self._frame_rate = frame_rate
+            for handler in self._frame_rate_change_handlers:
+                handler()
         return self
 
     @property
@@ -760,8 +764,15 @@ class VideoModel:
     def register_notify_handler(self, layer: ImageLayer, handler: NotifyHandler):
         """
         通知ハンドラーを登録する
+        各画像に変更があった時にコールバックされる
         """
         self._global_model.register_notify_handler(layer, handler)
+
+    def register_frame_rate_change_handler(self, handler: NotifyHandler):
+        """
+        フレームレート変更ハンドラーを登録する
+        """
+        self._frame_rate_change_handlers.append(handler)
 
 
 class PlaybackMode(Enum):
@@ -894,7 +905,7 @@ def save_content_model(
 
 
 def load_content_model(
-    file_path: Path, default_duration_in_sec: int = DEFAULT_FRAME_RATE
+    file_path: Path, default_framerate: int = DEFAULT_FRAME_RATE
 ) -> Union[ImageModel, VideoModel]:
     """
     file_path から画像を読み込む。
@@ -919,21 +930,26 @@ def load_content_model(
         raw_png_file_path = RAW_DIR_PATH / (file_path.stem + ".png")
         if raw_png_file_path.exists():
             actual_file_path = raw_png_file_path
+            gif_file_path = None
         elif file_path.exists():
             actual_file_path = file_path
+            gif_file_path = None
         else:
             raise FileNotFoundError(f"{raw_png_file_path} or {file_path}")
     elif file_path.suffix.lower() in MOVIE_EXTENSIONS:
         raw_zip_file_path = RAW_DIR_PATH / (file_path.stem + ".zip")
         if raw_zip_file_path.exists():
             actual_file_path = raw_zip_file_path
+            gif_file_path = file_path
         elif file_path.exists():
             actual_file_path = file_path
+            gif_file_path = file_path
         else:
             raise FileNotFoundError(f"{raw_zip_file_path} or {file_path}")
     elif file_path.suffix.lower() in RAW_ZIP_EXTENSIONS:
         if file_path.exists():
             actual_file_path = file_path
+            gif_file_path = None
         else:
             raise FileNotFoundError(f"{file_path}")
     else:
@@ -946,6 +962,9 @@ def load_content_model(
         time_stamp = actual_file_path.stem
     else:
         time_stamp = current_time_stamp()
+
+    # デフォルトのフレーム間隔（ミリ秒）を解決
+    default_duration_in_msec = round(1000 / default_framerate)
 
     # 画像・動画を読み込む
     if actual_file_path.suffix.lower() in IMAGE_EXTENSIONS:
@@ -964,7 +983,7 @@ def load_content_model(
                     video_model.append_frames(
                         [ImageModel(AISImage(pil_image), time_stamp)]
                     )
-                    delays.append(img.info.get("duration", default_duration_in_sec))
+                    delays.append(img.info.get("duration", default_duration_in_msec))
                     img.seek(img.tell() + 1)
             except EOFError:
                 pass
@@ -972,17 +991,39 @@ def load_content_model(
         video_model.set_frame_rate(int(1000 / avg_delay))
         return video_model
     elif actual_file_path.suffix.lower() in RAW_ZIP_EXTENSIONS:
-        # ZIP ファイルの場合は中身を読み込む
+        # ZIP ファイルの場合、中身を連番静止画として読み込む
         # NOTE
         #   ZIP ファイルはこのアプリによって出力されたものであることを前提としている
         #   その中身は .png であることを前提としている
-        # NOTE
-        #   各フレームの有効・無効はファイル名から解決する
-        #   なんかおかしい時は何も言わずに有効扱いする
-        video_model = VideoModel().set_time_stamp(time_stamp)
+
+        # 対応する gif ファイルからフレームレートをロード
+        if gif_file_path is None:
+            frame_rate = default_framerate
+        elif isinstance(gif_file_path, Path):
+            delays = []
+            with Image.open(gif_file_path) as img:
+                try:
+                    while True:
+                        delays.append(
+                            img.info.get("duration", default_duration_in_msec)
+                        )
+                        img.seek(img.tell() + 1)
+                except EOFError:
+                    pass
+            avg_delay = sum(delays) / len(delays)
+            frame_rate = int(1000 / avg_delay)
+        else:
+            raise TypeError(f"Invalid type {type(gif_file_path)}")
+
+        # ビデオモデルを構築
+        video_model = VideoModel().set_time_stamp(time_stamp).set_frame_rate(frame_rate)
         with ZipFile(actual_file_path, "r") as zip_file:
             file_list = zip_file.namelist()
             for file_name in file_list:
+                # フレームの有効・無効を解決する
+                # NOTE
+                #   ファイル名から解決する
+                #   なんかおかしい時は何も言わずに有効扱いする
                 enable_match = re.search(r"_([de])\.png$", file_name)
                 if enable_match is None:
                     enable = True
@@ -992,6 +1033,8 @@ def load_content_model(
                         enable = False
                     else:
                         enable = True
+
+                # フレームを追加
                 video_model.append_frames(
                     ImageModel(
                         AISImage(Image.open(zip_file.open(file_name)).convert("RGB")),
@@ -999,6 +1042,8 @@ def load_content_model(
                         enable,
                     )
                 )
+
+            # 正常終了
             return video_model
     else:
         raise ValueError("Logic Error")
