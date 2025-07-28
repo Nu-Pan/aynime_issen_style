@@ -518,6 +518,7 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
         paths = self.tk.splitlist(event_data)
         failed_names = []
         new_models = []
+        new_time_stamp = None
         new_frame_rate = None
         for path_str in paths:
             path = Path(path_str)
@@ -525,12 +526,15 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
                 new_model = load_content_model(path)
                 new_models.append(new_model)
                 if isinstance(new_model, VideoModel):
+                    new_time_stamp = new_model.time_stamp
                     new_frame_rate = new_model.frame_rate
             except Exception as e:
                 failed_names.append(path.name)
 
         # モデルに反映
         self._model.video.append_frames(new_models)
+        if new_time_stamp is not None:
+            self._model.video.set_time_stamp(new_time_stamp)
         if new_frame_rate is not None:
             self._model.video.set_frame_rate(new_frame_rate)
 
