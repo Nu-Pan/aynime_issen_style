@@ -2,9 +2,6 @@
 from typing import Optional, Generator, List
 from enum import Enum
 
-# PIL
-from PIL import Image
-
 # utils
 from utils.capture_context import (
     CaptureTargetInfo,
@@ -12,6 +9,7 @@ from utils.capture_context import (
     CaptureContextDXCam,
     CaptureContextPyWin32,
 )
+from utils.image import AISImage
 
 
 class CaptureMode(Enum):
@@ -23,9 +21,10 @@ class CaptureMode(Enum):
     PYWIN32 = "pywin32"
 
 
-class AynimeIssenStyleModel:
+class CaptureModel:
     """
-    えぃにめ一閃流奥義「一閃」のモデル
+    えぃにめ一閃流奥義「一閃」のモデルの１つ
+
     """
 
     def __init__(self) -> None:
@@ -96,7 +95,7 @@ class AynimeIssenStyleModel:
         """
         self._capture_target_info = capture_target_info
 
-    def capture(self) -> Image.Image:
+    def capture(self) -> AISImage:
         """
         キャプチャを実行する
 
@@ -105,7 +104,7 @@ class AynimeIssenStyleModel:
             RuntimeError: キャプチャ対象が未設定の場合
 
         Returns:
-            Image.Image: キャプチャ結果の PIL 画像
+            AISImage: キャプチャ結果の PIL 画像
         """
         reasons = self.capture_not_ready_reasons
         if len(reasons) != 0:

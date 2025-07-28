@@ -13,6 +13,7 @@ import dxcam_cpp as dxcam
 
 # utils
 from utils.windows import enumerate_dxgi_outputs
+from utils.image import AISImage
 
 
 @dataclass
@@ -70,7 +71,7 @@ class CaptureContext(ABC):
         ...
 
     @abstractmethod
-    def capture(self, capture_target_info: CaptureTargetInfo) -> Image.Image:
+    def capture(self, capture_target_info: CaptureTargetInfo) -> AISImage:
         """
         キャプチャを実行する
 
@@ -78,7 +79,7 @@ class CaptureContext(ABC):
             capture_target_info (CaptureTargetInfo): キャプチャ対象の情報
 
         Returns:
-            Image.Image: キャプチャした画像
+            AISImage: キャプチャした画像
         """
         ...
 
@@ -105,7 +106,7 @@ class CaptureContextDXCam(CaptureContext):
         self._dxcamera = None
         self._dxcamera_adaper_idx = None
         self._dxcamera_output_idx = None
-        self._latest_np_image = None
+        self._latest_pil_image = None
 
     def enumerate_capture_targets(self) -> Generator[CaptureTargetInfo, None, None]:
         # 合法なモニターを順番に返す
@@ -117,7 +118,7 @@ class CaptureContextDXCam(CaptureContext):
                 str(dxgi_output_info),
             )
 
-    def capture(self, capture_target_info: CaptureTargetInfo) -> Image.Image:
+    def capture(self, capture_target_info: CaptureTargetInfo) -> AISImage:
         # 引数の型チェック
         if not isinstance(capture_target_info.id, MonitorIdentifier):
             raise TypeError("Invalid capture target info type.")
@@ -144,7 +145,7 @@ class CaptureContextDXCam(CaptureContext):
             # メンバ更新
             self._dxcamera_adaper_idx = capture_target_info.id.adapter_index
             self._dxcamera_output_idx = capture_target_info.id.output_index
-            self._latest_np_image = None
+            self._latest_pil_image = None
 
             # 初回 Grab
             # NOTE
@@ -155,7 +156,7 @@ class CaptureContextDXCam(CaptureContext):
             if np_image is None:
                 raise ValueError("Invalid return value of DXCamera.grab.")
             else:
-                self._latest_np_image = np_image
+                self._latest_pil_image = Image.fromarray(np_image)
                 time.sleep(0.1)
 
         # キャプチャ
@@ -163,19 +164,20 @@ class CaptureContextDXCam(CaptureContext):
         #   grab が None が返す＝画面に変化なしなので、最後のキャプチャを使う。
         np_image = self._dxcamera.grab()
         if np_image is None:
-            np_image = self._latest_np_image
+            pil_image = self._latest_pil_image
         else:
-            self._latest_np_image = np_image
+            pil_image = Image.fromarray(np_image)
+            self._latest_pil_image = pil_image
 
         # 必ず非 None が出るはず
         # NOTE
         #   静的解析を黙らせるためのチェック
         #   関数外のコンテキストも含めて考えれば、ここで None はありえない
-        if np_image is None:
-            raise ValueError("np_image is None")
+        if pil_image is None:
+            raise ValueError("pil_image is None")
 
         # 正常終了
-        return Image.fromarray(np_image)
+        return AISImage(pil_image)
 
     def release(self) -> None:
         if self._dxcamera is not None:
@@ -218,7 +220,7 @@ class CaptureContextPyWin32(CaptureContext):
             # ウィンドウ情報を生成して返す
             yield CaptureTargetInfo(WindowIdentifier(hwnd), title)
 
-    def capture(self, capture_target_info: CaptureTargetInfo) -> Image.Image:
+    def capture(self, capture_target_info: CaptureTargetInfo) -> AISImage:
         # ウィンドウハンドルを解決
         if isinstance(capture_target_info.id, WindowIdentifier):
             hwnd = capture_target_info.id.hwnd
@@ -262,7 +264,7 @@ class CaptureContextPyWin32(CaptureContext):
                 win32gui.ReleaseDC(hwnd, hwndDC)
 
         # 正常終了
-        return pil_image
+        return AISImage(pil_image)
 
     def release(self) -> None:
         # NOTE pywin32 の場合は何もしなくて良い

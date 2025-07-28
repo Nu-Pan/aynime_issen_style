@@ -6,34 +6,7 @@ import customtkinter as ctk
 
 # utils
 from utils.constants import WIDGET_PADDING, DEFAULT_FONT_NAME
-from utils.pil import AspectRatio, Resolution
-
-
-def pattern_size_to_free(
-    aspect_raio: AspectRatio, resolution: Resolution
-) -> Tuple[int, int]:
-    """
-    列挙値を元に数値の解像度を解決する
-
-    Args:
-        aspect_raio (AspectRatio): アスペクト比列挙値
-        resolution (Resolution): 解像度列挙値
-
-    Returns:
-        Tuple[int, int]: Width x Height
-    """
-    # 解像度
-    width = resolution.int_value
-    if width is None:
-        raise ValueError(f"{resolution} is not supported")
-
-    # アスペクト比
-    asp_int = aspect_raio.int_value
-    if asp_int is None:
-        raise ValueError(f"{aspect_raio} is not supported")
-
-    # 正常終了
-    return (width, width * asp_int[1] // asp_int[0])
+from utils.image import AspectRatioPattern, ResizeDesc
 
 
 class SizePatternSlectionFrame(ctk.CTkFrame):
@@ -44,11 +17,15 @@ class SizePatternSlectionFrame(ctk.CTkFrame):
     def __init__(
         self,
         master: ctk.CTkBaseClass,
-        aux_on_radio_change: Callable[[AspectRatio, Resolution], None],
-        initial_aspect_ratio: AspectRatio = AspectRatio.E_RAW,
-        initial_resolution: Resolution = Resolution.E_RAW,
-        shown_aspect_raios: Sequence[AspectRatio] = [ar for ar in AspectRatio],
-        shown_resolutions: Sequence[Resolution] = [res for res in Resolution],
+        aux_on_radio_change: Callable[[AspectRatioPattern, ResizeDesc.Pattern], None],
+        initial_aspect_ratio: AspectRatioPattern = AspectRatioPattern.E_RAW,
+        initial_resolution: ResizeDesc.Pattern = ResizeDesc.Pattern.E_RAW,
+        shown_aspect_raios: Sequence[AspectRatioPattern] = [
+            ar for ar in AspectRatioPattern
+        ],
+        shown_resolutions: Sequence[ResizeDesc.Pattern] = [
+            res for res in ResizeDesc.Pattern
+        ],
         **kwargs,
     ):
         """
@@ -133,6 +110,26 @@ class SizePatternSlectionFrame(ctk.CTkFrame):
         """
         ラジオボタンに変化が合った時に呼び出されるハンドラ
         """
-        aspect_raio = AspectRatio(self.aspect_ratio_var.get())
-        resolution = Resolution(self.resolution_var.get())
-        self._aux_on_radio_change(aspect_raio, resolution)
+        aspect_raio = AspectRatioPattern(self.aspect_ratio_var.get())
+        resize_desc = ResizeDesc.Pattern(self.resolution_var.get())
+        self._aux_on_radio_change(aspect_raio, resize_desc)
+
+    @property
+    def aspect_ratio(self) -> AspectRatioPattern:
+        """
+        現在 UI 上で選択されているアスペクト比を返す
+
+        Returns:
+            AspectRatio: アスペクト比
+        """
+        return AspectRatioPattern(self.aspect_ratio_var.get())
+
+    @property
+    def resolution(self) -> ResizeDesc.Pattern:
+        """
+        現在 UI 上で選択されている解像度を返す
+
+        Returns:
+            Resolution: 解像度
+        """
+        return ResizeDesc.Pattern(self.resolution_var.get())

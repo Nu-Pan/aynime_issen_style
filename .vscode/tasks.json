@@ -1,0 +1,10 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Delete __pycache__",
+            "type": "shell",
+            "command": "Get-ChildItem -Recurse -Directory -Filter '__pycache__' | Remove-Item -Recurse -Force",
+        }
+    ]
+}

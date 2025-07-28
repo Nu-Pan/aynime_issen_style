@@ -10,9 +10,10 @@ from utils.pyinstaller import is_frozen
 from utils.std import redirect_to_file
 from utils.windows import SystemWideMutex
 from utils.constants import APP_NAME_EN, APP_NAME_JP
+from utils.ctk import show_error_dialog
 
 # local
-from aynime_issen_style_app import AynimeIssenStyleApp
+from gui.aynime_issen_style_app import AynimeIssenStyleApp
 
 if __name__ == "__main__":
     # ログファイルリダイレクト設定
@@ -28,7 +29,7 @@ if __name__ == "__main__":
     #   ここで止めないとホットキー登録でコケて、ユーザーにとって理解しにくいエラーが出る
     system_wide_mutex = SystemWideMutex(APP_NAME_EN)
     if system_wide_mutex.already_exists:
-        mb.showerror(APP_NAME_JP, "アプリはすでに起動しています")
+        show_error_dialog("アプリはすでに起動しています")
         sys.exit(-1)
 
     # CTk アプリを生成・開始

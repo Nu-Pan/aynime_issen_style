@@ -7,7 +7,7 @@ APP_NAME_EN = "aynime_issen_style"
 APP_NAME_JP = "えぃにめ一閃流奥義「一閃」"
 
 # ウィジェットのパディングサイズ
-WIDGET_PADDING = 4
+WIDGET_PADDING = 6
 
 # ウィンドウの最小サイズ
 # NOTE
@@ -21,3 +21,16 @@ DEFAULT_FONT_NAME = "Yu Gothic UI"
 
 # バージョン情報ファイルのパス
 VERSION_FILE_PATH = Path("src\\utils\\version_constants.py")
+
+# キャプチャ保存先
+# NOTE
+#   nime はリサイズなどの処理適用済みの最終結果画像の保存先
+#   raw は処理適用前のオリジナルのキャプチャ画像の保存先
+NIME_DIR_PATH = Path.cwd() / "nime"
+RAW_DIR_PATH = Path.cwd() / "raw"
+
+# デフォルトのフレームレート
+DEFAULT_FRAME_RATE = 15
+
+# サムネイルの高さ方向のサイズ
+THUMBNAIL_HEIGHT = 120

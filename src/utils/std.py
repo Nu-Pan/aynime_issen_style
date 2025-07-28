@@ -3,6 +3,8 @@ import sys
 from pathlib import Path
 from datetime import datetime
 import logging
+from typing import Any
+import traceback
 
 
 def redirect_to_file() -> None:
@@ -38,4 +40,33 @@ def redirect_to_file() -> None:
         level=logging.DEBUG,
         format="%(asctime)s [%(levelname)s] %(message)s",
         handlers=[logging.FileHandler(log_file_path, encoding="utf-8")],
+    )
+
+
+def flatten(source: Any) -> Any:
+    """
+    入れ子になったリストをフラット化する
+
+    Args:
+        source (List[Any]): フラット化したいリスト
+
+    Returns:
+        List[Any]: フラット化されたリスト
+    """
+    if isinstance(source, list):
+        for item in source:
+            yield from flatten(item)
+    elif isinstance(source, tuple):
+        for item in source:
+            yield from flatten(item)
+    else:
+        yield source
+
+
+def traceback_str(exception: Exception) -> str:
+    """
+    excetpion からトレースバック文字列を生成する
+    """
+    return "".join(
+        traceback.format_exception(type(exception), exception, exception.__traceback__)
     )

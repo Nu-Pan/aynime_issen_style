@@ -18,7 +18,8 @@ from gui.frames.animation_capture_frame import AnimationCaptureFrame
 from gui.frames.version_frame import VersionFrame
 
 # local
-from aynime_issen_style_model import CaptureMode, AynimeIssenStyleModel
+from gui.model.aynime_issen_style import AynimeIssenStyleModel
+from gui.model.capture import CaptureMode
 
 
 class AynimeIssenStyleApp(ctk.CTk, TkinterDnD.DnDWrapper):
@@ -55,7 +56,7 @@ class AynimeIssenStyleApp(ctk.CTk, TkinterDnD.DnDWrapper):
 
         # Model-View でいうところのモデル
         self.model = AynimeIssenStyleModel()
-        self.model.change_capture_mode(CaptureMode.DXCAM)
+        self.model.capture.change_capture_mode(CaptureMode.DXCAM)
 
         # タブビューを追加
         self.tabview = ctk.CTkTabview(self)
@@ -73,7 +74,7 @@ class AynimeIssenStyleApp(ctk.CTk, TkinterDnD.DnDWrapper):
         )
         self.still_capture_frame.pack(fill="both", expand=True)
 
-        # アニメキャプチャタブを追加
+        # # アニメキャプチャタブを追加
         self.tabview.add("gif")
         self.animation_capture_frame = AnimationCaptureFrame(
             self.tabview.tab("gif"), self.model
