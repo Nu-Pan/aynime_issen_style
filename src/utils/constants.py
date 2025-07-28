@@ -29,8 +29,5 @@ VERSION_FILE_PATH = Path("src\\utils\\version_constants.py")
 NIME_DIR_PATH = Path.cwd() / "nime"
 RAW_DIR_PATH = Path.cwd() / "raw"
 
-# デフォルトのフレームレート
-DEFAULT_FRAME_RATE = 15
-
 # サムネイルの高さ方向のサイズ
 THUMBNAIL_HEIGHT = 120

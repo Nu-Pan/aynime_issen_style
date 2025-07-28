@@ -121,7 +121,7 @@ class AnimationLabel(ctk.CTkLabel):
             raise TypeError(f"Invalid Type {self._frame_index}")
 
         # 次の更新処理をキック
-        self.after(1000 // self._model.video.frame_rate, self._next_frame_handler)
+        self.after(self._model.video.duration_in_msec, self._next_frame_handler)
 
     def _on_resize(self, _):
         """

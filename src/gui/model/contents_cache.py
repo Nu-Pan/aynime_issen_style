@@ -23,8 +23,14 @@ from enum import Enum
 from PIL import Image, ImageDraw, ImageFont, ImageEnhance, ImageOps
 
 # utils
-from utils.image import AspectRatioPattern, ResizeDesc, ResizeMode, AISImage
-from utils.constants import NIME_DIR_PATH, RAW_DIR_PATH, DEFAULT_FRAME_RATE
+from utils.image import (
+    AspectRatioPattern,
+    ResizeDesc,
+    ResizeMode,
+    AISImage,
+    GIF_DURATION_MAP,
+)
+from utils.constants import NIME_DIR_PATH, RAW_DIR_PATH
 
 
 _TIMESTAMP_FORMAT = "%Y-%m-%d_%H-%M-%S"
@@ -540,8 +546,8 @@ class VideoModel:
         #   フレーム個別の情報は self._frame で管理する
         self._global_model = ImageModel()
         self._frames: List[ImageModel] = []
-        self._frame_rate = DEFAULT_FRAME_RATE
-        self._frame_rate_change_handlers: List[NotifyHandler] = []
+        self._duration_in_msec = GIF_DURATION_MAP.default_entry.gif_duration_in_msec
+        self._duration_change_handlers: List[NotifyHandler] = []
 
     def set_enable(self, frame_index: int, enable: bool) -> Self:
         """
@@ -739,22 +745,22 @@ class VideoModel:
         """
         return self._frames[frame_index].get_image(layer)
 
-    def set_frame_rate(self, frame_rate: int) -> Self:
+    def set_duration_in_msec(self, duration_in_msec: int) -> Self:
         """
         再生フレームレートを設定する
         """
-        if self._frame_rate != frame_rate:
-            self._frame_rate = frame_rate
-            for handler in self._frame_rate_change_handlers:
+        if self._duration_in_msec != duration_in_msec:
+            self._duration_in_msec = duration_in_msec
+            for handler in self._duration_change_handlers:
                 handler()
         return self
 
     @property
-    def frame_rate(self) -> int:
+    def duration_in_msec(self) -> int:
         """
         再生フレームレート
         """
-        return self._frame_rate
+        return self._duration_in_msec
 
     def register_notify_handler(self, layer: ImageLayer, handler: NotifyHandler):
         """
@@ -763,11 +769,11 @@ class VideoModel:
         """
         self._global_model.register_notify_handler(layer, handler)
 
-    def register_frame_rate_change_handler(self, handler: NotifyHandler):
+    def register_furation_change_handler(self, handler: NotifyHandler):
         """
         フレームレート変更ハンドラーを登録する
         """
-        self._frame_rate_change_handlers.append(handler)
+        self._duration_change_handlers.append(handler)
 
 
 class PlaybackMode(Enum):
@@ -941,7 +947,7 @@ def save_content_model(
             str(gif_file_path),
             save_all=True,
             append_images=nime_frames[1:],
-            duration=1000 // model.frame_rate,
+            duration=model.duration_in_msec,
             loop=0,
             disposal=2,
             optimize=False,
@@ -955,7 +961,8 @@ def save_content_model(
 
 
 def load_content_model(
-    file_path: Path, default_framerate: int = DEFAULT_FRAME_RATE
+    file_path: Path,
+    default_duration_in_msec: int = GIF_DURATION_MAP[-1].gif_duration_in_msec,
 ) -> Union[ImageModel, VideoModel]:
     """
     file_path から画像を読み込む。
@@ -1013,9 +1020,6 @@ def load_content_model(
     else:
         time_stamp = current_time_stamp()
 
-    # デフォルトのフレーム間隔（ミリ秒）を解決
-    default_duration_in_msec = round(1000 / default_framerate)
-
     # 画像・動画を読み込む
     if actual_file_path.suffix.lower() in IMAGE_EXTENSIONS:
         # 画像ファイルの場合はそのまま読み込む
@@ -1037,8 +1041,8 @@ def load_content_model(
                     img.seek(img.tell() + 1)
             except EOFError:
                 pass
-        avg_delay = sum(delays) / len(delays)
-        video_model.set_frame_rate(int(1000 / avg_delay))
+        avg_delay = round(sum(delays) / len(delays))
+        video_model.set_duration_in_msec(avg_delay)
         return video_model
     elif actual_file_path.suffix.lower() in RAW_ZIP_EXTENSIONS:
         # ZIP ファイルの場合、中身を連番静止画として読み込む
@@ -1048,7 +1052,7 @@ def load_content_model(
 
         # 対応する gif ファイルからフレームレートをロード
         if gif_file_path is None:
-            frame_rate = default_framerate
+            avg_delay = default_duration_in_msec
         elif isinstance(gif_file_path, Path):
             delays = []
             with Image.open(gif_file_path) as img:
@@ -1060,13 +1064,14 @@ def load_content_model(
                         img.seek(img.tell() + 1)
                 except EOFError:
                     pass
-            avg_delay = sum(delays) / len(delays)
-            frame_rate = int(1000 / avg_delay)
+            avg_delay = round(sum(delays) / len(delays))
         else:
             raise TypeError(f"Invalid type {type(gif_file_path)}")
 
         # ビデオモデルを構築
-        video_model = VideoModel().set_time_stamp(time_stamp).set_frame_rate(frame_rate)
+        video_model = (
+            VideoModel().set_time_stamp(time_stamp).set_duration_in_msec(avg_delay)
+        )
         with ZipFile(actual_file_path, "r") as zip_file:
             file_list = zip_file.namelist()
             for file_name in file_list:
