@@ -6,26 +6,21 @@ from typing import (
     Callable,
     Generator,
     Self,
-    TypeVar,
-    Generic,
     Any,
     Tuple,
-    Type,
     cast,
-    Dict,
     Iterable,
 )
 from pathlib import Path
 from datetime import datetime
-from zipfile import ZipFile
+from zipfile import ZipFile, ZIP_STORED
 from io import BytesIO
-from statistics import mode
 import re
 from abc import ABC, abstractmethod
 from enum import Enum
 
 # PIL
-from PIL import Image, ImageDraw, ImageFont, ImageEnhance
+from PIL import Image, ImageDraw, ImageFont, ImageEnhance, ImageOps
 
 # utils
 from utils.image import AspectRatioPattern, ResizeDesc, ResizeMode, AISImage
@@ -856,27 +851,79 @@ def save_content_model(
         # NOTE
         #   raw フレームは enable かどうかを問わずに保存する。
         # NOTE
-        #
+        #   ここがかなり重たいので最適化を入れている
+        #   特に zip 圧縮が重いので ZIP_STORED にするのが大事
+        #   png 圧縮率は大した影響はない
         zip_file_path = RAW_DIR_PATH / (model.time_stamp + ".zip")
-        with ZipFile(zip_file_path, "w") as zip_file:
+        with ZipFile(zip_file_path, "w", compression=ZIP_STORED) as zip_file:
             for idx, img in enumerate(model.iter_frames(ImageLayer.RAW, False)):
                 # 無効なフレームはスキップ
                 if not isinstance(img, AISImage):
                     continue
                 # png ファイルメモリに書き出し
                 buf = BytesIO()
-                img.pil_image.save(buf, format="PNG", optimize=True)
-                buf.seek(0)
+                img.pil_image.save(buf, format="PNG", optimize=False, compress_level=6)
                 # png メモリイメージを zip ファイルに書き出し
                 enable_suffix = "e" if model.get_enable(idx) else "d"
                 png_file_name = f"{model.time_stamp}_{idx:03d}_{enable_suffix}.png"
-                zip_file.writestr(png_file_name, buf.read())
+                zip_file.writestr(png_file_name, buf.getvalue())
 
-        # nime ディレクトリに gif アニメーションを保存
-        gif_file_path = NIME_DIR_PATH / (model.time_stamp + ".gif")
+        # NIME フレームを展開
         nime_frames = [
-            f for f in model.iter_frames(ImageLayer.NIME) if isinstance(f, AISImage)
+            f.pil_image
+            for f in model.iter_frames(ImageLayer.NIME)
+            if isinstance(f, AISImage)
         ]
+
+        # フレームの横幅を解決
+        frame_width = {f.width for f in nime_frames}
+        if len(frame_width) == 1:
+            frame_width = frame_width.pop()
+        else:
+            raise ValueError("Multiple frame width contaminated.")
+
+        # フレームの高さを解決
+        frame_height = {f.height for f in nime_frames}
+        if len(frame_height) == 1:
+            frame_height = frame_height.pop()
+        else:
+            raise ValueError("Multiple frame height contaminated.")
+
+        # すべての NIME フレームを１つの atlas 画像に結合
+        nime_atlas = Image.new(
+            "RGB", (frame_width, frame_height * len(nime_frames)), color=None
+        )
+        for frame_index, nime_frame in enumerate(nime_frames):
+            nime_atlas.paste(nime_frame, (0, frame_index * frame_height))
+
+        # atlas 画像を 256 色パレット化
+        # NOTE
+        #   ちらつき対策として 6bit 量子化を先にやる
+        #   メディアンフィルタは輪郭線がちらつく原因になるので却下
+        #   FASTOCTREE はフリッカーが出やすい傾向があったので却下
+        #   kmeans は品質と速度の兼ね合いで 2 にした
+        nime_atlas = ImageOps.posterize(nime_atlas, bits=6)
+        nime_atlas = nime_atlas.quantize(
+            colors=256, method=Image.Quantize.MEDIANCUT, kmeans=2
+        )
+        nime_atlas = nime_atlas.convert("P", dither=Image.Dither.NONE, colors=256)
+        atlas_palette = nime_atlas.getpalette()
+        if atlas_palette is None:
+            raise TypeError("Failed to getpalette")
+
+        # atlas から 256 色パレット化された NIME 画像を切り出す
+        for frame_index in range(len(nime_frames)):
+            nime_frames[frame_index] = nime_atlas.crop(
+                (
+                    0,
+                    frame_index * frame_height,
+                    frame_width,
+                    (frame_index + 1) * frame_height,
+                )
+            )
+            nime_frames[frame_index].putpalette(atlas_palette)
+
+        # 再生モードを反映
         match playback_mode:
             case PlaybackMode.FORWARD:
                 pass
@@ -887,14 +934,17 @@ def save_content_model(
                     nime_frames = nime_frames + [f for f in reversed(nime_frames)][1:-1]
             case _:
                 raise RuntimeError()
-        nime_frames[0].pil_image.save(
+
+        # nime ディレクトリに gif ファイルを保存
+        gif_file_path = NIME_DIR_PATH / (model.time_stamp + ".gif")
+        nime_frames[0].save(
             str(gif_file_path),
             save_all=True,
-            append_images=[f.pil_image for f in nime_frames[1:]],
+            append_images=nime_frames[1:],
             duration=1000 // model.frame_rate,
             loop=0,
             disposal=2,
-            optimize=True,
+            optimize=False,
         )
 
         # 正常終了
