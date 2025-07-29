@@ -549,15 +549,23 @@ class VideoModel:
         self._duration_in_msec = GIF_DURATION_MAP.default_entry.gif_duration_in_msec
         self._duration_change_handlers: List[NotifyHandler] = []
 
-    def set_enable(self, frame_index: int, enable: bool) -> Self:
+    def set_enable(self, frame_index: Optional[int], enable: bool) -> Self:
         """
         指定フレームの有効・無効を設定する
         """
-        # フレームに有効・無効を反映
-        frame = self._frames[frame_index]
-        does_change = frame.enable != enable
-        if does_change:
-            frame.set_enable(enable)
+        # 対象フレーム情報をリストで統一
+        if frame_index is None:
+            frame_indices = [i for i in range(len(self._frames))]
+        elif isinstance(frame_index, int):
+            frame_indices = [frame_index]
+
+        # 各フレームに有効・無効を反映
+        does_change = False
+        for frame_index in frame_indices:
+            frame = self._frames[frame_index]
+            if frame.enable != enable:
+                does_change = True
+                frame.set_enable(enable)
 
         # 全体通知を呼び出す
         # NOTE

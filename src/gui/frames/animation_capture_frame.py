@@ -209,14 +209,14 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
         )
 
         # キャプチャ操作フレーム
-        self._capture_ctrl_frame = ctk.CTkFrame(
+        self._record_ctrl_frame = ctk.CTkFrame(
             self._input_kind_frame, width=0, height=0
         )
-        self._capture_ctrl_frame.grid(
+        self._record_ctrl_frame.grid(
             row=1, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
         )
-        self._capture_ctrl_frame.rowconfigure(0, weight=1)
-        self._capture_ctrl_frame.columnconfigure(0, weight=1)
+        self._record_ctrl_frame.rowconfigure(0, weight=1)
+        self._record_ctrl_frame.columnconfigure(0, weight=1)
 
         # レコード秒数スライダー
         # NOTE
@@ -224,7 +224,7 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
         MIN_RECORD_LENGTH = 5
         MAX_RECORD_LENGTH = 30
         self._record_length_slider = ctk.CTkSlider(
-            self._capture_ctrl_frame,
+            self._record_ctrl_frame,
             from_=MIN_RECORD_LENGTH,
             to=MAX_RECORD_LENGTH,
             number_of_steps=MAX_RECORD_LENGTH - MIN_RECORD_LENGTH,
@@ -236,7 +236,7 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
 
         # レコード秒数ラベル
         self._record_length_label = ctk.CTkLabel(
-            self._capture_ctrl_frame, text=f"--.0 SEC", font=default_font, width=80
+            self._record_ctrl_frame, text=f"--.0 SEC", font=default_font, width=80
         )
         self._record_length_label.grid(
             row=0, column=1, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
@@ -248,7 +248,7 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
 
         # レコードボタン
         self._record_button = ctk.CTkButton(
-            self._capture_ctrl_frame,
+            self._record_ctrl_frame,
             text="REC",
             width=80,
             command=self._on_record_button_clicked,
@@ -257,24 +257,15 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
             row=0, column=2, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
         )
 
-        # フレームリスト編集フレーム
-        self._edit_ctrl_frame = ctk.CTkFrame(self._input_kind_frame, width=0, height=0)
-        self._edit_ctrl_frame.grid(
+        # 重複除去フレーム
+        self._disable_dupe_frame = ctk.CTkFrame(
+            self._input_kind_frame, width=0, height=0
+        )
+        self._disable_dupe_frame.grid(
             row=2, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
         )
-        self._edit_ctrl_frame.rowconfigure(0, weight=1)
-        self._edit_ctrl_frame.columnconfigure(1, weight=1)
-
-        # 全削除ボタン
-        self._wipe_button = ctk.CTkButton(
-            self._edit_ctrl_frame,
-            text="REMOVE ALL",
-            width=80,
-            command=self._on_wipe_button_clicked,
-        )
-        self._wipe_button.grid(
-            row=0, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
-        )
+        self._disable_dupe_frame.rowconfigure(0, weight=1)
+        self._disable_dupe_frame.columnconfigure(0, weight=1)
 
         # 重複しきい値スライダー
         # NOTE
@@ -282,22 +273,22 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
         MIN_DUPE_THRESHOLD = 0
         MAX_DUPE_THRESHOLD = 99
         self._dupe_threshold_slider = ctk.CTkSlider(
-            self._edit_ctrl_frame,
+            self._disable_dupe_frame,
             from_=MIN_DUPE_THRESHOLD,
             to=MAX_DUPE_THRESHOLD,
             number_of_steps=MAX_DUPE_THRESHOLD - MIN_DUPE_THRESHOLD,
             command=self._on_dupe_threshold_slider_changed,
         )
         self._dupe_threshold_slider.grid(
-            row=0, column=1, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
+            row=0, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
         )
 
         # 重複しきい値ラベル
         self._duple_threshold_label = ctk.CTkLabel(
-            self._edit_ctrl_frame, text=f"--", font=default_font, width=80
+            self._disable_dupe_frame, text=f"--", font=default_font, width=80
         )
         self._duple_threshold_label.grid(
-            row=0, column=2, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
+            row=0, column=1, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
         )
 
         # 初期重複除去しきい値を設定
@@ -306,14 +297,45 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
 
         # 重複無効化ボタン
         self._disable_dupe_button = ctk.CTkButton(
-            self._edit_ctrl_frame,
+            self._disable_dupe_frame,
             text="DISABLE DUPE",
             width=80,
             command=self._on_disable_dup_button_clicked,
         )
         self._disable_dupe_button.grid(
-            row=0, column=3, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
+            row=0, column=2, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
         )
+
+        # フレームリスト操作フレーム
+        self._edit_ctrl_frame = ctk.CTkFrame(self._input_kind_frame, width=0, height=0)
+        self._edit_ctrl_frame.grid(
+            row=3, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
+        )
+        self._edit_ctrl_frame.rowconfigure(0, weight=1)
+
+        # 全有効化ボタン
+        self._disable_all_button = ctk.CTkButton(
+            self._edit_ctrl_frame,
+            text="ENABLE ALL",
+            width=80,
+            command=self._on_enable_all_button_clicked,
+        )
+        self._disable_all_button.grid(
+            row=0, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="ns"
+        )
+        self._edit_ctrl_frame.columnconfigure(0, weight=1)
+
+        # 全無効化ボタン
+        self._disable_all_button = ctk.CTkButton(
+            self._edit_ctrl_frame,
+            text="DISABLE ALL",
+            width=80,
+            command=self._on_disable_all_button_clicked,
+        )
+        self._disable_all_button.grid(
+            row=0, column=1, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="ns"
+        )
+        self._edit_ctrl_frame.columnconfigure(1, weight=1)
 
         # 無効化画像ワイプボタン
         self._remove_disable_button = ctk.CTkButton(
@@ -323,8 +345,21 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
             command=self._on_remove_disable_button_clicked,
         )
         self._remove_disable_button.grid(
-            row=0, column=4, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
+            row=0, column=2, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="ns"
         )
+        self._edit_ctrl_frame.columnconfigure(2, weight=1)
+
+        # 全削除ボタン
+        self._wipe_button = ctk.CTkButton(
+            self._edit_ctrl_frame,
+            text="REMOVE ALL",
+            width=80,
+            command=self._on_wipe_button_clicked,
+        )
+        self._wipe_button.grid(
+            row=0, column=3, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="ns"
+        )
+        self._edit_ctrl_frame.columnconfigure(3, weight=1)
 
         # ファイルドロップ関係
         self.drop_target_register(DND_FILES)
@@ -439,6 +474,18 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
         重複無効化ボタンハンドラ
         """
         raise NotImplementedError()
+
+    def _on_enable_all_button_clicked(self):
+        """
+        全フレーム有効化ボタンハンドラ
+        """
+        self._model.video.set_enable(None, True)
+
+    def _on_disable_all_button_clicked(self):
+        """
+        全フレーム無効化ボタンハンドラ
+        """
+        self._model.video.set_enable(None, False)
 
     def _on_remove_disable_button_clicked(self):
         """
