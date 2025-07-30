@@ -516,8 +516,8 @@ def calc_ssim(image_A: AISImage, image_B: AISImage) -> float:
         )
 
     # ndarray 化
-    np_image_A = np.array(image_A.grayscale)
-    np_image_B = np.array(image_B.grayscale)
+    np_image_A = np.array(image_A.grayscale.pil_image)
+    np_image_B = np.array(image_B.grayscale.pil_image)
 
     # ssim の計算処理を呼び出す
     ssim_result = ssim(np_image_A, np_image_B, full=True)

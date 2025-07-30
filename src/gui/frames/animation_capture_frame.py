@@ -10,11 +10,16 @@ from tkinterdnd2.TkinterDnD import DnDEvent
 
 # utils
 from utils.constants import WIDGET_PADDING, DEFAULT_FONT_NAME
-from utils.image import AspectRatioPattern, ResizeDesc, AISImage, GIF_DURATION_MAP
+from utils.image import (
+    AspectRatioPattern,
+    ResizeDesc,
+    AISImage,
+    GIF_DURATION_MAP,
+    calc_ssim,
+)
 from utils.constants import THUMBNAIL_HEIGHT
 from utils.windows import file_to_clipboard
 from utils.ctk import show_notify, show_error_dialog
-from utils.std import flatten
 
 # gui
 from gui.widgets.thumbnail_bar import ThumbnailBar
@@ -269,14 +274,16 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
 
         # 重複しきい値スライダー
         # NOTE
-        #   最終的にほしいのは [0.0, 1.0] だけど、スライダー上は [0, 100] を扱う
-        MIN_DUPE_THRESHOLD = 0
-        MAX_DUPE_THRESHOLD = 99
+        #   スライダー上で直接使うのは「種」となる値
+        #   この種値をデコードして実際のしきい値にする
+        #   デコードのアルゴリズムは _on_dupe_threshold_slider_changed を参照
+        MIN_DUPE_THRESHOLD_SEED = 1
+        MAX_DUPE_THRESHOLD_SEED = 59
         self._dupe_threshold_slider = ctk.CTkSlider(
             self._disable_dupe_frame,
-            from_=MIN_DUPE_THRESHOLD,
-            to=MAX_DUPE_THRESHOLD,
-            number_of_steps=MAX_DUPE_THRESHOLD - MIN_DUPE_THRESHOLD,
+            from_=MIN_DUPE_THRESHOLD_SEED,
+            to=MAX_DUPE_THRESHOLD_SEED,
+            number_of_steps=MAX_DUPE_THRESHOLD_SEED - MIN_DUPE_THRESHOLD_SEED,
             command=self._on_dupe_threshold_slider_changed,
         )
         self._dupe_threshold_slider.grid(
@@ -292,8 +299,8 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
         )
 
         # 初期重複除去しきい値を設定
-        self._dupe_threshold_slider.set(95)
-        self._on_dupe_threshold_slider_changed(95)
+        self._dupe_threshold_slider.set(29)
+        self._on_dupe_threshold_slider_changed(29)
 
         # 重複無効化ボタン
         self._disable_dupe_button = ctk.CTkButton(
@@ -466,14 +473,60 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
         Args:
             value (float): スライダー値
         """
-        self._dupe_threshold = value / 100
-        self._duple_threshold_label.configure(text=f"{self._dupe_threshold}")
+        # スライダー上の種値をしきい値にデコードする
+        # NOTE
+        #   しきい値の
+        # NOTE
+        #   １の位：しきい値の末尾の数値
+        #   １０の位：しきい値の末尾を何桁にするか？
+        #   e.g.) 01 --> 0.1
+        #   e.g.) 11 --> 0.91
+        #   e.g.) 21 --> 0.991
+        #   e.g.) 24 --> 0.994
+        value_int = round(value)
+        point = (value_int // 10) + 1
+        sub = 10 - value_int % 10
+        threshold = 1.0 - sub / (10**point)
+
+        # 各 UI にしきい値を設定
+        self._dupe_threshold = threshold
+        self._duple_threshold_label.configure(text=f"{threshold:.6f}")
 
     def _on_disable_dup_button_clicked(self):
         """
         重複無効化ボタンハンドラ
         """
-        raise NotImplementedError()
+        # 全フレームの有効・無効を解決
+        # NOTE
+        #   全有効を初期値として、類似が見つかったら後ろ側のフレームを無効化する
+        frame_enabled = [True for _ in range(self._model.video.num_total_frames)]
+        for idx_B in range(1, self._model.video.num_total_frames):
+            # 前方に向かって有効フレームを探索
+            idx_A = idx_B - 1
+            while idx_A > 0:
+                if frame_enabled[idx_A]:
+                    break
+                idx_A -= 1
+
+            # 画像を取得（A）
+            image_A = self._model.video.get_frame(ImageLayer.NIME, idx_A)
+            if image_A is None:
+                raise TypeError()
+
+            # 画像を取得（B）
+            image_B = self._model.video.get_frame(ImageLayer.NIME, idx_B)
+            if image_B is None:
+                raise TypeError()
+
+            # 類似度を元に有効・無効を判定
+            similarity = calc_ssim(image_A, image_B)
+            if similarity > self._dupe_threshold:
+                frame_enabled[idx_B] = False
+
+        # 解決した有効・無効をモデルに設定
+        self._model.video.set_enable_batch(
+            [(frame_index, enable) for frame_index, enable in enumerate(frame_enabled)]
+        )
 
     def _on_enable_all_button_clicked(self):
         """

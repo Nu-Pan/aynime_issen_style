@@ -549,19 +549,35 @@ class VideoModel:
         self._duration_in_msec = GIF_DURATION_MAP.default_entry.gif_duration_in_msec
         self._duration_change_handlers: List[NotifyHandler] = []
 
-    def set_enable(self, frame_index: Optional[int], enable: bool) -> Self:
+    def set_enable(
+        self, frame_indices: Union[int, List[int], None], enable: bool
+    ) -> Self:
         """
         指定フレームの有効・無効を設定する
         """
-        # 対象フレーム情報をリストで統一
-        if frame_index is None:
-            frame_indices = [i for i in range(len(self._frames))]
-        elif isinstance(frame_index, int):
-            frame_indices = [frame_index]
+        if frame_indices is None:
+            return self.set_enable_batch(
+                [(frame_index, enable) for frame_index in range(len(self._frames))]
+            )
+        elif isinstance(frame_indices, list):
+            return self.set_enable_batch(
+                [(frame_index, enable) for frame_index in frame_indices]
+            )
+        elif isinstance(frame_indices, int):
+            return self.set_enable_batch([(frame_indices, enable)])
+        else:
+            raise TypeError()
 
+    def set_enable_batch(self, entries: List[Tuple[int, bool]]) -> Self:
+        """
+        指定フレームの有効・無効を設定する
+        indices は (インデックス, 有効・無効) のリスト
+        """
         # 各フレームに有効・無効を反映
         does_change = False
-        for frame_index in frame_indices:
+        for entry in entries:
+            frame_index = entry[0]
+            enable = entry[1]
             frame = self._frames[frame_index]
             if frame.enable != enable:
                 does_change = True
