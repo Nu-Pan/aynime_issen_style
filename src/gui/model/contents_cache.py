@@ -31,6 +31,7 @@ from utils.image import (
     GIF_DURATION_MAP,
 )
 from utils.constants import NIME_DIR_PATH, RAW_DIR_PATH
+from utils.std import replace_multi
 
 
 _TIMESTAMP_FORMAT = "%Y-%m-%d_%H-%M-%S"
@@ -310,6 +311,7 @@ class ImageModel:
     def __init__(
         self,
         raw_image: Optional[AISImage] = None,
+        nime_name: Optional[str] = None,
         time_stamp: Optional[str] = None,
         enable: bool = True,
     ):
@@ -321,6 +323,7 @@ class ImageModel:
         """
         # 画像以外のステート
         self._enable = enable
+        self._nime_name = None
         self._time_stamp = None
 
         # 各画像メンバ
@@ -344,7 +347,7 @@ class ImageModel:
         }
 
         # 初期設定呼び出し
-        self.set_raw_image(raw_image, time_stamp)
+        self.set_raw_image(raw_image, nime_name, time_stamp)
 
     def set_enable(self, enable: bool) -> "ImageModel":
         """
@@ -365,6 +368,13 @@ class ImageModel:
         return self._enable
 
     @property
+    def nime_name(self) -> Optional[str]:
+        """
+        アニメ名を取得する
+        """
+        return self._nime_name
+
+    @property
     def time_stamp(self) -> Optional[str]:
         """
         この画像の撮影日時を表すタイムスタンプ
@@ -372,7 +382,10 @@ class ImageModel:
         return self._time_stamp
 
     def set_raw_image(
-        self, raw_image: Optional[AISImage], time_stamp: Optional[str]
+        self,
+        raw_image: Optional[AISImage],
+        nime_name: Optional[str],
+        time_stamp: Optional[str],
     ) -> Self:
         """
         RAW 画像を設定する。
@@ -389,11 +402,30 @@ class ImageModel:
         # RAW 画像に反映
         self._raw_image.set_source(raw_image)
 
+        # アニメ名を更新
+        self.set_nime_name(nime_name)
+
         # タイムスタンプを更新
         self.set_time_stamp(time_stamp)
 
         # 通知
         self._notify(ImageLayer.RAW)
+
+        # 正常終了
+        return self
+
+    def set_nime_name(self, nime_name: Optional[str]) -> Self:
+        """
+        アニメ名を設定する。
+        RAW 画像は更新されない。
+        """
+        # アニメ名更新
+        if isinstance(nime_name, str):
+            self._nime_name = nime_name
+        elif nime_name is None:
+            self._nime_name = nime_name
+        else:
+            raise TypeError(nime_name)
 
         # 正常終了
         return self
@@ -412,7 +444,7 @@ class ImageModel:
         elif time_stamp is None:
             self._time_stamp = current_time_stamp()
         else:
-            TypeError(time_stamp)
+            raise TypeError(time_stamp)
 
         # 正常終了
         return self
@@ -600,6 +632,20 @@ class VideoModel:
         """
         return self._frames[frame_index].enable
 
+    def set_nime_name(self, nime_name: Optional[str]) -> Self:
+        """
+        アニメ名を設定する。
+        """
+        self._global_model.set_nime_name(nime_name)
+        return self
+
+    @property
+    def nime_name(self) -> Optional[str]:
+        """
+        アニメ名
+        """
+        return self._global_model.time_stamp
+
     def set_time_stamp(self, time_stamp: Optional[str]) -> Self:
         """
         動画のタイムスタンプを設定する。
@@ -696,7 +742,9 @@ class VideoModel:
         #   よってグローバルモデルに新規生成した画像を渡して強制的に通知を発生させる
         if _does_notify:
             self._global_model.set_raw_image(
-                AISImage.empty("RGB", 8, 8), self._global_model.time_stamp
+                AISImage.empty("RGB", 8, 8),
+                self._global_model.nime_name,
+                self._global_model.time_stamp,
             )
 
         # 正常終了
@@ -711,7 +759,9 @@ class VideoModel:
 
         # 全体通知を呼び出す
         self._global_model.set_raw_image(
-            AISImage.empty("RGB", 8, 8), self._global_model.time_stamp
+            AISImage.empty("RGB", 8, 8),
+            self._global_model.nime_name,
+            self._global_model.time_stamp,
         )
 
         # 正常終了
@@ -726,7 +776,9 @@ class VideoModel:
 
         # 全体通知を呼び出す
         self._global_model.set_raw_image(
-            AISImage.empty("RGB", 8, 8), self._global_model.time_stamp
+            AISImage.empty("RGB", 8, 8),
+            self._global_model.nime_name,
+            self._global_model.time_stamp,
         )
 
         # 正常終了
@@ -800,6 +852,32 @@ class VideoModel:
         self._duration_change_handlers.append(handler)
 
 
+def encode_valid_nime_name(text: Optional[str]) -> str:
+    """
+    text を合法なアニメ名にエンコードする
+    """
+    if text is None:
+        # 名前なしの場合、 UNKNOWN に置き換え
+        return "UNKNOWN"
+    elif text.startswith("NIME "):
+        # 先頭が NIME の場合、適切に抽出されたアニメ名が続いているはずなのでそれを採用
+        # ただし空白文字は _ で置き換えて無害化
+        return text.replace("NIME ", "").replace(" ", "_")
+    else:
+        # それ以外の場合、 UNKNOWN を返す
+        return "UNKNOWN"
+
+
+def decode_valid_nime_name(text: str) -> Optional[str]:
+    """
+    text からアニメ名をデコードする
+    """
+    if text == "UNKNOWN":
+        return None
+    else:
+        return "NIME " + text.replace("_", " ")
+
+
 class PlaybackMode(Enum):
     FORWARD = "FORWARD"
     BACKWARD = "BACKWARD"
@@ -831,6 +909,8 @@ def save_content_model(
 
     # モデルを保存する
     if isinstance(model, ImageModel):
+        # ImageModel
+
         # raw 画像は必須
         raw_image = model.get_image(ImageLayer.RAW)
         if not isinstance(raw_image, AISImage):
@@ -841,11 +921,14 @@ def save_content_model(
         if not isinstance(nime_image, AISImage):
             raise ValueError("Invalid NIME Image")
 
+        # 合法なアニメ名を生成
+        valid_nime_name = encode_valid_nime_name(model.nime_name)
+
         # raw png ファイルの保存が必要か判定
         # NOTE
         #   スチル画像の場合は raw 画像に後から変更が入ることはありえない。
         #   よって、ローカルにファイルが無い場合だけ保存する。
-        png_file_path = RAW_DIR_PATH / (model.time_stamp + ".png")
+        png_file_path = RAW_DIR_PATH / f"{valid_nime_name}__{model.time_stamp}.png"
         save_png = not png_file_path.exists()
 
         # raw ディレクトリに png 画像を保存
@@ -861,7 +944,7 @@ def save_content_model(
         # nime ディレクトリに jpeg 画像を保存
         # NOTE
         #   NIME 画像はサイズ変更がかかっている可能性があるので、必ず保存処理を通す。
-        jpeg_file_path = NIME_DIR_PATH / (model.time_stamp + ".jpg")
+        jpeg_file_path = NIME_DIR_PATH / f"{valid_nime_name}__{model.time_stamp}.jpg"
         nime_image.pil_image.convert("RGB").save(
             str(jpeg_file_path),
             format="JPEG",
@@ -874,6 +957,11 @@ def save_content_model(
         return jpeg_file_path
 
     elif isinstance(model, VideoModel):
+        # VideoModel
+
+        # 合法なアニメ名を生成
+        valid_nime_name = encode_valid_nime_name(model.nime_name)
+
         # raw ディレクトリに zip ファイルを保存
         # NOTE
         #   raw zip ファイルの差分確認は処理的にも対応コスト的に重い。
@@ -884,7 +972,7 @@ def save_content_model(
         #   ここがかなり重たいので最適化を入れている
         #   特に zip 圧縮が重いので ZIP_STORED にするのが大事
         #   png 圧縮率は大した影響はない
-        zip_file_path = RAW_DIR_PATH / (model.time_stamp + ".zip")
+        zip_file_path = RAW_DIR_PATH / f"{valid_nime_name}__{model.time_stamp}.zip"
         with ZipFile(zip_file_path, "w", compression=ZIP_STORED) as zip_file:
             for idx, img in enumerate(model.iter_frames(ImageLayer.RAW, False)):
                 # 無効なフレームはスキップ
@@ -966,7 +1054,7 @@ def save_content_model(
                 raise RuntimeError()
 
         # nime ディレクトリに gif ファイルを保存
-        gif_file_path = NIME_DIR_PATH / (model.time_stamp + ".gif")
+        gif_file_path = NIME_DIR_PATH / f"{valid_nime_name}__{model.time_stamp}.gif"
         nime_frames[0].save(
             str(gif_file_path),
             save_all=True,
@@ -1038,17 +1126,28 @@ def load_content_model(
             f"Unsuported file type. Only extensions {IMAGE_EXTENSIONS + MOVIE_EXTENSIONS} are supported."
         )
 
-    # 使用するタイムスタンプを解決
-    if is_time_stamp(actual_file_path.stem):
-        time_stamp = actual_file_path.stem
+    # 使用するアニメ名・タイムスタンプを解決
+    file_stem_match = re.match("(.+)__(.+)", actual_file_path.stem)
+    if file_stem_match is None:
+        nime_name = None
+        if is_time_stamp(actual_file_path.stem):
+            time_stamp = actual_file_path.stem
+        else:
+            time_stamp = current_time_stamp()
     else:
-        time_stamp = current_time_stamp()
+        nime_name = decode_valid_nime_name(file_stem_match.group(1))
+        if is_time_stamp(file_stem_match.group(2)):
+            time_stamp = file_stem_match.group(2)
+        else:
+            time_stamp = current_time_stamp()
+
+    print(nime_name)
 
     # 画像・動画を読み込む
     if actual_file_path.suffix.lower() in IMAGE_EXTENSIONS:
         # 画像ファイルの場合はそのまま読み込む
         pil_image = Image.open(actual_file_path).convert("RGB")
-        image_model = ImageModel(AISImage(pil_image), time_stamp)
+        image_model = ImageModel(AISImage(pil_image), nime_name, time_stamp)
         return image_model
     elif actual_file_path.suffix.lower() in MOVIE_EXTENSIONS:
         # 動画ファイルの場合はフレームを全て読み込む
@@ -1059,7 +1158,7 @@ def load_content_model(
                 while True:
                     pil_image = img.copy().convert("RGB")
                     video_model.append_frames(
-                        [ImageModel(AISImage(pil_image), time_stamp)]
+                        [ImageModel(AISImage(pil_image), nime_name, time_stamp)]
                     )
                     delays.append(img.info.get("duration", default_duration_in_msec))
                     img.seek(img.tell() + 1)
@@ -1117,6 +1216,7 @@ def load_content_model(
                 video_model.append_frames(
                     ImageModel(
                         AISImage(Image.open(zip_file.open(file_name)).convert("RGB")),
+                        nime_name,
                         time_stamp,
                         enable,
                     )

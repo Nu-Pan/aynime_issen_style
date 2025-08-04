@@ -111,7 +111,9 @@ class StillCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
             return
 
         # モデルに反映
-        self.model.still.set_raw_image(pil_raw_capture_image, None)
+        self.model.still.set_raw_image(
+            pil_raw_capture_image, self.model.capture.current_window_name, None
+        )
 
         # エクスポート処理
         # NOTE
@@ -186,6 +188,7 @@ class StillCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
         #   先頭のフレームを代表して取り込む。
         paths = cast(Tuple[str], self.tk.splitlist(event_data))
         image = None
+        nime_name = None
         time_stamp = None
         exceptions: List[Exception] = []
         for file_path in paths:
@@ -193,10 +196,12 @@ class StillCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
                 load_result = load_content_model(Path(file_path))
                 if isinstance(load_result, ImageModel):
                     image = load_result.get_image(ImageLayer.RAW)
+                    nime_name = load_result.nime_name
                     time_stamp = load_result.time_stamp
                     break
                 elif isinstance(load_result, VideoModel):
                     image = load_result.get_frame(ImageLayer.RAW, 0)
+                    nime_name = load_result.nime_name
                     time_stamp = load_result.time_stamp
                     break
                 else:
@@ -211,4 +216,4 @@ class StillCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
             return
 
         # モデルに設定
-        self.model.still.set_raw_image(image, time_stamp)
+        self.model.still.set_raw_image(image, nime_name, time_stamp)

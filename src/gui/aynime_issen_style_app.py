@@ -19,7 +19,6 @@ from gui.frames.version_frame import VersionFrame
 
 # local
 from gui.model.aynime_issen_style import AynimeIssenStyleModel
-from gui.model.capture import CaptureMode
 
 
 class AynimeIssenStyleApp(ctk.CTk, TkinterDnD.DnDWrapper):
@@ -56,7 +55,6 @@ class AynimeIssenStyleApp(ctk.CTk, TkinterDnD.DnDWrapper):
 
         # Model-View でいうところのモデル
         self.model = AynimeIssenStyleModel()
-        self.model.capture.change_capture_mode(CaptureMode.DXCAM)
 
         # タブビューを追加
         self.tabview = ctk.CTkTabview(self)

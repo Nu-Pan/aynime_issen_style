@@ -573,7 +573,11 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
             self._model.video.set_time_stamp(None)
             self._model.video.append_frames(
                 [
-                    ImageModel(img, self._model.video.time_stamp)
+                    ImageModel(
+                        img,
+                        self._model.capture.current_window_name,
+                        self._model.video.time_stamp,
+                    )
                     for img in record_raw_images
                 ]
             )
