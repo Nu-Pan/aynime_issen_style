@@ -1,5 +1,5 @@
 # std
-from typing import Generator, List, Union, Optional
+from typing import Generator, List, Union, Optional, Any
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 import time
@@ -118,6 +118,15 @@ class MonitorIdentifier:
     adapter_index: int  # グラボのインデックス
     output_index: int  # モニターのインデックス
 
+    def __eq__(self, other: Any) -> bool:
+        if isinstance(other, MonitorIdentifier):
+            return (
+                self.adapter_index == other.adapter_index
+                and self.output_index == other.output_index
+            )
+        else:
+            return False
+
 
 class CaptureContextWindows(CaptureContext):
     """
@@ -181,7 +190,7 @@ class CaptureContextWindows(CaptureContext):
         # NOTE
         #   動画キャプチャ向けの連続呼び出し時に毎回再チェックが走ると重そうなので、
         #   前回キャプチャから時間が経ってる場合だけ再チェックを行う。
-        MONITOR_RESOLVE_PERIOD = 2.0
+        MONITOR_RESOLVE_PERIOD = 0.1
         current_time = time.time()
         if (
             self._monitor_id is None

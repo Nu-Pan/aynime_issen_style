@@ -1141,8 +1141,6 @@ def load_content_model(
         else:
             time_stamp = current_time_stamp()
 
-    print(nime_name)
-
     # 画像・動画を読み込む
     if actual_file_path.suffix.lower() in IMAGE_EXTENSIONS:
         # 画像ファイルの場合はそのまま読み込む
