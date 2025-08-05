@@ -7,7 +7,7 @@ from tkinter import Event
 import customtkinter as ctk
 
 # utils
-from utils.constants import WIDGET_PADDING, DEFAULT_FONT_NAME
+from utils.constants import WIDGET_PADDING, DEFAULT_FONT_FAMILY
 from utils.ctk import configure_presence
 from utils.image import AISImage
 
@@ -36,7 +36,7 @@ class SentinelItem(ctk.CTkFrame):
         super().__init__(master)
 
         # フォントを生成
-        default_font = ctk.CTkFont(DEFAULT_FONT_NAME)
+        default_font = ctk.CTkFont(DEFAULT_FONT_FAMILY)
 
         # 引数を保存
         self._model = model
@@ -94,7 +94,7 @@ class ThumbnailItem(ctk.CTkFrame):
         super().__init__(master)
 
         # フォントを生成
-        default_font = ctk.CTkFont(DEFAULT_FONT_NAME)
+        default_font = ctk.CTkFont(DEFAULT_FONT_FAMILY)
 
         # 現在表示している画像
         # NOTE

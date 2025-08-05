@@ -9,7 +9,7 @@ from CTkListbox import CTkListbox
 
 # utils
 from utils.capture_context import WindowHandle
-from utils.constants import WIDGET_PADDING, WINDOW_MIN_WIDTH, DEFAULT_FONT_NAME
+from utils.constants import WIDGET_PADDING, WINDOW_MIN_WIDTH, DEFAULT_FONT_FAMILY
 
 # gui
 from gui.widgets.still_label import StillLabel
@@ -44,7 +44,7 @@ class WindowSelectionFrame(ctk.CTkFrame):
         super().__init__(master, **kwargs)
 
         # フォントを生成
-        default_font = ctk.CTkFont(DEFAULT_FONT_NAME)
+        default_font = ctk.CTkFont(DEFAULT_FONT_FAMILY)
 
         # モデル
         self.model = model

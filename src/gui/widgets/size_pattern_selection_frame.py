@@ -5,7 +5,7 @@ from typing import Callable, List, Tuple, Sequence
 import customtkinter as ctk
 
 # utils
-from utils.constants import WIDGET_PADDING, DEFAULT_FONT_NAME
+from utils.constants import WIDGET_PADDING, DEFAULT_FONT_FAMILY
 from utils.image import AspectRatioPattern, ResizeDesc
 
 
@@ -38,7 +38,7 @@ class SizePatternSlectionFrame(ctk.CTkFrame):
         super().__init__(master, **kwargs)
 
         # フォントを生成
-        default_font = ctk.CTkFont(DEFAULT_FONT_NAME)
+        default_font = ctk.CTkFont(DEFAULT_FONT_FAMILY)
 
         # ハンドラを保存
         self._aux_on_radio_change = aux_on_radio_change

@@ -20,7 +20,7 @@ from abc import ABC, abstractmethod
 from enum import Enum
 
 # PIL
-from PIL import Image, ImageDraw, ImageFont, ImageEnhance, ImageOps
+from PIL import Image, ImageDraw, ImageFont, ImageEnhance, ImageOps, ImageStat
 
 # utils
 from utils.image import (
@@ -30,7 +30,7 @@ from utils.image import (
     AISImage,
     GIF_DURATION_MAP,
 )
-from utils.constants import NIME_DIR_PATH, RAW_DIR_PATH
+from utils.constants import NIME_DIR_PATH, RAW_DIR_PATH, DEFAULT_FONT_PATH
 from utils.std import replace_multi
 
 
@@ -266,9 +266,9 @@ def get_text_bbox_size(
 
 def make_disabled_image(
     source_image: AISImage, text="DISABLED", darkness=0.35
-) -> "AISImage":
+) -> AISImage:
     """
-    self を元に「無効っぽい見た目の画像」を生成する
+    source_image を元に「無効っぽい見た目の画像」を生成する
 
     Args:
         text (str, optional): オーバーレイする文字列
@@ -302,6 +302,80 @@ def make_disabled_image(
     return AISImage(dark_image.convert("RGB"))
 
 
+def overlay_nime_name(source_image: AISImage, nime_name: Optional[str]) -> AISImage:
+    """
+    source_image に nime_name をオーバーレイする。
+    """
+    # 名前が無い場合は何もしない
+    if nime_name is None:
+        return AISImage(source_image.pil_image.copy())
+
+    # <NIME> タグを削除
+    nime_name = nime_name.replace("<NIME>", "")
+
+    # フォントサイズを決定
+    # NOTE
+    #   フォントサイズが一定を切る場合は文字が潰れちゃうのでフォント描画なし
+    FONT_SCALE_DEN = 24
+    MIN_FONT_SIZE = 10
+    font_size = source_image.height // FONT_SCALE_DEN
+    if font_size < MIN_FONT_SIZE:
+        return AISImage(source_image.pil_image.copy())
+
+    # オーバーレイ画像
+    overlay_image = Image.new("RGBA", source_image.pil_image.size, (0, 0, 0, 0))
+    draw = ImageDraw.Draw(overlay_image)
+
+    # 画像内に収まるようにテキストの中央を切り詰める
+    # NOTE
+    #   末尾には話数が入っている可能性があるので、そこは避ける。
+    nime_name_first = nime_name[: len(nime_name) // 2]
+    nime_name_second = nime_name[len(nime_name) // 2 :]
+    actual_nime_name = nime_name
+    while True:
+        font = ImageFont.truetype(DEFAULT_FONT_PATH, size=font_size)
+        text_width, text_height = get_text_bbox_size(draw, actual_nime_name, font)
+        if text_width <= source_image.width:
+            break
+        else:
+            nime_name_first = nime_name_first[:-1]
+            nime_name_second = nime_name_second[1:]
+            actual_nime_name = nime_name_first + "…" + nime_name_second
+
+    # テキスト背景の塗りつぶし強度を解決
+    text_x = 0
+    text_y = source_image.height - text_height
+    text_region = source_image.pil_image.crop(
+        (text_x, text_y, text_x + text_width, text_y + text_height)
+    )
+    source_text_region_brightness = sum(ImageStat.Stat(text_region).mean[:3]) / 3
+    text_bg_strength = min(1.0, source_text_region_brightness / 255)
+    text_bg_alpha = round(159 * text_bg_strength)
+
+    # テキスト背景描画
+    draw.rectangle(
+        (text_x, text_y, text_x + text_width, text_y + text_height),
+        fill=(0, 0, 0, text_bg_alpha),
+    )
+
+    # テキスト描画
+    draw.text(
+        (text_x, text_y),
+        actual_nime_name,
+        font=font,
+        fill=(255, 255, 255),
+        anchor="lt",
+    )
+
+    # 元画像とテキストをオーバーレイ
+    result_pil_image = Image.alpha_composite(
+        source_image.pil_image.convert("RGBA"), overlay_image
+    ).convert("RGB")
+
+    # 正常終了
+    return AISImage(result_pil_image)
+
+
 class ImageModel:
     """
     画像を表すクラス
@@ -328,7 +402,9 @@ class ImageModel:
 
         # 各画像メンバ
         self._raw_image = CachedSourceImage()
-        self._nime_image = CachedScalableImage(self._raw_image, ResizeMode.COVER)
+        self._nime_image = CachedScalableImage(
+            self._raw_image, ResizeMode.COVER, aux_process=self._aux_process_nime
+        )
         self._preview_pil_image = CachedScalableImage(
             self._nime_image, ResizeMode.CONTAIN
         )
@@ -560,6 +636,12 @@ class ImageModel:
 
         # 正常終了
         return self
+
+    def _aux_process_nime(self, source_image: AISImage) -> AISImage:
+        """
+        NIME 用の外部プロセス
+        """
+        return overlay_nime_name(source_image, self._nime_name)
 
 
 class VideoModel:
@@ -859,10 +941,10 @@ def encode_valid_nime_name(text: Optional[str]) -> str:
     if text is None:
         # 名前なしの場合、 UNKNOWN に置き換え
         return "UNKNOWN"
-    elif text.startswith("NIME "):
+    elif text.startswith("<NIME>"):
         # 先頭が NIME の場合、適切に抽出されたアニメ名が続いているはずなのでそれを採用
         # ただし空白文字は _ で置き換えて無害化
-        return text.replace("NIME ", "").replace(" ", "_")
+        return text.replace("<NIME>", "").replace(" ", "_")
     else:
         # それ以外の場合、 UNKNOWN を返す
         return "UNKNOWN"
@@ -875,7 +957,7 @@ def decode_valid_nime_name(text: str) -> Optional[str]:
     if text == "UNKNOWN":
         return None
     else:
-        return "NIME " + text.replace("_", " ")
+        return "<NIME>" + text.replace("_", " ")
 
 
 class PlaybackMode(Enum):

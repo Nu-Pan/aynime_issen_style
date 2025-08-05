@@ -10,7 +10,7 @@ import tkinter.messagebox as mb
 from tkinter import Event
 
 # utils
-from utils.constants import WIDGET_PADDING, DEFAULT_FONT_NAME
+from utils.constants import WIDGET_PADDING, DEFAULT_FONT_FAMILY
 from utils.image import AspectRatioPattern, ResizeDesc, AISImage
 from gui.model.contents_cache import (
     ImageModel,

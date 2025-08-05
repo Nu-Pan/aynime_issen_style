@@ -9,7 +9,7 @@ from tkinterdnd2 import TkinterDnD, DND_FILES
 from tkinterdnd2.TkinterDnD import DnDEvent
 
 # utils
-from utils.constants import WIDGET_PADDING, DEFAULT_FONT_NAME
+from utils.constants import WIDGET_PADDING, DEFAULT_FONT_FAMILY
 from utils.image import (
     AspectRatioPattern,
     ResizeDesc,
@@ -59,7 +59,7 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
         self._model = model
 
         # フォントを生成
-        default_font = ctk.CTkFont(DEFAULT_FONT_NAME)
+        default_font = ctk.CTkFont(DEFAULT_FONT_FAMILY)
 
         # レイアウト設定
         self.rowconfigure(0, weight=1)

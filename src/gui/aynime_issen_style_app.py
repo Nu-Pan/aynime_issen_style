@@ -7,7 +7,7 @@ from utils.constants import (
     APP_NAME_JP,
     WINDOW_MIN_WIDTH,
     WINDOW_MIN_HEIGHT,
-    DEFAULT_FONT_NAME,
+    DEFAULT_FONT_FAMILY,
 )
 from utils.pyinstaller import resource_path
 
@@ -38,7 +38,7 @@ class AynimeIssenStyleApp(ctk.CTk, TkinterDnD.DnDWrapper):
         self.tk_dnd_version = TkinterDnD._require(self)
 
         # フォントを設定
-        default_font = ctk.CTkFont(DEFAULT_FONT_NAME)
+        default_font = ctk.CTkFont(DEFAULT_FONT_FAMILY)
         self.configure(font=default_font)
 
         # タイトルを設定

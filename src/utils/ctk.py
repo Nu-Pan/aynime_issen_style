@@ -11,7 +11,7 @@ from tkinter import Event
 import tkinter.messagebox as mb
 
 # utils
-from utils.constants import DEFAULT_FONT_NAME, WIDGET_PADDING, APP_NAME_JP
+from utils.constants import DEFAULT_FONT_FAMILY, WIDGET_PADDING, APP_NAME_JP
 from utils.std import traceback_str
 
 
@@ -55,7 +55,7 @@ def show_notify(
     """
     # フォントを生成
 
-    default_font = ctk.CTkFont(DEFAULT_FONT_NAME)
+    default_font = ctk.CTkFont(DEFAULT_FONT_FAMILY)
 
     # 通知ラベルを生成
     # NOTE

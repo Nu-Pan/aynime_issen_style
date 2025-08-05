@@ -17,7 +17,8 @@ WINDOW_MIN_WIDTH = 640
 WINDOW_MIN_HEIGHT = 640
 
 # 共通して使用するフォント
-DEFAULT_FONT_NAME = "Yu Gothic UI"
+DEFAULT_FONT_FAMILY = "Yu Gothic UI"
+DEFAULT_FONT_PATH = Path("C:\\Windows\\Fonts\\YuGothM.ttc")
 
 # バージョン情報ファイルのパス
 VERSION_FILE_PATH = Path("src\\utils\\version_constants.py")

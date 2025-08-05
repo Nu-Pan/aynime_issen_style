@@ -78,9 +78,11 @@ def get_nime_window_text(window_handle: WindowHandle) -> str:
     bc_pos = text.find("バンダイチャンネル")
     if text.endswith("dアニメストア"):
         # NOTE
-        #   区切り文字３文字は贅沢なので１文字に短縮
+        #   dアニメストアは「<アニメ名> - <話数> - <話タイトル>」形式。
+        #   <話タイトル> は冗長なので除外する。
+        #   区切り文字「 - 」は贅沢なので空白１文字に短縮。
         text = text.replace(" dアニメストア", "")
-        text = text.replace(" - ", " ")
+        text = " ".join(text.split(" - ")[:2])
     elif text.endswith("AnimeFesta"):
         # NOTE
         #   AnimeFest はアニメ名しか出てこないので、特別にすることも無い
@@ -106,7 +108,7 @@ def get_nime_window_text(window_handle: WindowHandle) -> str:
     text = re.sub(r" {2,}", " ", text)
 
     # 正常終了
-    return "NIME " + text
+    return "<NIME>" + text
 
 
 @dataclass
