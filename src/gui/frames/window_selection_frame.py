@@ -140,12 +140,30 @@ class WindowSelectionFrame(ctk.CTkFrame):
         try:
             self.reload_capture_target_list_button.configure(state=ctk.DISABLED)
             self.capture_target_list_box.delete("all")
-            for window_handle in self.model.capture.enumerate_windows():
+            raw_items = [
+                WindowListBoxItem(
+                    window_handle, self.model.capture.get_window_name(window_handle)
+                )
+                for window_handle in self.model.capture.enumerate_windows()
+            ]
+            nime_items = sorted(
+                [
+                    WindowListBoxItem(
+                        item.window_handle, item.window_name.replace("<NIME>", "")
+                    )
+                    for item in raw_items
+                    if "<NIME>" in item.window_name
+                ],
+                key=lambda item: item.window_name,
+            )
+            other_items = sorted(
+                [item for item in raw_items if "<NIME>" not in item.window_name],
+                key=lambda item: item.window_name,
+            )
+            for item in nime_items + other_items:
                 self.capture_target_list_box.insert(
                     ctk.END,
-                    WindowListBoxItem(
-                        window_handle, self.model.capture.get_window_name(window_handle)
-                    ),
+                    item,
                     False,
                 )
             self.capture_target_list_box.update()
