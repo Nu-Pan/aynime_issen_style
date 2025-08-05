@@ -184,6 +184,7 @@ class CaptureContextWindows(CaptureContext):
         return get_nime_window_text(window_handle)
 
     def capture(self) -> AISImage:
+
         # 対象ウィンドウが未指定ならエラー
         if self._window_handle is None:
             raise ValueError("Invalid Window not set")

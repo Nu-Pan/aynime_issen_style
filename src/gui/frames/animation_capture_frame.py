@@ -570,17 +570,18 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
         """
         # 所定の時間を経過してたら終了
         if time() > stop_time_in_sec:
-            self._model.video.set_time_stamp(None)
-            self._model.video.append_frames(
-                [
-                    ImageModel(
-                        img,
-                        self._model.capture.current_window_name,
-                        self._model.video.time_stamp,
-                    )
-                    for img in record_raw_images
-                ]
-            )
+            if len(record_raw_images) > 0:
+                self._model.video.set_time_stamp(None)
+                self._model.video.append_frames(
+                    [
+                        ImageModel(
+                            img,
+                            self._model.capture.current_window_name,
+                            self._model.video.time_stamp,
+                        )
+                        for img in record_raw_images
+                    ]
+                )
             return
 
         # キャプチャ
