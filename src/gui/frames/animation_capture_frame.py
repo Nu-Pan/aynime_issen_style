@@ -25,6 +25,7 @@ from utils.ctk import show_notify, show_error_dialog
 from gui.widgets.thumbnail_bar import ThumbnailBar
 from gui.widgets.animation_label import AnimationLabel
 from gui.widgets.size_pattern_selection_frame import SizePatternSlectionFrame
+from gui.widgets.ais_entry import AISEntry
 from gui.model.contents_cache import (
     ImageLayer,
     ImageModel,
@@ -83,6 +84,15 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
             row=0, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
         )
 
+        # アニメ名テキストボックス
+        self.nime_name_entry = AISEntry(
+            self._output_kind_frame, width=0, placeholder_text="Entry NIME Name Here"
+        )
+        self.nime_name_entry.grid(
+            row=1, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
+        )
+        self.nime_name_entry.register_handler(self.on_nime_name_entry_changed)
+
         # 解像度選択フレーム
         self._size_pattern_selection_frame = SizePatternSlectionFrame(
             self._output_kind_frame,
@@ -104,7 +114,7 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
             ],
         )
         self._size_pattern_selection_frame.grid(
-            row=1, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
+            row=2, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
         )
 
         # UI とモデルの解像度を揃える
@@ -121,7 +131,7 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
             self._output_kind_frame, width=0, height=0
         )
         self._playback_mode_frame.grid(
-            row=2, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
+            row=3, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
         )
         self._playback_mode_frame.rowconfigure(0, weight=1)
 
@@ -151,7 +161,7 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
             self._output_kind_frame, width=0, height=0
         )
         self._frame_rate_frame.grid(
-            row=3, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
+            row=4, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
         )
         self._frame_rate_frame.rowconfigure(0, weight=1)
         self._frame_rate_frame.columnconfigure(0, weight=1)
@@ -372,6 +382,15 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
         self.drop_target_register(DND_FILES)
         self.dnd_bind("<<Drop>>", self._on_drop_file)
 
+    def on_nime_name_entry_changed(self, text: str):
+        """
+        アニメ名テキストボックスが変更されたときに呼び出される
+        """
+        if text != "":
+            self._model.video.set_nime_name(text)
+        else:
+            self._model.video.set_nime_name(self._model.capture.current_window_name)
+
     def _on_resolution_changes(
         self, aspect_ratio: AspectRatioPattern, resolution: ResizeDesc.Pattern
     ):
@@ -571,6 +590,12 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
         # 所定の時間を経過してたら終了
         if time() > stop_time_in_sec:
             if len(record_raw_images) > 0:
+                if self.nime_name_entry.text != "":
+                    self._model.video.set_nime_name(self.nime_name_entry.text)
+                else:
+                    self._model.video.set_nime_name(
+                        self._model.capture.current_window_name
+                    )
                 self._model.video.set_time_stamp(None)
                 self._model.video.append_frames(
                     [
@@ -629,6 +654,7 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
         new_models = []
         new_time_stamp = None
         new_duration_in_msec = None
+        new_nime_name = None
         for path_str in paths:
             path = Path(path_str)
             try:
@@ -637,15 +663,22 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
                 if isinstance(new_model, VideoModel):
                     new_time_stamp = new_model.time_stamp
                     new_duration_in_msec = new_model.duration_in_msec
+                    new_nime_name = new_model.nime_name
             except Exception as e:
                 failed_names.append(path.name)
 
-        # モデルに反映
-        self._model.video.append_frames(new_models)
+        # ビデオモデルのメタ情報を更新
         if new_time_stamp is not None:
             self._model.video.set_time_stamp(new_time_stamp)
         if new_duration_in_msec is not None:
             self._model.video.set_duration_in_msec(new_duration_in_msec)
+        if self.nime_name_entry.text != "":
+            self._model.video.set_nime_name(self.nime_name_entry.text)
+        elif new_nime_name is not None:
+            self._model.video.set_nime_name(new_nime_name)
+
+        # フレームを追加
+        self._model.video.append_frames(new_models)
 
         # 問題が起きていればダイアログを出す
         if len(failed_names) > 0:

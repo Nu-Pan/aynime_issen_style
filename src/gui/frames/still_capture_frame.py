@@ -10,7 +10,7 @@ import tkinter.messagebox as mb
 from tkinter import Event
 
 # utils
-from utils.constants import WIDGET_PADDING, DEFAULT_FONT_FAMILY
+from utils.constants import WIDGET_PADDING
 from utils.image import AspectRatioPattern, ResizeDesc, AISImage
 from gui.model.contents_cache import (
     ImageModel,
@@ -19,7 +19,6 @@ from gui.model.contents_cache import (
     load_content_model,
 )
 from utils.windows import file_to_clipboard, register_global_hotkey_handler
-from utils.constants import APP_NAME_JP, NIME_DIR_PATH
 from utils.ctk import show_notify, show_error_dialog
 
 # gui
@@ -27,6 +26,7 @@ from gui.widgets.still_label import StillLabel
 from gui.widgets.size_pattern_selection_frame import (
     SizePatternSlectionFrame,
 )
+from gui.widgets.ais_entry import AISEntry
 from gui.model.contents_cache import ImageLayer
 
 # local
@@ -53,11 +53,11 @@ class StillCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
         self.model.still.register_notify_handler(ImageLayer.NIME, self.on_nime_changed)
 
         # レイアウト設定
-        self.rowconfigure(0, weight=1)
         self.columnconfigure(0, weight=1)
 
         # プレビューラベル兼キャプチャボタン
         self.preview_label = StillLabel(self, model.still, "Click Here or Ctrl+Alt+P")
+        self.rowconfigure(0, weight=1)
         self.preview_label.grid(
             row=0, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
         )
@@ -65,6 +65,14 @@ class StillCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
 
         # グローバルホットキーを登録
         register_global_hotkey_handler(self, self.on_preview_label_click, None)
+
+        # アニメ名テキストボックス
+        self.nime_name_entry = AISEntry(self, placeholder_text="Entry NIME Name Here")
+        self.rowconfigure(1, weight=0)
+        self.nime_name_entry.grid(
+            row=1, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
+        )
+        self.nime_name_entry.register_handler(self.on_nime_name_entry_changed)
 
         # 解像度選択フレーム
         self._size_pattern_selection_frame = SizePatternSlectionFrame(
@@ -85,8 +93,9 @@ class StillCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
                 ResizeDesc.Pattern.E_4K,
             ],
         )
+        self.rowconfigure(2, weight=0)
         self._size_pattern_selection_frame.grid(
-            row=1, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
+            row=2, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
         )
 
         # ファイルドロップ関係
@@ -110,16 +119,29 @@ class StillCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
             )
             return
 
+        # アニメ名を解決
+        if self.nime_name_entry.text != "":
+            actual_nime_name = self.nime_name_entry.text
+        else:
+            actual_nime_name = self.model.capture.current_window_name
+
         # モデルに反映
-        self.model.still.set_raw_image(
-            pil_raw_capture_image, self.model.capture.current_window_name, None
-        )
+        self.model.still.set_raw_image(pil_raw_capture_image, actual_nime_name, None)
 
         # エクスポート処理
         # NOTE
         #   リサイズ --> コールバック登録の順番なので、
         #   明示的にエクスポートを呼び出す必要がある。
         self.export_image()
+
+    def on_nime_name_entry_changed(self, text: str):
+        """
+        アニメ名テキストボックスが変更されたときに呼び出される
+        """
+        if text != "":
+            self.model.still.set_nime_name(text)
+        else:
+            self.model.still.set_nime_name(self.model.capture.current_window_name)
 
     def on_resolution_changes(
         self, aspect_ratio: AspectRatioPattern, resolution: ResizeDesc.Pattern
@@ -215,5 +237,11 @@ class StillCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
                 show_error_dialog("画像・動画の読み込みに失敗。", exceptions)
             return
 
+        # アニメ名を解決
+        if self.nime_name_entry.text != "":
+            actual_nime_name = self.nime_name_entry.text
+        else:
+            actual_nime_name = nime_name
+
         # モデルに設定
-        self.model.still.set_raw_image(image, nime_name, time_stamp)
+        self.model.still.set_raw_image(image, actual_nime_name, time_stamp)

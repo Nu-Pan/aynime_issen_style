@@ -495,13 +495,15 @@ class ImageModel:
         アニメ名を設定する。
         RAW 画像は更新されない。
         """
-        # アニメ名更新
-        if isinstance(nime_name, str):
-            self._nime_name = nime_name
-        elif nime_name is None:
-            self._nime_name = nime_name
-        else:
+        # 型チェック
+        if not isinstance(nime_name, str) and nime_name is not None:
             raise TypeError(nime_name)
+
+        # アニメ名更新・通知
+        if self._nime_name != nime_name:
+            self._nime_name = nime_name
+            self._nime_image.set_dirty()
+            self._notify(ImageLayer.NIME)
 
         # 正常終了
         return self
@@ -719,6 +721,8 @@ class VideoModel:
         アニメ名を設定する。
         """
         self._global_model.set_nime_name(nime_name)
+        for frame in self._frames:
+            frame.set_nime_name(nime_name)
         return self
 
     @property
@@ -798,6 +802,9 @@ class VideoModel:
 
             # タイムスタンプを統一
             new_obj.set_time_stamp(self._global_model.time_stamp)
+
+            # アニメ名を統一
+            new_obj.set_nime_name(self._global_model.nime_name)
 
             # フレームリストに挿入
             self._frames.append(new_obj)

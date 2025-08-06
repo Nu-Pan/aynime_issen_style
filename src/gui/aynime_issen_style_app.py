@@ -7,6 +7,8 @@ from utils.constants import (
     APP_NAME_JP,
     WINDOW_MIN_WIDTH,
     WINDOW_MIN_HEIGHT,
+    WINDOW_INIT_WIDTH,
+    WINDOW_INIT_HEIGHT,
     DEFAULT_FONT_FAMILY,
 )
 from utils.pyinstaller import resource_path
@@ -48,7 +50,7 @@ class AynimeIssenStyleApp(ctk.CTk, TkinterDnD.DnDWrapper):
         self.iconbitmap(resource_path("app.ico"))
 
         # 初期サイズを設定
-        self.geometry(f"{WINDOW_MIN_WIDTH}x{WINDOW_MIN_HEIGHT}")
+        self.geometry(f"{WINDOW_INIT_WIDTH}x{WINDOW_INIT_HEIGHT}")
 
         # 最小サイズを設定
         self.minsize(WINDOW_MIN_WIDTH, WINDOW_MIN_HEIGHT)

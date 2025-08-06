@@ -11,10 +11,15 @@ WIDGET_PADDING = 6
 
 # ウィンドウの最小サイズ
 # NOTE
-#   最小サイズであると同時に初期サイズでもある
-#   gif タブに事情を合わせて 1:1 になった
+#   16:9 をスチルキャプチャしたときにちょうど良いサイズ。
 WINDOW_MIN_WIDTH = 640
-WINDOW_MIN_HEIGHT = 640
+WINDOW_MIN_HEIGHT = 480
+
+# ウィンドウの初期サイズ
+# NOTE
+#   16:9 をビデオキャプチャしたときにちょうど良いサイズ。
+WINDOW_INIT_WIDTH = 640
+WINDOW_INIT_HEIGHT = 960
 
 # 共通して使用するフォント
 DEFAULT_FONT_FAMILY = "Yu Gothic UI"
