@@ -17,6 +17,7 @@ from gui.model.contents_cache import (
     VideoModel,
     save_content_model,
     load_content_model,
+    ImageModelEditSession,
 )
 from utils.windows import file_to_clipboard, register_global_hotkey_handler
 from utils.ctk import show_notify, show_error_dialog
@@ -126,22 +127,22 @@ class StillCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
             actual_nime_name = self.model.capture.current_window_name
 
         # モデルに反映
-        self.model.still.set_raw_image(pil_raw_capture_image, actual_nime_name, None)
-
-        # エクスポート処理
         # NOTE
-        #   リサイズ --> コールバック登録の順番なので、
-        #   明示的にエクスポートを呼び出す必要がある。
-        self.export_image()
+        #   通知の結果エクスポートも行われる
+        with ImageModelEditSession(self.model.still) as edit:
+            edit.set_raw_image(pil_raw_capture_image)
+            edit.set_nime_name(actual_nime_name)
+            edit.set_time_stamp(None)
 
     def on_nime_name_entry_changed(self, text: str):
         """
         アニメ名テキストボックスが変更されたときに呼び出される
         """
-        if text != "":
-            self.model.still.set_nime_name(text)
-        else:
-            self.model.still.set_nime_name(self.model.capture.current_window_name)
+        with ImageModelEditSession(self.model.still) as edit:
+            if text != "":
+                edit.set_nime_name(text)
+            else:
+                edit.set_nime_name(self.model.capture.current_window_name)
 
     def on_resolution_changes(
         self, aspect_ratio: AspectRatioPattern, resolution: ResizeDesc.Pattern
@@ -156,9 +157,10 @@ class StillCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
         # リサイズを適用
         # NOTE
         #   リサイズさえすればコールバック経由でエクスポートまで走るはず
-        self.model.still.set_size(
-            ImageLayer.NIME, ResizeDesc.from_pattern(aspect_ratio, resolution)
-        )
+        with ImageModelEditSession(self.model.still) as edit:
+            edit.set_size(
+                ImageLayer.NIME, ResizeDesc.from_pattern(aspect_ratio, resolution)
+            )
 
     def on_nime_changed(self):
         """
@@ -244,4 +246,7 @@ class StillCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
             actual_nime_name = nime_name
 
         # モデルに設定
-        self.model.still.set_raw_image(image, actual_nime_name, time_stamp)
+        with ImageModelEditSession(self.model.still) as edit:
+            edit.set_raw_image(image)
+            edit.set_nime_name(actual_nime_name)
+            edit.set_time_stamp(time_stamp)

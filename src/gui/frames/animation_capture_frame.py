@@ -33,6 +33,7 @@ from gui.model.contents_cache import (
     PlaybackMode,
     save_content_model,
     load_content_model,
+    VideoModelEditSession,
 )
 
 # local
@@ -118,13 +119,14 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
         )
 
         # UI とモデルの解像度を揃える
-        self._model.video.set_size(
-            ImageLayer.NIME,
-            ResizeDesc.from_pattern(
-                self._size_pattern_selection_frame.aspect_ratio,
-                self._size_pattern_selection_frame.resolution,
-            ),
-        )
+        with VideoModelEditSession(self._model.video) as edit:
+            edit.set_size(
+                ImageLayer.NIME,
+                ResizeDesc.from_pattern(
+                    self._size_pattern_selection_frame.aspect_ratio,
+                    self._size_pattern_selection_frame.resolution,
+                ),
+            )
 
         # 再生モード関係フレーム
         self._playback_mode_frame = ctk.CTkFrame(
@@ -191,7 +193,7 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
         self._on_frame_rate_slider_changed(GIF_DURATION_MAP.default_entry.index)
 
         # ビデオモデルフレームレート変更ハンドラを登録
-        self._model.video.register_furation_change_handler(
+        self._model.video.register_duration_change_handler(
             self._on_model_frame_rate_changed
         )
 
@@ -386,10 +388,11 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
         """
         アニメ名テキストボックスが変更されたときに呼び出される
         """
-        if text != "":
-            self._model.video.set_nime_name(text)
-        else:
-            self._model.video.set_nime_name(self._model.capture.current_window_name)
+        with VideoModelEditSession(self._model.video) as edit:
+            if text != "":
+                edit.set_nime_name(text)
+            else:
+                edit.set_nime_name(self._model.capture.current_window_name)
 
     def _on_resolution_changes(
         self, aspect_ratio: AspectRatioPattern, resolution: ResizeDesc.Pattern
@@ -401,11 +404,12 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
             aspect_ratio (AspectRatio): アスペクト比
             resolution (Resolution): 解像度
         """
-        self._model.video.set_size(
-            ImageLayer.NIME, ResizeDesc.from_pattern(aspect_ratio, resolution)
-        )
         self._aspect_ratio = aspect_ratio
         self._resolution = resolution
+        with VideoModelEditSession(self._model.video) as edit:
+            edit.set_size(
+                ImageLayer.NIME, ResizeDesc.from_pattern(aspect_ratio, resolution)
+            )
 
     def _on_playback_mode_radio_change(self):
         """
@@ -424,7 +428,8 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
         self._frame_rate_label.configure(
             text=f"{gif_duration_entry.frame_rate_float:4.1f} FPS"
         )
-        self._model.video.set_duration_in_msec(gif_duration_entry.gif_duration_in_msec)
+        with VideoModelEditSession(self._model.video) as edit:
+            edit.set_duration_in_msec(gif_duration_entry.gif_duration_in_msec)
 
     def _on_model_frame_rate_changed(self):
         """
@@ -483,7 +488,8 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
         """
         ワイプボタンクリックハンドラ
         """
-        self._model.video.clear_frames()
+        with VideoModelEditSession(self._model.video) as edit:
+            edit.clear_frames()
 
     def _on_dupe_threshold_slider_changed(self, value: float):
         """
@@ -543,21 +549,27 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
                 frame_enabled[idx_B] = False
 
         # 解決した有効・無効をモデルに設定
-        self._model.video.set_enable_batch(
-            [(frame_index, enable) for frame_index, enable in enumerate(frame_enabled)]
-        )
+        with VideoModelEditSession(self._model.video) as edit:
+            edit.set_enable_batch(
+                [
+                    (frame_index, enable)
+                    for frame_index, enable in enumerate(frame_enabled)
+                ]
+            )
 
     def _on_enable_all_button_clicked(self):
         """
         全フレーム有効化ボタンハンドラ
         """
-        self._model.video.set_enable(None, True)
+        with VideoModelEditSession(self._model.video) as edit:
+            edit.set_enable(None, True)
 
     def _on_disable_all_button_clicked(self):
         """
         全フレーム無効化ボタンハンドラ
         """
-        self._model.video.set_enable(None, False)
+        with VideoModelEditSession(self._model.video) as edit:
+            edit.set_enable(None, False)
 
     def _on_remove_disable_button_clicked(self):
         """
@@ -573,8 +585,9 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
         # NOTE
         #   前方のフレームを削除すると、それよりも後方のフレームがずれるので
         disabled_frame_indices.sort(reverse=True)
-        for disabled_frame_index in disabled_frame_indices:
-            self._model.video.delete_frame(disabled_frame_index)
+        with VideoModelEditSession(self._model.video) as edit:
+            for disabled_frame_index in disabled_frame_indices:
+                edit.delete_frame(disabled_frame_index)
 
     def _record_handler(
         self, stop_time_in_sec: float, record_raw_images: List[AISImage] = []
@@ -590,23 +603,22 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
         # 所定の時間を経過してたら終了
         if time() > stop_time_in_sec:
             if len(record_raw_images) > 0:
-                if self.nime_name_entry.text != "":
-                    self._model.video.set_nime_name(self.nime_name_entry.text)
-                else:
-                    self._model.video.set_nime_name(
-                        self._model.capture.current_window_name
+                with VideoModelEditSession(self._model.video) as edit:
+                    if self.nime_name_entry.text != "":
+                        edit.set_nime_name(self.nime_name_entry.text)
+                    else:
+                        edit.set_nime_name(self._model.capture.current_window_name)
+                    edit.set_time_stamp(None)
+                    edit.append_frames(
+                        [
+                            ImageModel(
+                                img,
+                                self._model.capture.current_window_name,
+                                self._model.video.time_stamp,
+                            )
+                            for img in record_raw_images
+                        ]
                     )
-                self._model.video.set_time_stamp(None)
-                self._model.video.append_frames(
-                    [
-                        ImageModel(
-                            img,
-                            self._model.capture.current_window_name,
-                            self._model.video.time_stamp,
-                        )
-                        for img in record_raw_images
-                    ]
-                )
             return
 
         # キャプチャ
@@ -648,7 +660,7 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
         if not isinstance(event_data, str):
             return
 
-        # 動画・画像で分岐
+        # ImageModel の配列に展開
         paths = self.tk.splitlist(event_data)
         failed_names = []
         new_models = []
@@ -667,18 +679,17 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
             except Exception as e:
                 failed_names.append(path.name)
 
-        # ビデオモデルのメタ情報を更新
-        if new_time_stamp is not None:
-            self._model.video.set_time_stamp(new_time_stamp)
-        if new_duration_in_msec is not None:
-            self._model.video.set_duration_in_msec(new_duration_in_msec)
-        if self.nime_name_entry.text != "":
-            self._model.video.set_nime_name(self.nime_name_entry.text)
-        elif new_nime_name is not None:
-            self._model.video.set_nime_name(new_nime_name)
-
-        # フレームを追加
-        self._model.video.append_frames(new_models)
+        # モデルに反映
+        with VideoModelEditSession(self._model.video) as edit:
+            if new_time_stamp is not None:
+                edit.set_time_stamp(new_time_stamp)
+            if new_duration_in_msec is not None:
+                edit.set_duration_in_msec(new_duration_in_msec)
+            if self.nime_name_entry.text != "":
+                edit.set_nime_name(self.nime_name_entry.text)
+            elif new_nime_name is not None:
+                edit.set_nime_name(new_nime_name)
+            edit.append_frames(new_models)
 
         # 問題が起きていればダイアログを出す
         if len(failed_names) > 0:

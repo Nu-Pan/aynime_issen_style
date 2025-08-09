@@ -395,11 +395,6 @@ class ImageModel:
         Args:
             raw_image (AISImage): 元画像
         """
-        # 画像以外のステート
-        self._enable = enable
-        self._nime_name = None
-        self._time_stamp = None
-
         # 各画像メンバ
         self._raw_image = CachedSourceImage()
         self._nime_image = CachedScalableImage(
@@ -422,26 +417,11 @@ class ImageModel:
             image_layer: cast(List[NotifyHandler], []) for image_layer in ImageLayer
         }
 
-        # 初期設定呼び出し
-        self.set_raw_image(raw_image, nime_name, time_stamp)
-
-    def set_enable(self, enable: bool) -> "ImageModel":
-        """
-        モデルの有効・無効を切り替える
-        """
-        if self._enable != enable:
-            self._enable = enable
-            self._thumbnail_pil_image_enable.set_dirty()
-            self._thumbnail_pil_image_disable.set_dirty()
-            self._notify(ImageLayer.THUMBNAIL)
-        return self
-
-    @property
-    def enable(self) -> bool:
-        """
-        モデルの有効・無効を取得する
-        """
-        return self._enable
+        # 初期設定
+        self._raw_image.set_source(raw_image)
+        self._nime_name = nime_name
+        self._time_stamp = time_stamp
+        self._enable = enable
 
     @property
     def nime_name(self) -> Optional[str]:
@@ -457,98 +437,12 @@ class ImageModel:
         """
         return self._time_stamp
 
-    def set_raw_image(
-        self,
-        raw_image: Optional[AISImage],
-        nime_name: Optional[str],
-        time_stamp: Optional[str],
-    ) -> Self:
+    @property
+    def enable(self) -> bool:
         """
-        RAW 画像を設定する。
-        それまでの全ては吹き飛ぶ。
-        タイムスタンプも強制的に更新される。
-
-        Args:
-            raw_image (AISImage): 新しい RAW 画像
-            time_stamp (Optional[str]): 新しいタイムスタンプ
-
-        Returns:
-            ImageModel: 自分自身
+        モデルの有効・無効を取得する
         """
-        # RAW 画像に反映
-        self._raw_image.set_source(raw_image)
-
-        # アニメ名を更新
-        self.set_nime_name(nime_name)
-
-        # タイムスタンプを更新
-        self.set_time_stamp(time_stamp)
-
-        # 通知
-        self._notify(ImageLayer.RAW)
-
-        # 正常終了
-        return self
-
-    def set_nime_name(self, nime_name: Optional[str]) -> Self:
-        """
-        アニメ名を設定する。
-        RAW 画像は更新されない。
-        """
-        # 型チェック
-        if not isinstance(nime_name, str) and nime_name is not None:
-            raise TypeError(nime_name)
-
-        # アニメ名更新・通知
-        if self._nime_name != nime_name:
-            self._nime_name = nime_name
-            self._nime_image.set_dirty()
-            self._notify(ImageLayer.NIME)
-
-        # 正常終了
-        return self
-
-    def set_time_stamp(self, time_stamp: Optional[str]) -> Self:
-        """
-        タイムスタンプを設定する
-        RAW 画像は更新されない。
-        """
-        # タイムスタンプ更新
-        if isinstance(time_stamp, str):
-            if is_time_stamp(time_stamp):
-                self._time_stamp = time_stamp
-            else:
-                raise ValueError(time_stamp)
-        elif time_stamp is None:
-            self._time_stamp = current_time_stamp()
-        else:
-            raise TypeError(time_stamp)
-
-        # 正常終了
-        return self
-
-    def set_size(self, layer: ImageLayer, size: ResizeDesc) -> Self:
-        """
-        指定 layer のリサイズ挙動を設定する。
-        """
-        # layer 分岐
-        match layer:
-            case ImageLayer.RAW:
-                raise ValueError("RAW set_size NOT supported.")
-            case ImageLayer.NIME:
-                self._nime_image.set_size(size)
-            case ImageLayer.PREVIEW:
-                self._preview_pil_image.set_size(size)
-            case ImageLayer.THUMBNAIL:
-                self._thumbnail_pil_image_enable.set_size(size)
-            case _:
-                raise ValueError(layer)
-
-        # 通知
-        self._notify(layer)
-
-        # 正常終了
-        return self
+        return self._enable
 
     def get_size(self, layer: ImageLayer) -> ResizeDesc:
         """
@@ -595,31 +489,66 @@ class ImageModel:
         self._notify_handlers[layer].append(handler)
         return self
 
+    def _aux_process_nime(self, source_image: AISImage) -> AISImage:
+        """
+        NIME 用の外部プロセス
+        """
+        return overlay_nime_name(source_image, self._nime_name)
+
+
+class ImageModelEditSession:
+    """
+    ImageModel 編集セッション
+    with 句で使用する
+    """
+
+    def __init__(self, image_model: ImageModel, *, _does_notify: bool = True):
+        """
+        コンストラクタ
+        """
+        self._model = image_model
+        self._does_notify = _does_notify
+
+    def __enter__(self) -> Self:
+        """
+        with 句開始
+        """
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """
+        with 句終了
+        """
+        if exc_type is None and self._does_notify:
+            self._notify(ImageLayer.RAW)
+
     def _notify(self, layer: ImageLayer) -> Self:
         """
         あらかじめ登録しておいた通知ハンドラを呼び出す。
         layer と、その影響受けるすべてのレイヤーの通知ハンドラが呼び出される。
-        画像がダーティー化した時の通知に使われることを想定。
         """
+        # エイリアス
+        model = self._model
+
         # ダーティフラグを解決
         match layer:
             case ImageLayer.RAW:
-                is_dirty = self._raw_image.is_dirty
+                is_dirty = model._raw_image.is_dirty
             case ImageLayer.NIME:
-                is_dirty = self._nime_image.is_dirty
+                is_dirty = model._nime_image.is_dirty
             case ImageLayer.PREVIEW:
-                is_dirty = self._preview_pil_image.is_dirty
+                is_dirty = model._preview_pil_image.is_dirty
             case ImageLayer.THUMBNAIL:
                 is_dirty = (
-                    self._thumbnail_pil_image_enable.is_dirty
-                    or self._thumbnail_pil_image_disable
+                    model._thumbnail_pil_image_enable.is_dirty
+                    or model._thumbnail_pil_image_disable
                 )
             case _:
                 raise ValueError(f"Invalid ImageLayer(={layer})")
 
         # ダーティ状態ならハンドラを呼び出す
         if is_dirty:
-            for handler in self._notify_handlers[layer]:
+            for handler in model._notify_handlers[layer]:
                 handler()
 
         # 影響先のレイヤーの通知ハンドラを再帰的に呼び出す
@@ -639,11 +568,82 @@ class ImageModel:
         # 正常終了
         return self
 
-    def _aux_process_nime(self, source_image: AISImage) -> AISImage:
+    def set_raw_image(self, raw_image: Optional[AISImage]) -> Self:
         """
-        NIME 用の外部プロセス
+        RAW 画像を設定する。
+        タイムスタンプなどの関連要素は触らないので注意
         """
-        return overlay_nime_name(source_image, self._nime_name)
+        # 設定
+        self._model._raw_image.set_source(raw_image)
+
+        # 正常終了
+        return self
+
+    def set_nime_name(self, nime_name: Optional[str]) -> Self:
+        """
+        アニメ名を設定する。
+        NIME 画像が影響を受ける。
+        """
+        # アニメ名更新・通知
+        model = self._model
+        if model._nime_name != nime_name:
+            model._nime_name = nime_name
+            model._nime_image.set_dirty()
+
+        # 正常終了
+        return self
+
+    def set_time_stamp(self, time_stamp: Optional[str]) -> Self:
+        """
+        タイムスタンプを設定する
+        RAW 画像は更新されない。
+        """
+        # タイムスタンプ更新
+        model = self._model
+        if isinstance(time_stamp, str):
+            if is_time_stamp(time_stamp):
+                model._time_stamp = time_stamp
+            else:
+                raise ValueError(time_stamp)
+        elif time_stamp is None:
+            model._time_stamp = current_time_stamp()
+        else:
+            raise TypeError(time_stamp)
+
+        # 正常終了
+        return self
+
+    def set_enable(self, enable: bool) -> Self:
+        """
+        モデルの有効・無効を切り替える
+        """
+        model = self._model
+        if model._enable != enable:
+            self._enable = enable
+            model._thumbnail_pil_image_enable.set_dirty()
+            model._thumbnail_pil_image_disable.set_dirty()
+        return self
+
+    def set_size(self, layer: ImageLayer, size: ResizeDesc) -> Self:
+        """
+        指定 layer のリサイズ挙動を設定する。
+        """
+        # layer 分岐
+        model = self._model
+        match layer:
+            case ImageLayer.RAW:
+                raise ValueError("RAW set_size NOT supported.")
+            case ImageLayer.NIME:
+                model._nime_image.set_size(size)
+            case ImageLayer.PREVIEW:
+                model._preview_pil_image.set_size(size)
+            case ImageLayer.THUMBNAIL:
+                model._thumbnail_pil_image_enable.set_size(size)
+            case _:
+                raise ValueError(layer)
+
+        # 正常終了
+        return self
 
 
 class VideoModel:
@@ -663,67 +663,8 @@ class VideoModel:
         self._global_model = ImageModel()
         self._frames: List[ImageModel] = []
         self._duration_in_msec = GIF_DURATION_MAP.default_entry.gif_duration_in_msec
+        self._duration_is_dirty = False
         self._duration_change_handlers: List[NotifyHandler] = []
-
-    def set_enable(
-        self, frame_indices: Union[int, List[int], None], enable: bool
-    ) -> Self:
-        """
-        指定フレームの有効・無効を設定する
-        """
-        if frame_indices is None:
-            return self.set_enable_batch(
-                [(frame_index, enable) for frame_index in range(len(self._frames))]
-            )
-        elif isinstance(frame_indices, list):
-            return self.set_enable_batch(
-                [(frame_index, enable) for frame_index in frame_indices]
-            )
-        elif isinstance(frame_indices, int):
-            return self.set_enable_batch([(frame_indices, enable)])
-        else:
-            raise TypeError()
-
-    def set_enable_batch(self, entries: List[Tuple[int, bool]]) -> Self:
-        """
-        指定フレームの有効・無効を設定する
-        indices は (インデックス, 有効・無効) のリスト
-        """
-        # 各フレームに有効・無効を反映
-        does_change = False
-        for entry in entries:
-            frame_index = entry[0]
-            enable = entry[1]
-            frame = self._frames[frame_index]
-            if frame.enable != enable:
-                does_change = True
-                frame.set_enable(enable)
-
-        # 全体通知を呼び出す
-        # NOTE
-        #   原則として、１フレームでも変更があれば動画全体として通知が飛ぶ
-        #   よって、グローバルモデルに対して変化を発生させる
-        #   グローバルモデルの enable の値そのものは整合する必要がなくて、変化させることが重要
-        if does_change:
-            self._global_model.set_enable(not self._global_model.enable)
-
-        # 正常終了
-        return self
-
-    def get_enable(self, frame_index: int) -> bool:
-        """
-        指定フレームの有効・無効を取得する
-        """
-        return self._frames[frame_index].enable
-
-    def set_nime_name(self, nime_name: Optional[str]) -> Self:
-        """
-        アニメ名を設定する。
-        """
-        self._global_model.set_nime_name(nime_name)
-        for frame in self._frames:
-            frame.set_nime_name(nime_name)
-        return self
 
     @property
     def nime_name(self) -> Optional[str]:
@@ -732,16 +673,6 @@ class VideoModel:
         """
         return self._global_model.time_stamp
 
-    def set_time_stamp(self, time_stamp: Optional[str]) -> Self:
-        """
-        動画のタイムスタンプを設定する。
-        """
-        # NOTE
-        #   タイムスタンプはグローバルモデルで一元管理
-        #   個別のフレームは触らない
-        self._global_model.set_time_stamp(time_stamp)
-        return self
-
     @property
     def time_stamp(self) -> Optional[str]:
         """
@@ -749,129 +680,17 @@ class VideoModel:
         """
         return self._global_model.time_stamp
 
-    def set_size(self, layer: ImageLayer, size: ResizeDesc) -> Self:
+    def get_enable(self, frame_index: int) -> bool:
         """
-        フレームサイズを設定する
+        指定フレームの有効・無効を取得する
         """
-        # 個別のフレームにサイズを設定
-        for f in self._frames:
-            f.set_size(layer, size)
-
-        # グローバルモデルにサイズを設定
-        # NOTE
-        #   通知を最後に回したいので _global_model の処理が後
-        self._global_model.set_size(layer, size)
-        return self
+        return self._frames[frame_index].enable
 
     def get_size(self, layer: ImageLayer) -> ResizeDesc:
         """
         フレームサイズを取得する
         """
         return self._global_model.get_size(layer)
-
-    def append_frames(
-        self,
-        new_obj: Union[
-            AISImage,
-            Iterable[AISImage],
-            ImageModel,
-            Iterable[ImageModel],
-            "VideoModel",
-            Iterable["VideoModel"],
-        ],
-        *,
-        _does_notify: bool = True,
-    ) -> Self:
-        """
-        動画フレームを末尾に追加する
-
-        Args:
-            frames (List[ImageModel]): 挿入するフレーム
-
-        Returns:
-            VideoModel: 自分自身
-        """
-        # 追加フレームが…
-        if isinstance(new_obj, ImageModel):
-            # ImageModel の場合、通常の追加フロー
-
-            # サイズを統一
-            for layer in ImageLayer:
-                if layer != ImageLayer.RAW:
-                    new_obj.set_size(layer, self._global_model.get_size(layer))
-
-            # タイムスタンプを統一
-            new_obj.set_time_stamp(self._global_model.time_stamp)
-
-            # アニメ名を統一
-            new_obj.set_nime_name(self._global_model.nime_name)
-
-            # フレームリストに挿入
-            self._frames.append(new_obj)
-        else:
-            # ImageModel ではない場合、 ImageModel の呼び出しに変換
-            if isinstance(new_obj, Iterable):
-                for new_frame in new_obj:
-                    self.append_frames(new_frame, _does_notify=False)
-            elif isinstance(new_obj, AISImage):
-                self.append_frames(
-                    ImageModel(new_obj, self.time_stamp), _does_notify=False
-                )
-            elif isinstance(new_obj, VideoModel):
-                for new_frame in new_obj._frames:
-                    self.append_frames(new_frame, _does_notify=False)
-
-            else:
-                raise TypeError(f"Invalid type {type(new_obj)}")
-
-        # 全体通知を呼び出す
-        # NOTE
-        #   原則、１フレームでも変更があれば動画全体として通知が飛ぶ
-        #   フレームの追加・削除については RAW レイヤーでの変更とみなす
-        #   よってグローバルモデルに新規生成した画像を渡して強制的に通知を発生させる
-        if _does_notify:
-            self._global_model.set_raw_image(
-                AISImage.empty("RGB", 8, 8),
-                self._global_model.nime_name,
-                self._global_model.time_stamp,
-            )
-
-        # 正常終了
-        return self
-
-    def delete_frame(self, position: int) -> Self:
-        """
-        指定インデックスのフレームを削除する
-        """
-        # 指定フレームを削除
-        self._frames.pop(position)
-
-        # 全体通知を呼び出す
-        self._global_model.set_raw_image(
-            AISImage.empty("RGB", 8, 8),
-            self._global_model.nime_name,
-            self._global_model.time_stamp,
-        )
-
-        # 正常終了
-        return self
-
-    def clear_frames(self) -> Self:
-        """
-        全フレームを削除する
-        """
-        # 全フレームを削除
-        self._frames.clear()
-
-        # 全体通知を呼び出す
-        self._global_model.set_raw_image(
-            AISImage.empty("RGB", 8, 8),
-            self._global_model.nime_name,
-            self._global_model.time_stamp,
-        )
-
-        # 正常終了
-        return self
 
     @property
     def num_total_frames(self) -> int:
@@ -910,16 +729,6 @@ class VideoModel:
         """
         return self._frames[frame_index].get_image(layer)
 
-    def set_duration_in_msec(self, duration_in_msec: int) -> Self:
-        """
-        再生フレームレートを設定する
-        """
-        if self._duration_in_msec != duration_in_msec:
-            self._duration_in_msec = duration_in_msec
-            for handler in self._duration_change_handlers:
-                handler()
-        return self
-
     @property
     def duration_in_msec(self) -> int:
         """
@@ -934,11 +743,278 @@ class VideoModel:
         """
         self._global_model.register_notify_handler(layer, handler)
 
-    def register_furation_change_handler(self, handler: NotifyHandler):
+    def register_duration_change_handler(self, handler: NotifyHandler):
         """
         フレームレート変更ハンドラーを登録する
         """
         self._duration_change_handlers.append(handler)
+
+
+class VideoModelEditSession:
+    """
+    VideoModel 編集セッション
+    with 句で使用する
+    """
+
+    def __init__(self, video_model: VideoModel):
+        """
+        コンストラクタ
+        """
+        self._model = video_model
+
+    def __enter__(self) -> Self:
+        """
+        with 句開始
+        """
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """
+        with 句終了
+        """
+        if exc_type is None:
+            self._notify(ImageLayer.RAW)
+
+    def _notify(self, layer: ImageLayer) -> Self:
+        """
+        あらかじめ登録しておいた通知ハンドラを呼び出す。
+        layer と、その影響受けるすべてのレイヤーの通知ハンドラが呼び出される。
+        """
+        # エイリアス
+        model = self._model
+
+        # グローバルモデルによる通知
+        with ImageModelEditSession(model._global_model):
+            pass
+
+        # フレーム更新間隔による通知
+        if model._duration_is_dirty:
+            for handler in model._duration_change_handlers:
+                handler()
+
+        # 正常終了
+        return self
+
+    def set_nime_name(self, nime_name: Optional[str]) -> Self:
+        """
+        アニメ名を設定する。
+        """
+        # エイリアス
+        model = self._model
+
+        # 各フレーム
+        for frame in model._frames:
+            with ImageModelEditSession(frame, _does_notify=False) as e:
+                e.set_nime_name(nime_name)
+
+        # グローバル
+        with ImageModelEditSession(model._global_model, _does_notify=False) as e:
+            e.set_nime_name(nime_name)
+
+        # 正常終了
+        return self
+
+    def set_time_stamp(self, time_stamp: Optional[str]) -> Self:
+        """
+        動画のタイムスタンプを設定する。
+        """
+        # エイリアス
+        model = self._model
+
+        # 各フレーム
+        for frame in model._frames:
+            with ImageModelEditSession(frame, _does_notify=False) as e:
+                e.set_time_stamp(time_stamp)
+
+        # グローバル
+        with ImageModelEditSession(model._global_model, _does_notify=False) as e:
+            e.set_time_stamp(time_stamp)
+
+        # 正常終了
+        return self
+
+    def set_enable(
+        self, frame_indices: Union[int, List[int], None], enable: bool
+    ) -> Self:
+        """
+        指定フレームの有効・無効を設定する
+        """
+        model = self._model
+        if frame_indices is None:
+            return self.set_enable_batch(
+                [(frame_index, enable) for frame_index in range(len(model._frames))]
+            )
+        elif isinstance(frame_indices, list):
+            return self.set_enable_batch(
+                [(frame_index, enable) for frame_index in frame_indices]
+            )
+        elif isinstance(frame_indices, int):
+            return self.set_enable_batch([(frame_indices, enable)])
+        else:
+            raise TypeError()
+
+    def set_enable_batch(self, entries: List[Tuple[int, bool]]) -> Self:
+        """
+        指定フレームの有効・無効を設定する
+        indices は (インデックス, 有効・無効) のリスト
+        """
+        # 各フレームに有効・無効を反映
+        model = self._model
+        does_change = False
+        for entry in entries:
+            frame_index = entry[0]
+            enable = entry[1]
+            frame = model._frames[frame_index]
+            if frame.enable != enable:
+                does_change = True
+                with ImageModelEditSession(frame, _does_notify=False) as e:
+                    e.set_enable(enable)
+
+        # グローバルモデルに状態を反映
+        # NOTE
+        #   原則として、１フレームでも変更があれば動画全体として通知が飛ぶ
+        #   よって、グローバルモデルに対して変化を発生させる
+        #   グローバルモデルの enable の値そのものは整合する必要がなくて、変化させることが重要
+        if does_change:
+            with ImageModelEditSession(model._global_model, _does_notify=False) as e:
+                e.set_enable(not model._global_model.enable)
+
+        # 正常終了
+        return self
+
+    def set_size(self, layer: ImageLayer, size: ResizeDesc) -> Self:
+        """
+        フレームサイズを設定する
+        """
+        # エイリアス
+        model = self._model
+
+        # 各フレーム
+        for frame in model._frames:
+            with ImageModelEditSession(frame, _does_notify=False) as e:
+                e.set_size(layer, size)
+
+        # グローバル
+        with ImageModelEditSession(model._global_model, _does_notify=False) as e:
+            e.set_size(layer, size)
+
+        # 正常終了
+        return self
+
+    def append_frames(
+        self,
+        new_obj: Union[
+            AISImage,
+            Iterable[AISImage],
+            ImageModel,
+            Iterable[ImageModel],
+            "VideoModel",
+            Iterable["VideoModel"],
+        ],
+        *,
+        _does_notify: bool = True,
+    ) -> Self:
+        """
+        動画フレームを末尾に追加する
+
+        Args:
+            frames (List[ImageModel]): 挿入するフレーム
+
+        Returns:
+            VideoModel: 自分自身
+        """
+        # エイリアス
+        model = self._model
+
+        # 追加フレームが…
+        if isinstance(new_obj, ImageModel):
+            # ImageModel の場合、通常の追加フロー
+
+            with ImageModelEditSession(new_obj, _does_notify=False) as e:
+                # サイズを統一
+                for layer in ImageLayer:
+                    if layer != ImageLayer.RAW:
+                        e.set_size(layer, model._global_model.get_size(layer))
+
+                # タイムスタンプを統一
+                e.set_time_stamp(model._global_model.time_stamp)
+
+                # アニメ名を統一
+                e.set_nime_name(model._global_model.nime_name)
+
+                # フレームリストに挿入
+                model._frames.append(new_obj)
+        else:
+            # ImageModel ではない場合、 ImageModel の呼び出しに変換
+            if isinstance(new_obj, Iterable):
+                for new_frame in new_obj:
+                    self.append_frames(new_frame, _does_notify=False)
+            elif isinstance(new_obj, AISImage):
+                self.append_frames(
+                    ImageModel(new_obj, model.time_stamp), _does_notify=False
+                )
+            elif isinstance(new_obj, VideoModel):
+                for new_frame in new_obj._frames:
+                    self.append_frames(new_frame, _does_notify=False)
+
+            else:
+                raise TypeError(f"Invalid type {type(new_obj)}")
+
+        # グローバルモデルに状態を反映
+        # NOTE
+        #   原則、１フレームでも変更があれば動画全体として通知が飛ぶ
+        #   フレームの追加・削除については RAW レイヤーでの変更とみなす
+        #   よってグローバルモデルに新規生成した画像を渡して強制的に通知を発生させる
+        if _does_notify:
+            with ImageModelEditSession(model._global_model, _does_notify=False) as e:
+                e.set_raw_image(AISImage.empty("RGB", 8, 8))
+
+        # 正常終了
+        return self
+
+    def delete_frame(self, position: int) -> Self:
+        """
+        指定インデックスのフレームを削除する
+        """
+        # エイリアス
+        model = self._model
+
+        # 指定フレームを削除
+        model._frames.pop(position)
+
+        # グローバルモデルに状態を反映
+        with ImageModelEditSession(model._global_model, _does_notify=False) as e:
+            e.set_raw_image(AISImage.empty("RGB", 8, 8))
+
+        # 正常終了
+        return self
+
+    def clear_frames(self) -> Self:
+        """
+        全フレームを削除する
+        """
+        # エイリアス
+        model = self._model
+
+        # 全フレームを削除
+        model._frames.clear()
+
+        # グローバルモデルに状態を反映
+        with ImageModelEditSession(model._global_model, _does_notify=False) as e:
+            e.set_raw_image(AISImage.empty("RGB", 8, 8))
+
+        # 正常終了
+        return self
+
+    def set_duration_in_msec(self, duration_in_msec: int) -> Self:
+        """
+        再生フレームレートを設定する
+        """
+        model = self._model
+        if model._duration_in_msec != duration_in_msec:
+            model._duration_in_msec = duration_in_msec
+            model._duration_is_dirty |= True
+        return self
 
 
 def encode_valid_nime_name(text: Optional[str]) -> str:
@@ -1238,21 +1314,25 @@ def load_content_model(
         return image_model
     elif actual_file_path.suffix.lower() in MOVIE_EXTENSIONS:
         # 動画ファイルの場合はフレームを全て読み込む
-        video_model = VideoModel().set_time_stamp(time_stamp)
-        delays = []
-        with Image.open(actual_file_path) as img:
-            try:
-                while True:
-                    pil_image = img.copy().convert("RGB")
-                    video_model.append_frames(
-                        [ImageModel(AISImage(pil_image), nime_name, time_stamp)]
-                    )
-                    delays.append(img.info.get("duration", default_duration_in_msec))
-                    img.seek(img.tell() + 1)
-            except EOFError:
-                pass
-        avg_delay = round(sum(delays) / len(delays))
-        video_model.set_duration_in_msec(avg_delay)
+        video_model = VideoModel()
+        with VideoModelEditSession(video_model) as edit:
+            edit.set_time_stamp(time_stamp)
+            delays = []
+            with Image.open(actual_file_path) as img:
+                try:
+                    while True:
+                        pil_image = img.copy().convert("RGB")
+                        edit.append_frames(
+                            [ImageModel(AISImage(pil_image), nime_name, time_stamp)]
+                        )
+                        delays.append(
+                            img.info.get("duration", default_duration_in_msec)
+                        )
+                        img.seek(img.tell() + 1)
+                except EOFError:
+                    pass
+            avg_delay = round(sum(delays) / len(delays))
+            edit.set_duration_in_msec(avg_delay)
         return video_model
     elif actual_file_path.suffix.lower() in RAW_ZIP_EXTENSIONS:
         # ZIP ファイルの場合、中身を連番静止画として読み込む
@@ -1279,37 +1359,40 @@ def load_content_model(
             raise TypeError(f"Invalid type {type(gif_file_path)}")
 
         # ビデオモデルを構築
-        video_model = (
-            VideoModel().set_time_stamp(time_stamp).set_duration_in_msec(avg_delay)
-        )
-        with ZipFile(actual_file_path, "r") as zip_file:
-            file_list = zip_file.namelist()
-            for file_name in file_list:
-                # フレームの有効・無効を解決する
-                # NOTE
-                #   ファイル名から解決する
-                #   なんかおかしい時は何も言わずに有効扱いする
-                enable_match = re.search(r"_([de])\.png$", file_name)
-                if enable_match is None:
-                    enable = True
-                else:
-                    enable_str = enable_match.group(1)
-                    if enable_str == "d":
-                        enable = False
-                    else:
+        video_model = VideoModel()
+        with VideoModelEditSession(video_model) as edit:
+            edit.set_time_stamp(time_stamp)
+            edit.set_duration_in_msec(avg_delay)
+            with ZipFile(actual_file_path, "r") as zip_file:
+                file_list = zip_file.namelist()
+                for file_name in file_list:
+                    # フレームの有効・無効を解決する
+                    # NOTE
+                    #   ファイル名から解決する
+                    #   なんかおかしい時は何も言わずに有効扱いする
+                    enable_match = re.search(r"_([de])\.png$", file_name)
+                    if enable_match is None:
                         enable = True
+                    else:
+                        enable_str = enable_match.group(1)
+                        if enable_str == "d":
+                            enable = False
+                        else:
+                            enable = True
 
-                # フレームを追加
-                video_model.append_frames(
-                    ImageModel(
-                        AISImage(Image.open(zip_file.open(file_name)).convert("RGB")),
-                        nime_name,
-                        time_stamp,
-                        enable,
+                    # フレームを追加
+                    edit.append_frames(
+                        ImageModel(
+                            AISImage(
+                                Image.open(zip_file.open(file_name)).convert("RGB")
+                            ),
+                            nime_name,
+                            time_stamp,
+                            enable,
+                        )
                     )
-                )
 
-            # 正常終了
-            return video_model
+        # 正常終了
+        return video_model
     else:
         raise ValueError("Logic Error")

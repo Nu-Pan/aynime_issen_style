@@ -10,7 +10,7 @@ from utils.ctk import silent_configure, configure_presence
 from utils.image import ResizeDesc, AspectRatioPattern, AISImage
 
 # model
-from gui.model.contents_cache import ImageModel, ImageLayer
+from gui.model.contents_cache import ImageModel, ImageLayer, ImageModelEditSession
 
 
 class StillLabel(ctk.CTkLabel):
@@ -75,7 +75,8 @@ class StillLabel(ctk.CTkLabel):
         # モデルにサイズを反映
         actual_width = self.winfo_width()
         actual_height = self.winfo_height()
-        self._image_model.set_size(
-            ImageLayer.PREVIEW,
-            ResizeDesc(AspectRatioPattern.E_RAW, actual_width, actual_height),
-        )
+        with ImageModelEditSession(self._image_model) as edit:
+            edit.set_size(
+                ImageLayer.PREVIEW,
+                ResizeDesc(AspectRatioPattern.E_RAW, actual_width, actual_height),
+            )

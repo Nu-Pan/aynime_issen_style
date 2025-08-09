@@ -14,6 +14,7 @@ from utils.constants import WIDGET_PADDING, WINDOW_MIN_WIDTH, DEFAULT_FONT_FAMIL
 # gui
 from gui.widgets.still_label import StillLabel
 from gui.model.aynime_issen_style import AynimeIssenStyleModel
+from gui.model.contents_cache import ImageModelEditSession
 
 
 @dataclass
@@ -104,7 +105,8 @@ class WindowSelectionFrame(ctk.CTkFrame):
 
         # 初回キャプチャターゲットリスト更新
         self.update_list()
-        self.model.window_selection_image.set_raw_image(None, None, None)
+        with ImageModelEditSession(self.model.window_selection_image) as edit:
+            edit.set_raw_image(None)
 
     def on_capture_target_select(self, event: Event) -> None:
         """
@@ -123,14 +125,11 @@ class WindowSelectionFrame(ctk.CTkFrame):
         self.model.capture.set_capture_window(selection.window_handle)
 
         # 描画更新
-        try:
-            self.model.window_selection_image.set_raw_image(
-                self.model.capture.capture(),
-                self.model.capture.current_window_name,
-                None,
-            )
-        except Exception as e:
-            self.model.window_selection_image.set_raw_image(None, None, None)
+        with ImageModelEditSession(self.model.window_selection_image) as edit:
+            try:
+                edit.set_raw_image(self.model.capture.capture())
+            except Exception as e:
+                edit.set_raw_image(None)
 
     def update_list(self) -> None:
         """
