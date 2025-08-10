@@ -118,7 +118,7 @@ class StillCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
 
         # アニメ名を解決
         if self.nime_name_entry.text != "":
-            actual_nime_name = self.nime_name_entry.text
+            actual_nime_name = "<NIME>" + self.nime_name_entry.text
         else:
             window_name = self.model.capture.current_window_name
             if window_name is not None and "<NIME>" in window_name:
