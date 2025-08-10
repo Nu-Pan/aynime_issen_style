@@ -674,7 +674,7 @@ class VideoModel:
         """
         アニメ名
         """
-        return self._global_model.time_stamp
+        return self._global_model.nime_name
 
     @property
     def time_stamp(self) -> Optional[str]:
@@ -1319,6 +1319,7 @@ def load_content_model(
         # 動画ファイルの場合はフレームを全て読み込む
         video_model = VideoModel()
         with VideoModelEditSession(video_model) as edit:
+            edit.set_nime_name(nime_name)
             edit.set_time_stamp(time_stamp)
             delays = []
             with Image.open(actual_file_path) as img:
@@ -1364,6 +1365,7 @@ def load_content_model(
         # ビデオモデルを構築
         video_model = VideoModel()
         with VideoModelEditSession(video_model) as edit:
+            edit.set_nime_name(nime_name)
             edit.set_time_stamp(time_stamp)
             edit.set_duration_in_msec(avg_delay)
             with ZipFile(actual_file_path, "r") as zip_file:

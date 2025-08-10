@@ -664,18 +664,22 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
         paths = self.tk.splitlist(event_data)
         failed_names = []
         new_models = []
+        new_nime_name = None
         new_time_stamp = None
         new_duration_in_msec = None
-        new_nime_name = None
         for path_str in paths:
             path = Path(path_str)
             try:
                 new_model = load_content_model(path)
                 new_models.append(new_model)
-                if isinstance(new_model, VideoModel):
+                if isinstance(new_model, ImageModel):
+                    new_nime_name = new_model.nime_name
+                    new_time_stamp = new_model.time_stamp
+                    new_duration_in_msec = None
+                elif isinstance(new_model, VideoModel):
+                    new_nime_name = new_model.nime_name
                     new_time_stamp = new_model.time_stamp
                     new_duration_in_msec = new_model.duration_in_msec
-                    new_nime_name = new_model.nime_name
             except Exception as e:
                 failed_names.append(path.name)
 
