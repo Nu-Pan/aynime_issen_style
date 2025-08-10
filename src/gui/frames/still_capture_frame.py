@@ -120,7 +120,11 @@ class StillCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
         if self.nime_name_entry.text != "":
             actual_nime_name = self.nime_name_entry.text
         else:
-            actual_nime_name = self.model.capture.current_window_name
+            window_name = self.model.capture.current_window_name
+            if window_name is not None and "<NIME>" in window_name:
+                actual_nime_name = window_name
+            else:
+                actual_nime_name = None
 
         # モデルに反映
         # NOTE
