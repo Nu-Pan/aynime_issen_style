@@ -19,8 +19,20 @@ import re
 from abc import ABC, abstractmethod
 from enum import Enum
 
+# numpy
+import numpy as np
+
 # PIL
-from PIL import Image, ImageDraw, ImageFont, ImageEnhance, ImageOps, ImageStat
+from PIL import (
+    Image,
+    ImageDraw,
+    ImageFont,
+    ImageEnhance,
+    ImageOps,
+    ImageStat,
+    ImageFilter,
+    ImageChops,
+)
 
 # utils
 from utils.image import (
@@ -253,8 +265,8 @@ class ImageLayer(Enum):
 
 
 def get_text_bbox_size(
-    draw: ImageDraw.ImageDraw, text: str, font: ImageFont.FreeTypeFont
-) -> Tuple[float, float]:
+    image_size: Tuple[int, int], text: str, font: ImageFont.FreeTypeFont
+) -> Tuple[int, int]:
     """
     指定された条件でのテキストバウンディングボックスのサイズを返す
 
@@ -266,8 +278,10 @@ def get_text_bbox_size(
     Returns:
         Tuple[int, int]: バウンディングボックスの幅・高さ
     """
-    x0, y0, x1, y1 = draw.textbbox((0, 0), text, font=font, anchor=None)
-    return x1 - x0, y1 - y0
+    dummy_image = Image.new("L", image_size, None)
+    dummy_draw = ImageDraw.Draw(dummy_image)
+    x0, y0, x1, y1 = dummy_draw.textbbox((0, 0), text, font=font, anchor=None)
+    return round(x1 - x0), round(y1 - y0)
 
 
 def make_disabled_image(
@@ -296,16 +310,69 @@ def make_disabled_image(
     dark_image.alpha_composite(overlay)
 
     # テキストを描画
-    draw = ImageDraw.Draw(dark_image)
     font = ImageFont.truetype("arial.ttf", size=h // 8)
-    tw, th = get_text_bbox_size(draw, text, font)
+    tw, th = get_text_bbox_size(dark_image.size, text, font)
     center_w = (w - tw) / 2
     center_h = (h - th) / 2
     center_pos = (center_w, center_h)
+    draw = ImageDraw.Draw(dark_image)
     draw.text(center_pos, text, font=font, fill=(255, 255, 255, 230))
 
     # 正常終了
     return AISImage(dark_image.convert("RGB"))
+
+
+def apply_rgb(
+    pil_image: Image.Image, converter: Callable[[np.ndarray], np.ndarray]
+) -> Image.Image:
+    """
+    pil_image に converter を適用する。
+    """
+    # [0, 1] に変換
+    np_image = np.asanyarray(pil_image).astype(np.float32) / 255.0
+
+    # RGB に輝度変換を適用
+    if len(np_image.shape) == 2:
+        np_image = converter(np_image)
+    elif np_image.shape[2] <= 3:
+        np_image = converter(np_image)
+    else:
+        np_image_rgb = np_image[..., :3]
+        np_image_a = np_image[..., 3:]
+        np_image_rgb = converter(np_image_rgb)
+        np_image = np.concatenate([np_image_rgb, np_image_a], axis=-1)
+
+    # [0, 255] に戻す
+    np_image = (np_image * 255.0).clip(0, 255).astype(np.uint8)
+
+    # 正常終了
+    return Image.fromarray(np_image, mode=pil_image.mode)
+
+
+def srgb_to_linear(pil_image: Image.Image) -> Image.Image:
+    """
+    自分自身が sRGB であると仮定して Linear RGB に変換する
+    """
+
+    # 輝度変換関数
+    def _srgb_to_linear(x: np.ndarray) -> np.ndarray:
+        return np.where(x <= 0.04045, x / 12.92, ((x + 0.055) / 1.055) ** 2.4)
+
+    # 適用
+    return apply_rgb(pil_image, _srgb_to_linear)
+
+
+def linear_to_srgb(pil_image: Image.Image) -> Image.Image:
+    """
+    自分自身が Linear RGB であると仮定して sRGB に変換する
+    """
+
+    # 輝度変換関数
+    def _linear_to_srgb(x: np.ndarray) -> np.ndarray:
+        return np.where(x <= 0.0031308, x * 12.92, 1.055 * (x ** (1 / 2.4)) - 0.055)
+
+    # 適用
+    return apply_rgb(pil_image, _linear_to_srgb)
 
 
 def overlay_nime_name(source_image: AISImage, nime_name: Optional[str]) -> AISImage:
@@ -328,9 +395,8 @@ def overlay_nime_name(source_image: AISImage, nime_name: Optional[str]) -> AISIm
     if font_size < MIN_FONT_SIZE:
         return AISImage(source_image.pil_image.copy())
 
-    # オーバーレイ画像
-    overlay_image = Image.new("RGBA", source_image.pil_image.size, (0, 0, 0, 0))
-    draw = ImageDraw.Draw(overlay_image)
+    # 構築先画像
+    result_image = source_image.pil_image.copy()
 
     # 画像内に収まるようにテキストの中央を切り詰める
     # NOTE
@@ -340,7 +406,9 @@ def overlay_nime_name(source_image: AISImage, nime_name: Optional[str]) -> AISIm
     actual_nime_name = nime_name
     while True:
         font = ImageFont.truetype(DEFAULT_FONT_PATH, size=font_size)
-        text_width, text_height = get_text_bbox_size(draw, actual_nime_name, font)
+        text_width, text_height = get_text_bbox_size(
+            result_image.size, actual_nime_name, font
+        )
         if text_width <= source_image.width:
             break
         else:
@@ -348,53 +416,65 @@ def overlay_nime_name(source_image: AISImage, nime_name: Optional[str]) -> AISIm
             nime_name_second = nime_name_second[1:]
             actual_nime_name = nime_name_first + "…" + nime_name_second
 
-    # テキスト背景の塗りつぶし強度を解決
-    # NOTE
-    #   小領域に分割し、小領域事に平均輝度を計算する。
-    #   最も明るい小領域に合わせて塗りつぶし強度を決める。
+    # 処理対象の矩形領域を解決
+    # TODO テキスト描画領域と、処理対象領域は微妙に違う
     text_left = 0
     text_top = source_image.height - text_height
-    text_region = source_image.pil_image.crop(
-        (text_left, text_top, text_left + text_width, text_top + text_height)
-    )
-    text_region_brightness = 0
-    num_text_sub_region = round(text_width / text_height)
-    for text_sub_regoin_index in range(num_text_sub_region):
-        left = round(
-            text_region.width * (text_sub_regoin_index + 0) / num_text_sub_region
-        )
-        right = round(
-            text_region.width * (text_sub_regoin_index + 1) / num_text_sub_region
-        )
-        text_sub_region = text_region.crop((left, 0, right, text_region.height))
-        text_sub_region_brighness = sum(ImageStat.Stat(text_sub_region).mean[:3]) / 3
-        if text_sub_region_brighness > text_region_brightness:
-            text_region_brightness = text_sub_region_brighness
-    text_bg_strength = min(1.0, text_region_brightness / 255)
-    text_bg_alpha = round(159 * text_bg_strength)
+    text_box = (text_left, text_top, text_left + text_width, text_top + text_height)
 
-    # テキスト背景描画
-    draw.rectangle(
-        (text_left, text_top, text_left + text_width, text_top + text_height),
-        fill=(0, 0, 0, text_bg_alpha),
+    # バックドロップ局所ブラー
+    # NOTE
+    #   テキスト描画の背景をぼかして明度・彩度を落とす
+    #   背景のエッジを丸めて文字のエッジが目立つようにする
+    bdlb_region = result_image.crop(text_box)
+    bdlb_radius = max(1, round(font_size * 0.14))
+    bdlb_region = bdlb_region.filter(ImageFilter.GaussianBlur(bdlb_radius))
+    bdlb_region = ImageEnhance.Brightness(bdlb_region).enhance(0.95)
+    bdlb_region = ImageEnhance.Color(bdlb_region).enhance(0.92)
+    result_image.paste(bdlb_region, text_box)
+
+    # ノックアウト暗化
+    # NOTE
+    #   文字の線の周辺を暗くして文字を目立たせる
+    #   暗くなっていることが分かるかどうかのギリギリを狙っている
+    KD_DARK_DEPTH = round(0.88 * 255)
+    KD_BLUR_1ST_MIN_RADIUS = 1.0
+    KD_BLUR_1ST_PCT = 0.08
+    KD_BLUR_2ND_SCALE = 2.0
+    KD_BLUR_2ND_MIN_RADIUS = KD_BLUR_2ND_SCALE * KD_BLUR_1ST_MIN_RADIUS
+    KD_BLUR_2ND_PCT = KD_BLUR_2ND_SCALE * KD_BLUR_1ST_PCT
+    kd_mask = Image.new("L", (text_width, text_height), 255)
+    ImageDraw.Draw(kd_mask).text(
+        (0, 0),
+        actual_nime_name,
+        font=font,
+        fill=KD_DARK_DEPTH,
+        anchor="lt",
     )
+    kd_radius_1st = max(KD_BLUR_1ST_MIN_RADIUS, KD_BLUR_1ST_PCT * font_size)
+    kd_radius_2nd = max(KD_BLUR_2ND_MIN_RADIUS, KD_BLUR_2ND_PCT * font_size)
+    kd_mask = kd_mask.filter(ImageFilter.GaussianBlur(kd_radius_1st))
+    kd_mask = kd_mask.filter(ImageFilter.GaussianBlur(kd_radius_2nd))
+    kd_mask = srgb_to_linear(kd_mask)
+    kd_mask = apply_rgb(kd_mask, lambda x: x**1.8)
+    kd_mask = kd_mask.convert("RGB")
+    kd_region = result_image.crop(text_box)
+    kd_region = srgb_to_linear(kd_region)
+    kd_region = ImageChops.multiply(kd_region, kd_mask)
+    kd_region = linear_to_srgb(kd_region)
+    result_image.paste(kd_region, text_box)
 
     # テキスト描画
-    draw.text(
+    ImageDraw.Draw(result_image).text(
         (text_left, text_top),
         actual_nime_name,
         font=font,
-        fill=(255, 255, 255, 255),
+        fill=(255, 255, 255),
         anchor="lt",
     )
 
-    # 元画像とテキストをオーバーレイ
-    result_pil_image = Image.alpha_composite(
-        source_image.pil_image.convert("RGBA"), overlay_image
-    ).convert("RGB")
-
     # 正常終了
-    return AISImage(result_pil_image)
+    return AISImage(result_image)
 
 
 class ImageModel:
