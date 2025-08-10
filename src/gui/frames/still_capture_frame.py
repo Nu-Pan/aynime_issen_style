@@ -81,11 +81,7 @@ class StillCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
             self.on_resolution_changes,
             AspectRatioPattern.E_RAW,
             ResizeDesc.Pattern.E_HD,
-            [
-                AspectRatioPattern.E_RAW,
-                AspectRatioPattern.E_16_9,
-                AspectRatioPattern.E_4_3,
-            ],
+            [ar for ar in AspectRatioPattern],
             [
                 ResizeDesc.Pattern.E_RAW,
                 ResizeDesc.Pattern.E_VGA,
