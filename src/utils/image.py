@@ -1,5 +1,5 @@
 # std
-from typing import Tuple, Optional, Union, Any, cast, List
+from typing import Tuple, Optional, Union, Any, cast, List, Callable
 from enum import Enum
 from dataclasses import dataclass
 from enum import Enum, auto

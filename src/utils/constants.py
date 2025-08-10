@@ -24,6 +24,8 @@ WINDOW_INIT_HEIGHT = 960
 # 共通して使用するフォント
 DEFAULT_FONT_FAMILY = "Yu Gothic UI"
 DEFAULT_FONT_PATH = Path("C:\\Windows\\Fonts\\YuGothM.ttc")
+OVERLAY_FONT_FAMILY = "Meiryo UI Bold"
+OVERLAY_FONT_PATH = Path("C:\\Windows\\Fonts\\Meiryob.ttc")
 
 # バージョン情報ファイルのパス
 VERSION_FILE_PATH = Path("src\\utils\\version_constants.py")
