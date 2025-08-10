@@ -346,27 +346,42 @@ def overlay_nime_name(source_image: AISImage, nime_name: Optional[str]) -> AISIm
             actual_nime_name = nime_name_first + "…" + nime_name_second
 
     # テキスト背景の塗りつぶし強度を解決
-    text_x = 0
-    text_y = source_image.height - text_height
+    # NOTE
+    #   小領域に分割し、小領域事に平均輝度を計算する。
+    #   最も明るい小領域に合わせて塗りつぶし強度を決める。
+    text_left = 0
+    text_top = source_image.height - text_height
     text_region = source_image.pil_image.crop(
-        (text_x, text_y, text_x + text_width, text_y + text_height)
+        (text_left, text_top, text_left + text_width, text_top + text_height)
     )
-    source_text_region_brightness = sum(ImageStat.Stat(text_region).mean[:3]) / 3
-    text_bg_strength = min(1.0, source_text_region_brightness / 255)
+    text_region_brightness = 0
+    num_text_sub_region = round(text_width / text_height)
+    for text_sub_regoin_index in range(num_text_sub_region):
+        left = round(
+            text_region.width * (text_sub_regoin_index + 0) / num_text_sub_region
+        )
+        right = round(
+            text_region.width * (text_sub_regoin_index + 1) / num_text_sub_region
+        )
+        text_sub_region = text_region.crop((left, 0, right, text_region.height))
+        text_sub_region_brighness = sum(ImageStat.Stat(text_sub_region).mean[:3]) / 3
+        if text_sub_region_brighness > text_region_brightness:
+            text_region_brightness = text_sub_region_brighness
+    text_bg_strength = min(1.0, text_region_brightness / 255)
     text_bg_alpha = round(159 * text_bg_strength)
 
     # テキスト背景描画
     draw.rectangle(
-        (text_x, text_y, text_x + text_width, text_y + text_height),
+        (text_left, text_top, text_left + text_width, text_top + text_height),
         fill=(0, 0, 0, text_bg_alpha),
     )
 
     # テキスト描画
     draw.text(
-        (text_x, text_y),
+        (text_left, text_top),
         actual_nime_name,
         font=font,
-        fill=(255, 255, 255),
+        fill=(255, 255, 255, 255),
         anchor="lt",
     )
 
