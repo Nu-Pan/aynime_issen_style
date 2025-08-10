@@ -68,7 +68,7 @@ class StillCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
         register_global_hotkey_handler(self, self.on_preview_label_click, None)
 
         # アニメ名テキストボックス
-        self.nime_name_entry = AISEntry(self, placeholder_text="Entry NIME Name Here")
+        self.nime_name_entry = AISEntry(self, placeholder_text="Override NIME name ...")
         self.rowconfigure(1, weight=0)
         self.nime_name_entry.grid(
             row=1, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"

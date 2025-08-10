@@ -87,7 +87,9 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
 
         # アニメ名テキストボックス
         self.nime_name_entry = AISEntry(
-            self._output_kind_frame, width=0, placeholder_text="Entry NIME Name Here"
+            self._output_kind_frame,
+            width=0,
+            placeholder_text="Override NIME name ...",
         )
         self.nime_name_entry.grid(
             row=1, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
