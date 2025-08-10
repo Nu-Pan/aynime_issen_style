@@ -5,12 +5,12 @@ from typing import Optional
 import customtkinter as ctk
 
 # utils
-from utils.constants import DEFAULT_FONT_NAME
+from utils.constants import DEFAULT_FONT_FAMILY
 from utils.ctk import silent_configure, configure_presence
 from utils.image import ResizeDesc, AspectRatioPattern, AISImage
 
 # model
-from gui.model.contents_cache import ImageModel, ImageLayer
+from gui.model.contents_cache import ImageModel, ImageLayer, ImageModelEditSession
 
 
 class StillLabel(ctk.CTkLabel):
@@ -44,7 +44,7 @@ class StillLabel(ctk.CTkLabel):
         )
 
         # フォントを設定
-        default_font = ctk.CTkFont(DEFAULT_FONT_NAME)
+        default_font = ctk.CTkFont(DEFAULT_FONT_FAMILY)
         silent_configure(self, font=default_font)
 
         # ブランク表示
@@ -75,7 +75,8 @@ class StillLabel(ctk.CTkLabel):
         # モデルにサイズを反映
         actual_width = self.winfo_width()
         actual_height = self.winfo_height()
-        self._image_model.set_size(
-            ImageLayer.PREVIEW,
-            ResizeDesc(AspectRatioPattern.E_RAW, actual_width, actual_height),
-        )
+        with ImageModelEditSession(self._image_model) as edit:
+            edit.set_size(
+                ImageLayer.PREVIEW,
+                ResizeDesc(AspectRatioPattern.E_RAW, actual_width, actual_height),
+            )

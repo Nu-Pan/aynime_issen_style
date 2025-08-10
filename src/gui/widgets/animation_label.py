@@ -10,7 +10,7 @@ from utils.image import ResizeDesc, AspectRatioPattern, AISImage
 
 # gui
 from gui.model.aynime_issen_style import AynimeIssenStyleModel
-from gui.model.contents_cache import ImageLayer, PlaybackMode
+from gui.model.contents_cache import ImageLayer, PlaybackMode, VideoModelEditSession
 
 
 class AnimationLabel(ctk.CTkLabel):
@@ -130,7 +130,8 @@ class AnimationLabel(ctk.CTkLabel):
         # 適切なサイズを解決
         actual_width = self.winfo_width()
         actual_height = self.winfo_height()
-        self._model.video.set_size(
-            ImageLayer.PREVIEW,
-            ResizeDesc(AspectRatioPattern.E_RAW, actual_width, actual_height),
-        )
+        with VideoModelEditSession(self._model.video) as edit:
+            edit.set_size(
+                ImageLayer.PREVIEW,
+                ResizeDesc(AspectRatioPattern.E_RAW, actual_width, actual_height),
+            )

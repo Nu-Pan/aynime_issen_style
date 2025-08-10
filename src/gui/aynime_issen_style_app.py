@@ -7,7 +7,9 @@ from utils.constants import (
     APP_NAME_JP,
     WINDOW_MIN_WIDTH,
     WINDOW_MIN_HEIGHT,
-    DEFAULT_FONT_NAME,
+    WINDOW_INIT_WIDTH,
+    WINDOW_INIT_HEIGHT,
+    DEFAULT_FONT_FAMILY,
 )
 from utils.pyinstaller import resource_path
 
@@ -19,7 +21,6 @@ from gui.frames.version_frame import VersionFrame
 
 # local
 from gui.model.aynime_issen_style import AynimeIssenStyleModel
-from gui.model.capture import CaptureMode
 
 
 class AynimeIssenStyleApp(ctk.CTk, TkinterDnD.DnDWrapper):
@@ -39,7 +40,7 @@ class AynimeIssenStyleApp(ctk.CTk, TkinterDnD.DnDWrapper):
         self.tk_dnd_version = TkinterDnD._require(self)
 
         # フォントを設定
-        default_font = ctk.CTkFont(DEFAULT_FONT_NAME)
+        default_font = ctk.CTkFont(DEFAULT_FONT_FAMILY)
         self.configure(font=default_font)
 
         # タイトルを設定
@@ -49,14 +50,13 @@ class AynimeIssenStyleApp(ctk.CTk, TkinterDnD.DnDWrapper):
         self.iconbitmap(resource_path("app.ico"))
 
         # 初期サイズを設定
-        self.geometry(f"{WINDOW_MIN_WIDTH}x{WINDOW_MIN_HEIGHT}")
+        self.geometry(f"{WINDOW_INIT_WIDTH}x{WINDOW_INIT_HEIGHT}")
 
         # 最小サイズを設定
         self.minsize(WINDOW_MIN_WIDTH, WINDOW_MIN_HEIGHT)
 
         # Model-View でいうところのモデル
         self.model = AynimeIssenStyleModel()
-        self.model.capture.change_capture_mode(CaptureMode.DXCAM)
 
         # タブビューを追加
         self.tabview = ctk.CTkTabview(self)

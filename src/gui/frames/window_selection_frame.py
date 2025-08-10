@@ -1,5 +1,6 @@
 # std
 from typing import cast
+from dataclasses import dataclass
 
 # Tk/CTk
 from tkinter import Event
@@ -7,15 +8,23 @@ import customtkinter as ctk
 from CTkListbox import CTkListbox
 
 # utils
-from utils.capture_context import CaptureTargetInfo
-from utils.constants import WIDGET_PADDING, WINDOW_MIN_WIDTH, DEFAULT_FONT_NAME
-from gui.model.contents_cache import ImageModel
+from utils.capture_context import WindowHandle
+from utils.constants import WIDGET_PADDING, WINDOW_MIN_WIDTH, DEFAULT_FONT_FAMILY
 
 # gui
 from gui.widgets.still_label import StillLabel
 from gui.model.aynime_issen_style import AynimeIssenStyleModel
-from gui.model.capture import CaptureMode
-from gui.model.contents_cache import ImageLayer
+from gui.model.contents_cache import ImageModelEditSession
+
+
+@dataclass
+class WindowListBoxItem:
+
+    window_handle: WindowHandle
+    window_name: str
+
+    def __str__(self) -> str:
+        return self.window_name
 
 
 class WindowSelectionFrame(ctk.CTkFrame):
@@ -36,7 +45,7 @@ class WindowSelectionFrame(ctk.CTkFrame):
         super().__init__(master, **kwargs)
 
         # フォントを生成
-        default_font = ctk.CTkFont(DEFAULT_FONT_NAME)
+        default_font = ctk.CTkFont(DEFAULT_FONT_FAMILY)
 
         # モデル
         self.model = model
@@ -52,53 +61,16 @@ class WindowSelectionFrame(ctk.CTkFrame):
             row=0, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
         )
         self.west_frame.configure(width=WINDOW_MIN_WIDTH // 2)
-        self.west_frame.rowconfigure(1, weight=1)
         self.west_frame.columnconfigure(0, weight=1)
-
-        # キャプチャモード選択フレーム
-        self.capture_mode_frame = ctk.CTkFrame(self.west_frame)
-        self.capture_mode_frame.grid(
-            row=0, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nwe"
-        )
-        self.capture_mode_frame.columnconfigure(0, weight=1)
-        self.capture_mode_frame.columnconfigure(1, weight=1)
-
-        # キャプチャモード選択ラジオボタン変数
-        self.capture_mode_var = ctk.StringVar(value=CaptureMode.DXCAM.value)
-
-        # キャプチャモード選択ラジオボタン（DXCAM）
-        self.capture_mode_dxcam_radio = ctk.CTkRadioButton(
-            self.capture_mode_frame,
-            text=CaptureMode.DXCAM.name,
-            variable=self.capture_mode_var,
-            value=CaptureMode.DXCAM.value,
-            command=self.on_capture_mode_radio_change,
-            width=0,
-        )
-        self.capture_mode_dxcam_radio.grid(
-            row=0, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
-        )
-
-        # キャプチャモード選択ラジオボタン（PYWIN32）
-        self.capture_mode_pywin32_radio = ctk.CTkRadioButton(
-            self.capture_mode_frame,
-            text=CaptureMode.PYWIN32.name,
-            variable=self.capture_mode_var,
-            value=CaptureMode.PYWIN32.value,
-            command=self.on_capture_mode_radio_change,
-            width=0,
-        )
-        self.capture_mode_pywin32_radio.grid(
-            row=0, column=1, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
-        )
 
         # キャプチャ対象リストボックス
         self.capture_target_list_box = CTkListbox(
             self.west_frame, multiple_selection=False
         )
         self.capture_target_list_box.grid(
-            row=1, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
+            row=0, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
         )
+        self.west_frame.rowconfigure(0, weight=1)
         self.capture_target_list_box.bind(
             "<<ListboxSelect>>", self.on_capture_target_select
         )
@@ -110,8 +82,9 @@ class WindowSelectionFrame(ctk.CTkFrame):
             command=self.update_list,
             font=default_font,
         )
+        self.west_frame.rowconfigure(1, weight=0)
         self.reload_capture_target_list_button.grid(
-            row=2, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
+            row=1, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
         )
 
         # 画面右側のフレーム
@@ -124,7 +97,7 @@ class WindowSelectionFrame(ctk.CTkFrame):
 
         # プレビュー画像表示用ラベル
         self.capture_target_preview_label = StillLabel(
-            self.east_frame, model.window_selection, "Preview"
+            self.east_frame, model.window_selection_image, "Preview"
         )
         self.capture_target_preview_label.grid(
             row=1, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
@@ -132,21 +105,8 @@ class WindowSelectionFrame(ctk.CTkFrame):
 
         # 初回キャプチャターゲットリスト更新
         self.update_list()
-        self.clear_capture_target_preview()
-
-        # UI 上の設定をモデルに反映
-        self.on_capture_mode_radio_change()
-
-    def on_capture_mode_radio_change(self) -> None:
-        """
-        キャプチャモードの選択イベントハンドラ
-        """
-        # モデルに変更を反映
-        self.model.capture.change_capture_mode(CaptureMode(self.capture_mode_var.get()))
-        self.update_list()
-
-        # プレビューをクリア
-        self.clear_capture_target_preview()
+        with ImageModelEditSession(self.model.window_selection_image) as edit:
+            edit.set_raw_image(None)
 
     def on_capture_target_select(self, event: Event) -> None:
         """
@@ -157,15 +117,19 @@ class WindowSelectionFrame(ctk.CTkFrame):
         """
         # キャプチャ対象の変更をモデルに反映
         selection = cast(
-            CaptureTargetInfo,
+            WindowListBoxItem,
             self.capture_target_list_box.get(
                 self.capture_target_list_box.curselection()
             ),
         )
-        self.model.capture.change_capture_target(selection)
+        self.model.capture.set_capture_window(selection.window_handle)
 
         # 描画更新
-        self.update_original_capture_image()
+        with ImageModelEditSession(self.model.window_selection_image) as edit:
+            try:
+                edit.set_raw_image(self.model.capture.capture())
+            except Exception as e:
+                edit.set_raw_image(None)
 
     def update_list(self) -> None:
         """
@@ -175,25 +139,32 @@ class WindowSelectionFrame(ctk.CTkFrame):
         try:
             self.reload_capture_target_list_button.configure(state=ctk.DISABLED)
             self.capture_target_list_box.delete("all")
-            for capture_target_info in self.model.capture.enumerate_capture_targets():
-                self.capture_target_list_box.insert(ctk.END, capture_target_info, False)
+            raw_items = [
+                WindowListBoxItem(
+                    window_handle, self.model.capture.get_window_name(window_handle)
+                )
+                for window_handle in self.model.capture.enumerate_windows()
+            ]
+            nime_items = sorted(
+                [
+                    WindowListBoxItem(
+                        item.window_handle, item.window_name.replace("<NIME>", "")
+                    )
+                    for item in raw_items
+                    if "<NIME>" in item.window_name
+                ],
+                key=lambda item: item.window_name,
+            )
+            other_items = sorted(
+                [item for item in raw_items if "<NIME>" not in item.window_name],
+                key=lambda item: item.window_name,
+            )
+            for item in nime_items + other_items:
+                self.capture_target_list_box.insert(
+                    ctk.END,
+                    item,
+                    False,
+                )
             self.capture_target_list_box.update()
         finally:
             self.reload_capture_target_list_button.configure(state=ctk.NORMAL)
-
-    def update_original_capture_image(self) -> None:
-        """
-        選択されたウィンドウのキャプチャを撮影し、その画像で内部状態を更新する。
-        """
-        try:
-            self.model.window_selection.set_raw_image(
-                self.model.capture.capture(), None
-            )
-        except Exception as e:
-            self.model.window_selection.set_raw_image(None, None)
-
-    def clear_capture_target_preview(self) -> None:
-        """
-        プレビューの表示状態をクリアする。
-        """
-        self.model.window_selection.set_raw_image(None, None)

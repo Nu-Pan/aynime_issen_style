@@ -8,7 +8,7 @@ import sys
 import customtkinter as ctk
 
 # utils
-from utils.constants import WIDGET_PADDING, DEFAULT_FONT_NAME, VERSION_FILE_PATH
+from utils.constants import WIDGET_PADDING, DEFAULT_FONT_FAMILY, VERSION_FILE_PATH
 
 # バージョン情報のインポート
 # NOTE
@@ -39,7 +39,7 @@ class VersionFrame(ctk.CTkFrame):
         super().__init__(master, **kwargs)
 
         # フォントを生成
-        default_font = ctk.CTkFont(DEFAULT_FONT_NAME)
+        default_font = ctk.CTkFont(DEFAULT_FONT_FAMILY)
 
         # 表示用バージョン文字列
         version_text = f"""

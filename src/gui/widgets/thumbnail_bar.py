@@ -7,12 +7,17 @@ from tkinter import Event
 import customtkinter as ctk
 
 # utils
-from utils.constants import WIDGET_PADDING, DEFAULT_FONT_NAME
+from utils.constants import WIDGET_PADDING, DEFAULT_FONT_FAMILY
 from utils.ctk import configure_presence
 from utils.image import AISImage
 
 # gui
-from gui.model.contents_cache import ResizeDesc, ImageLayer, AspectRatioPattern
+from gui.model.contents_cache import (
+    ResizeDesc,
+    ImageLayer,
+    AspectRatioPattern,
+    VideoModelEditSession,
+)
 from gui.model.aynime_issen_style import AynimeIssenStyleModel
 
 
@@ -36,7 +41,7 @@ class SentinelItem(ctk.CTkFrame):
         super().__init__(master)
 
         # フォントを生成
-        default_font = ctk.CTkFont(DEFAULT_FONT_NAME)
+        default_font = ctk.CTkFont(DEFAULT_FONT_FAMILY)
 
         # 引数を保存
         self._model = model
@@ -73,10 +78,11 @@ class SentinelItem(ctk.CTkFrame):
         #   そのため、番兵アイテムでサイズ変更をハンドルしてモデルに反映する
         actual_height = self.winfo_height()
         aspect_ratio = self._model.video.get_size(ImageLayer.THUMBNAIL).aspect_ratio
-        self._model.video.set_size(
-            ImageLayer.THUMBNAIL,
-            ResizeDesc(aspect_ratio, None, actual_height),
-        )
+        with VideoModelEditSession(self._model.video) as edit:
+            edit.set_size(
+                ImageLayer.THUMBNAIL,
+                ResizeDesc(aspect_ratio, None, actual_height),
+            )
 
 
 class ThumbnailItem(ctk.CTkFrame):
@@ -94,7 +100,7 @@ class ThumbnailItem(ctk.CTkFrame):
         super().__init__(master)
 
         # フォントを生成
-        default_font = ctk.CTkFont(DEFAULT_FONT_NAME)
+        default_font = ctk.CTkFont(DEFAULT_FONT_FAMILY)
 
         # 現在表示している画像
         # NOTE
@@ -154,13 +160,15 @@ class ThumbnailItem(ctk.CTkFrame):
         マウスクリック（左ボタン）
         """
         enable = self._model.video.get_enable(self._frame_index)
-        self._model.video.set_enable(self._frame_index, not enable)
+        with VideoModelEditSession(self._model.video) as edit:
+            edit.set_enable(self._frame_index, not enable)
 
     def _on_click_right(self, event: Event):
         """
         マウスクリック（右ボタン）
         """
-        self._model.video.delete_frame(self._frame_index)
+        with VideoModelEditSession(self._model.video) as edit:
+            edit.delete_frame(self._frame_index)
 
 
 class ThumbnailBar(ctk.CTkScrollableFrame):
@@ -200,10 +208,11 @@ class ThumbnailBar(ctk.CTkScrollableFrame):
         self.grid_rowconfigure(0, weight=1)
 
         # サムネイル画像のアスペクト比を設定
-        self._model.video.set_size(
-            ImageLayer.THUMBNAIL,
-            ResizeDesc(AspectRatioPattern.E_RAW, None, None),
-        )
+        with VideoModelEditSession(self._model.video) as edit:
+            edit.set_size(
+                ImageLayer.THUMBNAIL,
+                ResizeDesc(AspectRatioPattern.E_RAW, None, None),
+            )
 
         # 番兵アイテムを追加
         # NOTE

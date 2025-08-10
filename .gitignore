@@ -7,3 +7,4 @@ __pycache__
 /*.spec
 /src/utils/version_constants.py
 /log/
+/memo.md

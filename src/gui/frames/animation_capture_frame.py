@@ -1,6 +1,6 @@
 # std
 from pathlib import Path
-from typing import List
+from typing import List, Tuple, cast
 from time import time
 
 # Tk/CTk
@@ -9,7 +9,7 @@ from tkinterdnd2 import TkinterDnD, DND_FILES
 from tkinterdnd2.TkinterDnD import DnDEvent
 
 # utils
-from utils.constants import WIDGET_PADDING, DEFAULT_FONT_NAME
+from utils.constants import WIDGET_PADDING, DEFAULT_FONT_FAMILY
 from utils.image import (
     AspectRatioPattern,
     ResizeDesc,
@@ -25,6 +25,7 @@ from utils.ctk import show_notify, show_error_dialog
 from gui.widgets.thumbnail_bar import ThumbnailBar
 from gui.widgets.animation_label import AnimationLabel
 from gui.widgets.size_pattern_selection_frame import SizePatternSlectionFrame
+from gui.widgets.ais_entry import AISEntry
 from gui.model.contents_cache import (
     ImageLayer,
     ImageModel,
@@ -32,6 +33,7 @@ from gui.model.contents_cache import (
     PlaybackMode,
     save_content_model,
     load_content_model,
+    VideoModelEditSession,
 )
 
 # local
@@ -59,7 +61,7 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
         self._model = model
 
         # フォントを生成
-        default_font = ctk.CTkFont(DEFAULT_FONT_NAME)
+        default_font = ctk.CTkFont(DEFAULT_FONT_FAMILY)
 
         # レイアウト設定
         self.rowconfigure(0, weight=1)
@@ -83,6 +85,15 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
             row=0, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
         )
 
+        # アニメ名テキストボックス
+        self.nime_name_entry = AISEntry(
+            self._output_kind_frame, width=0, placeholder_text="Entry NIME Name Here"
+        )
+        self.nime_name_entry.grid(
+            row=1, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
+        )
+        self.nime_name_entry.register_handler(self.on_nime_name_entry_changed)
+
         # 解像度選択フレーム
         self._size_pattern_selection_frame = SizePatternSlectionFrame(
             self._output_kind_frame,
@@ -104,24 +115,25 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
             ],
         )
         self._size_pattern_selection_frame.grid(
-            row=1, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
+            row=2, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
         )
 
         # UI とモデルの解像度を揃える
-        self._model.video.set_size(
-            ImageLayer.NIME,
-            ResizeDesc.from_pattern(
-                self._size_pattern_selection_frame.aspect_ratio,
-                self._size_pattern_selection_frame.resolution,
-            ),
-        )
+        with VideoModelEditSession(self._model.video) as edit:
+            edit.set_size(
+                ImageLayer.NIME,
+                ResizeDesc.from_pattern(
+                    self._size_pattern_selection_frame.aspect_ratio,
+                    self._size_pattern_selection_frame.resolution,
+                ),
+            )
 
         # 再生モード関係フレーム
         self._playback_mode_frame = ctk.CTkFrame(
             self._output_kind_frame, width=0, height=0
         )
         self._playback_mode_frame.grid(
-            row=2, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
+            row=3, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
         )
         self._playback_mode_frame.rowconfigure(0, weight=1)
 
@@ -151,7 +163,7 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
             self._output_kind_frame, width=0, height=0
         )
         self._frame_rate_frame.grid(
-            row=3, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
+            row=4, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
         )
         self._frame_rate_frame.rowconfigure(0, weight=1)
         self._frame_rate_frame.columnconfigure(0, weight=1)
@@ -181,7 +193,7 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
         self._on_frame_rate_slider_changed(GIF_DURATION_MAP.default_entry.index)
 
         # ビデオモデルフレームレート変更ハンドラを登録
-        self._model.video.register_furation_change_handler(
+        self._model.video.register_duration_change_handler(
             self._on_model_frame_rate_changed
         )
 
@@ -372,6 +384,16 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
         self.drop_target_register(DND_FILES)
         self.dnd_bind("<<Drop>>", self._on_drop_file)
 
+    def on_nime_name_entry_changed(self, text: str):
+        """
+        アニメ名テキストボックスが変更されたときに呼び出される
+        """
+        with VideoModelEditSession(self._model.video) as edit:
+            if text != "":
+                edit.set_nime_name(text)
+            else:
+                edit.set_nime_name(self._model.capture.current_window_name)
+
     def _on_resolution_changes(
         self, aspect_ratio: AspectRatioPattern, resolution: ResizeDesc.Pattern
     ):
@@ -382,11 +404,12 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
             aspect_ratio (AspectRatio): アスペクト比
             resolution (Resolution): 解像度
         """
-        self._model.video.set_size(
-            ImageLayer.NIME, ResizeDesc.from_pattern(aspect_ratio, resolution)
-        )
         self._aspect_ratio = aspect_ratio
         self._resolution = resolution
+        with VideoModelEditSession(self._model.video) as edit:
+            edit.set_size(
+                ImageLayer.NIME, ResizeDesc.from_pattern(aspect_ratio, resolution)
+            )
 
     def _on_playback_mode_radio_change(self):
         """
@@ -405,7 +428,8 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
         self._frame_rate_label.configure(
             text=f"{gif_duration_entry.frame_rate_float:4.1f} FPS"
         )
-        self._model.video.set_duration_in_msec(gif_duration_entry.gif_duration_in_msec)
+        with VideoModelEditSession(self._model.video) as edit:
+            edit.set_duration_in_msec(gif_duration_entry.gif_duration_in_msec)
 
     def _on_model_frame_rate_changed(self):
         """
@@ -464,7 +488,8 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
         """
         ワイプボタンクリックハンドラ
         """
-        self._model.video.clear_frames()
+        with VideoModelEditSession(self._model.video) as edit:
+            edit.clear_frames()
 
     def _on_dupe_threshold_slider_changed(self, value: float):
         """
@@ -524,21 +549,27 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
                 frame_enabled[idx_B] = False
 
         # 解決した有効・無効をモデルに設定
-        self._model.video.set_enable_batch(
-            [(frame_index, enable) for frame_index, enable in enumerate(frame_enabled)]
-        )
+        with VideoModelEditSession(self._model.video) as edit:
+            edit.set_enable_batch(
+                [
+                    (frame_index, enable)
+                    for frame_index, enable in enumerate(frame_enabled)
+                ]
+            )
 
     def _on_enable_all_button_clicked(self):
         """
         全フレーム有効化ボタンハンドラ
         """
-        self._model.video.set_enable(None, True)
+        with VideoModelEditSession(self._model.video) as edit:
+            edit.set_enable(None, True)
 
     def _on_disable_all_button_clicked(self):
         """
         全フレーム無効化ボタンハンドラ
         """
-        self._model.video.set_enable(None, False)
+        with VideoModelEditSession(self._model.video) as edit:
+            edit.set_enable(None, False)
 
     def _on_remove_disable_button_clicked(self):
         """
@@ -554,8 +585,9 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
         # NOTE
         #   前方のフレームを削除すると、それよりも後方のフレームがずれるので
         disabled_frame_indices.sort(reverse=True)
-        for disabled_frame_index in disabled_frame_indices:
-            self._model.video.delete_frame(disabled_frame_index)
+        with VideoModelEditSession(self._model.video) as edit:
+            for disabled_frame_index in disabled_frame_indices:
+                edit.delete_frame(disabled_frame_index)
 
     def _record_handler(
         self, stop_time_in_sec: float, record_raw_images: List[AISImage] = []
@@ -570,13 +602,23 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
         """
         # 所定の時間を経過してたら終了
         if time() > stop_time_in_sec:
-            self._model.video.set_time_stamp(None)
-            self._model.video.append_frames(
-                [
-                    ImageModel(img, self._model.video.time_stamp)
-                    for img in record_raw_images
-                ]
-            )
+            if len(record_raw_images) > 0:
+                with VideoModelEditSession(self._model.video) as edit:
+                    if self.nime_name_entry.text != "":
+                        edit.set_nime_name(self.nime_name_entry.text)
+                    else:
+                        edit.set_nime_name(self._model.capture.current_window_name)
+                    edit.set_time_stamp(None)
+                    edit.append_frames(
+                        [
+                            ImageModel(
+                                img,
+                                self._model.capture.current_window_name,
+                                self._model.video.time_stamp,
+                            )
+                            for img in record_raw_images
+                        ]
+                    )
             return
 
         # キャプチャ
@@ -613,53 +655,43 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
         Args:
             event (Event): イベント
         """
-        # ファイルパスのみ受付
+        # イベントからデータを取り出し
         event_data = vars(event)["data"]
         if not isinstance(event_data, str):
             return
 
-        # 動画・画像で分岐
-        paths = self.tk.splitlist(event_data)
-        failed_names = []
-        new_models = []
-        new_time_stamp = None
-        new_duration_in_msec = None
-        for path_str in paths:
-            path = Path(path_str)
-            try:
-                new_model = load_content_model(path)
-                new_models.append(new_model)
-                if isinstance(new_model, VideoModel):
-                    new_time_stamp = new_model.time_stamp
-                    new_duration_in_msec = new_model.duration_in_msec
-            except Exception as e:
-                failed_names.append(path.name)
+        # 読み込み対象を解決
+        file_paths = cast(Tuple[str], self.tk.splitlist(event_data))
+        if len(file_paths) > 1:
+            show_error_dialog("ファイルは１つだけドロップしてね。")
+            return
+        else:
+            file_path = file_paths[0]
+
+        # モデルロード
+        try:
+            load_result = load_content_model(Path(file_path))
+        except Exception as e:
+            show_error_dialog("ファイルロードに失敗。", e)
+            return
+
+        # スチル画像はロード不可
+        if isinstance(load_result, ImageModel):
+            show_error_dialog("スチル画像はロード不可。")
+            return
+
+        # アニメ名を解決
+        if self.nime_name_entry.text != "":
+            actual_nime_name = self.nime_name_entry.text
+        else:
+            actual_nime_name = load_result.nime_name
 
         # モデルに反映
-        self._model.video.append_frames(new_models)
-        if new_time_stamp is not None:
-            self._model.video.set_time_stamp(new_time_stamp)
-        if new_duration_in_msec is not None:
-            self._model.video.set_duration_in_msec(new_duration_in_msec)
-
-        # 問題が起きていればダイアログを出す
-        if len(failed_names) > 0:
-            # 基本メッセージ
-            message_lines = []
-            if len(new_models) > 0:
-                message_lines.append(
-                    "ドロップされた画像・動画のうち、一部の読み込みに失敗。"
-                )
-            else:
-                message_lines.append(
-                    "ドロップされたすべての画像・動画の読み込みに失敗。"
-                )
-
-            # 読み込み失敗リスト
-            TOP_N = 5
-            message_lines.extend(failed_names[:TOP_N])
-            if len(failed_names) > TOP_N:
-                message_lines.append("...")
-
-            # ダイアログ表示
-            show_error_dialog("\n".join(message_lines))
+        with VideoModelEditSession(self._model.video) as edit:
+            (
+                edit.clear_frames()
+                .set_nime_name(actual_nime_name)
+                .set_time_stamp(load_result.time_stamp)
+                .set_duration_in_msec(load_result.duration_in_msec)
+                .append_frames(load_result)
+            )

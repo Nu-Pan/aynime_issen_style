@@ -3,7 +3,7 @@ import sys
 from pathlib import Path
 from datetime import datetime
 import logging
-from typing import Any
+from typing import Any, Iterable
 import traceback
 
 
@@ -70,3 +70,17 @@ def traceback_str(exception: Exception) -> str:
     return "".join(
         traceback.format_exception(type(exception), exception, exception.__traceback__)
     )
+
+
+def replace_multi(
+    text: str,
+    repl_sources: Iterable[str],
+    repl_target: str,
+) -> str:
+    """
+    text 中に登場する repl_source を repl_target で置き換える。
+    標準の replace の複数指定可能バージョン
+    """
+    for repl_source in repl_sources:
+        text = text.replace(repl_source, repl_target)
+    return text
