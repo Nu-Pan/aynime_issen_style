@@ -86,18 +86,20 @@ class CachedContent(ABC):
         else:
             return self._parent.output
 
-    def set_dirty(self, does_set: bool = True) -> Self:
+    def mark_dirty(self, does_set: bool = True) -> Self:
         """
-        ダーティフラグを立てる
+        ダーティ状態としてマークする
         立てるかどうかを source_state で指定可能
         """
         self._is_dirty |= does_set
         return self
 
-    def reset_dirty(self) -> Self:
+    def mark_resolved(self) -> Self:
         """
-        ダーティフラグを下げる
+        ダーティ状態が解除されたとしてマークする
         """
+        if self._parent is not None:
+            self._known_parent_output = self._parent.output
         self._is_dirty = False
         return self
 
@@ -106,12 +108,13 @@ class CachedContent(ABC):
         """
         ダーティー状態なら True を返す
         """
-        # 親の変化の有無を自身のダーティフラグに反映
+        # 親の状態を自身のダーティフラグに反映
         if self._parent is not None:
-            parent_output = self.parent_output
-            if parent_output != self._known_parent_output:
-                self._known_parent_output = parent_output
-                self.set_dirty()
+            parent = self._parent
+            if parent.is_dirty:
+                self.mark_dirty()
+            elif parent.output != self._known_parent_output:
+                self.mark_dirty()
 
         # 内部状態を返す
         return self._is_dirty
@@ -145,7 +148,7 @@ class CachedSourceImage(CachedContent):
         ソース画像を設定する
         """
         if self._source != source:
-            self.set_dirty()
+            self.mark_dirty()
             self._source = source
         return self
 
@@ -158,7 +161,7 @@ class CachedSourceImage(CachedContent):
         # NOTE
         #   ソースを素通しなので画像処理は不要
         #   ダーティフラグを下げてソース画像をそのまま返す
-        self.reset_dirty()
+        self.mark_resolved()
         return self._source
 
 
@@ -196,7 +199,7 @@ class CachedScalableImage(CachedContent):
         スケーリング後のサイズを設定
         """
         if self._size != size:
-            self.set_dirty()
+            self.mark_dirty()
             self._size = size
         return self
 
@@ -225,11 +228,11 @@ class CachedScalableImage(CachedContent):
                     raise TypeError(type(parent_output))
                 if self._aux_process is not None:
                     self._output = self._aux_process(self._output)
-                self.reset_dirty()
+                self.mark_resolved()
             else:
                 # 揃っていない場合、単にクリア
                 self._output = None
-                self.reset_dirty()
+                self.mark_resolved()
 
         # 正常終了
         return self._output
@@ -588,7 +591,7 @@ class ImageModelEditSession:
         model = self._model
         if model._nime_name != nime_name:
             model._nime_name = nime_name
-            model._nime_image.set_dirty()
+            model._nime_image.mark_dirty()
 
         # 正常終了
         return self
@@ -619,9 +622,9 @@ class ImageModelEditSession:
         """
         model = self._model
         if model._enable != enable:
-            self._enable = enable
-            model._thumbnail_pil_image_enable.set_dirty()
-            model._thumbnail_pil_image_disable.set_dirty()
+            model._enable = enable
+            model._thumbnail_pil_image_enable.mark_dirty()
+            model._thumbnail_pil_image_disable.mark_dirty()
         return self
 
     def set_size(self, layer: ImageLayer, size: ResizeDesc) -> Self:
