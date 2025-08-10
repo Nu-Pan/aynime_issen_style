@@ -39,26 +39,29 @@ _TIMESTAMP_FORMAT = "%Y-%m-%d_%H-%M-%S"
 
 def current_time_stamp() -> str:
     """
-    現在時刻からタイムスタンプ文字列を生成
-
-    Returns:
-        str: タイムスタンプ文字列
+    現在時刻からタイムスタンプ文字列を生成（ミリ秒3桁）
     """
-    return datetime.now().strftime(_TIMESTAMP_FORMAT)
+    now = datetime.now()
+    ms = now.microsecond // 1000  # 0〜999
+    return f"{now.strftime(_TIMESTAMP_FORMAT)}_{ms:03d}"
 
 
 def is_time_stamp(text: str) -> bool:
     """
-    text がタイムスタンプ文字列であるなら True を返す
+    text が旧フォーマット or 新フォーマットのタイムスタンプ文字列なら True
     """
-    # datetime でパース
-    try:
-        dt = datetime.strptime(text, _TIMESTAMP_FORMAT)
-    except ValueError:
-        return False
+    # 新フォーマット（ミリ秒あり）
+    m_new = re.fullmatch(r"\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}_\d{3}", text)
+    if m_new:
+        return True
 
-    # パース結果をまた文字列化して一致するか確認
-    return dt.strftime(_TIMESTAMP_FORMAT) == text
+    # 旧フォーマット（秒まで）
+    m_old = re.fullmatch(r"\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}", text)
+    if m_old:
+        return True
+
+    # どちらでもない
+    return False
 
 
 type AuxProcess = Callable[[AISImage], AISImage]
