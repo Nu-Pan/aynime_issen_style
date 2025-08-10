@@ -1,6 +1,6 @@
 # std
 from pathlib import Path
-from typing import List
+from typing import List, Tuple, cast
 from time import time
 
 # Tk/CTk
@@ -655,64 +655,43 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
         Args:
             event (Event): イベント
         """
-        # ファイルパスのみ受付
+        # イベントからデータを取り出し
         event_data = vars(event)["data"]
         if not isinstance(event_data, str):
             return
 
-        # ImageModel の配列に展開
-        paths = self.tk.splitlist(event_data)
-        failed_names = []
-        new_models = []
-        new_nime_name = None
-        new_time_stamp = None
-        new_duration_in_msec = None
-        for path_str in paths:
-            path = Path(path_str)
-            try:
-                new_model = load_content_model(path)
-                new_models.append(new_model)
-                if isinstance(new_model, ImageModel):
-                    new_nime_name = new_model.nime_name
-                    new_time_stamp = new_model.time_stamp
-                    new_duration_in_msec = None
-                elif isinstance(new_model, VideoModel):
-                    new_nime_name = new_model.nime_name
-                    new_time_stamp = new_model.time_stamp
-                    new_duration_in_msec = new_model.duration_in_msec
-            except Exception as e:
-                failed_names.append(path.name)
+        # 読み込み対象を解決
+        file_paths = cast(Tuple[str], self.tk.splitlist(event_data))
+        if len(file_paths) > 1:
+            show_error_dialog("ファイルは１つだけドロップしてね。")
+            return
+        else:
+            file_path = file_paths[0]
+
+        # モデルロード
+        try:
+            load_result = load_content_model(Path(file_path))
+        except Exception as e:
+            show_error_dialog("ファイルロードに失敗。", e)
+            return
+
+        # スチル画像はロード不可
+        if isinstance(load_result, ImageModel):
+            show_error_dialog("スチル画像はロード不可。")
+            return
+
+        # アニメ名を解決
+        if self.nime_name_entry.text != "":
+            actual_nime_name = self.nime_name_entry.text
+        else:
+            actual_nime_name = load_result.nime_name
 
         # モデルに反映
         with VideoModelEditSession(self._model.video) as edit:
-            if new_time_stamp is not None:
-                edit.set_time_stamp(new_time_stamp)
-            if new_duration_in_msec is not None:
-                edit.set_duration_in_msec(new_duration_in_msec)
-            if self.nime_name_entry.text != "":
-                edit.set_nime_name(self.nime_name_entry.text)
-            elif new_nime_name is not None:
-                edit.set_nime_name(new_nime_name)
-            edit.append_frames(new_models)
-
-        # 問題が起きていればダイアログを出す
-        if len(failed_names) > 0:
-            # 基本メッセージ
-            message_lines = []
-            if len(new_models) > 0:
-                message_lines.append(
-                    "ドロップされた画像・動画のうち、一部の読み込みに失敗。"
-                )
-            else:
-                message_lines.append(
-                    "ドロップされたすべての画像・動画の読み込みに失敗。"
-                )
-
-            # 読み込み失敗リスト
-            TOP_N = 5
-            message_lines.extend(failed_names[:TOP_N])
-            if len(failed_names) > TOP_N:
-                message_lines.append("...")
-
-            # ダイアログ表示
-            show_error_dialog("\n".join(message_lines))
+            (
+                edit.clear_frames()
+                .set_nime_name(actual_nime_name)
+                .set_time_stamp(load_result.time_stamp)
+                .set_duration_in_msec(load_result.duration_in_msec)
+                .append_frames(load_result)
+            )

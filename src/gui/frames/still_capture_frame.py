@@ -201,42 +201,37 @@ class StillCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
         Args:
             event (Event): イベント
         """
-        # ファイルパスのみ受付
+        # イベントからデータを取り出し
         event_data = vars(event)["data"]
         if not isinstance(event_data, str):
             return
 
-        # 読み込み処理
-        # NOTE
-        #   複数の画像ファイルがドロップ or 動画系ファイルがドロップされた場合、
-        #   先頭のフレームを代表して取り込む。
-        paths = cast(Tuple[str], self.tk.splitlist(event_data))
-        image = None
-        nime_name = None
-        time_stamp = None
-        exceptions: List[Exception] = []
-        for file_path in paths:
-            try:
-                load_result = load_content_model(Path(file_path))
-                if isinstance(load_result, ImageModel):
-                    image = load_result.get_image(ImageLayer.RAW)
-                    nime_name = load_result.nime_name
-                    time_stamp = load_result.time_stamp
-                    break
-                elif isinstance(load_result, VideoModel):
-                    image = load_result.get_frame(ImageLayer.RAW, 0)
-                    nime_name = load_result.nime_name
-                    time_stamp = load_result.time_stamp
-                    break
-                else:
-                    raise TypeError(load_result)
-            except Exception as e:
-                exceptions.append(e)
+        # 読み込み対象を解決
+        file_paths = cast(Tuple[str], self.tk.splitlist(event_data))
+        if len(file_paths) > 1:
+            show_error_dialog("ファイルは１つだけドロップしてね。")
+            return
+        else:
+            file_path = file_paths[0]
 
-        # 読み込めてない場合はここでおしまい
-        if not isinstance(image, AISImage) or not isinstance(time_stamp, str):
-            if len(exceptions) > 0:
-                show_error_dialog("画像・動画の読み込みに失敗。", exceptions)
+        # モデルロード
+        try:
+            load_result = load_content_model(Path(file_path))
+        except Exception as e:
+            show_error_dialog("ファイルロードに失敗。", e)
+            return
+
+        # モデルの中身を展開
+        if isinstance(load_result, ImageModel):
+            image = load_result.get_image(ImageLayer.RAW)
+            nime_name = load_result.nime_name
+            time_stamp = load_result.time_stamp
+        elif isinstance(load_result, VideoModel):
+            image = load_result.get_frame(ImageLayer.RAW, 0)
+            nime_name = load_result.nime_name
+            time_stamp = load_result.time_stamp
+        else:
+            show_error_dialog(f"ファイルロードに失敗。", TypeError(type(load_result)))
             return
 
         # アニメ名を解決
@@ -245,7 +240,7 @@ class StillCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
         else:
             actual_nime_name = nime_name
 
-        # モデルに設定
+        # AIS モデルに設定
         with ImageModelEditSession(self.model.still) as edit:
             edit.set_raw_image(image)
             edit.set_nime_name(actual_nime_name)
