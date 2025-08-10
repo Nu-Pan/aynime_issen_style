@@ -1,5 +1,6 @@
 # std
 from typing import Callable, List
+import time
 
 # ctk
 import customtkinter as ctk
@@ -18,12 +19,8 @@ class AISEntry(ctk.CTkEntry):
         """
         コンストラクタ
         """
-        # 変数
-        self._var = tk.StringVar()
-        self._var.set("")
-
         # 基底コンストラクタ
-        super().__init__(master, textvariable=self._var, **kwargs)
+        super().__init__(master, **kwargs)
 
         # フォントを設定
         default_font = ctk.CTkFont(DEFAULT_FONT_FAMILY)
@@ -32,21 +29,17 @@ class AISEntry(ctk.CTkEntry):
         # ハンドラリスト
         self._handlers: List[Callable[[str], None]] = []
 
-        # StringVar に対する write 監視
-        self._var.trace_add("write", self._trace_write)
-
-    def set_text(self, text: str) -> None:
-        """
-        テキストを変更
-        """
-        self._var.set(text)
+        # Entry の内容変更監視
+        self._polled_value = ""
+        self._next_notify_time = None
+        self.after(100, self._poll_edit)
 
     @property
     def text(self) -> str:
         """
         テキストを取得
         """
-        return self._var.get()
+        return self.get()
 
     def register_handler(self, handler: Callable[[str], None]):
         """
@@ -54,9 +47,21 @@ class AISEntry(ctk.CTkEntry):
         """
         self._handlers.append(handler)
 
-    def _trace_write(self, *_):
+    def _poll_edit(self) -> None:
         """
-        テキストに変更があったときに呼び出されるハンドラ
+        テキスト変更ポーリング関数
+        変更が発生した後少ししてからモデルに反映する
         """
-        for handler in self._handlers:
-            handler(self.text)
+        # 変更内容に変更があった場合は、モデル適用時刻を更新
+        if self.text != self._polled_value:
+            self._polled_value = self.text
+            self._next_notify_time = time.time() + 0.5
+
+        # 予定時刻を過ぎたら通知
+        if self._next_notify_time is not None and time.time() > self._next_notify_time:
+            self._next_notify_time = None
+            for handler in self._handlers:
+                handler(self.text)
+
+        # 次のポーリング
+        self.after(100, self._poll_edit)
