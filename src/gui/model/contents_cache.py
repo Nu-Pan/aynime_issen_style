@@ -10,6 +10,7 @@ from typing import (
     Tuple,
     cast,
     Iterable,
+    Dict,
 )
 from pathlib import Path
 from datetime import datetime
@@ -42,8 +43,25 @@ from utils.image import (
     AISImage,
     GIF_DURATION_MAP,
 )
-from utils.constants import NIME_DIR_PATH, RAW_DIR_PATH, DEFAULT_FONT_PATH
+from utils.constants import NIME_DIR_PATH, RAW_DIR_PATH, OVERLAY_FONT_PATH
 from utils.std import replace_multi
+
+
+class FontCache:
+    """
+    フォントをキャッシュするクラス
+    """
+
+    _cache: Dict[float, ImageFont.FreeTypeFont] = dict()
+
+    @classmethod
+    def query(cls, font_size: float):
+        if font_size in cls._cache:
+            return cls._cache[font_size]
+        else:
+            new_font = ImageFont.truetype(OVERLAY_FONT_PATH, size=font_size)
+            cls._cache[font_size] = new_font
+            return new_font
 
 
 _TIMESTAMP_FORMAT = "%Y-%m-%d_%H-%M-%S"
@@ -310,7 +328,7 @@ def make_disabled_image(
     dark_image.alpha_composite(overlay)
 
     # テキストを描画
-    font = ImageFont.truetype("arial.ttf", size=h // 8)
+    font = FontCache.query(h / 8)
     tw, th = get_text_bbox_size(dark_image.size, text, font)
     center_w = (w - tw) / 2
     center_h = (h - th) / 2
@@ -424,7 +442,7 @@ def overlay_nime_name(source_image: AISImage, nime_name: Optional[str]) -> AISIm
     nime_name_second = nime_name[len(nime_name) // 2 :]
     actual_nime_name = nime_name
     while True:
-        font = ImageFont.truetype(DEFAULT_FONT_PATH, size=font_size)
+        font = FontCache.query(font_size)
         text_box_width, text_box_height = get_text_bbox_size(
             result_image.size, actual_nime_name, font
         )
