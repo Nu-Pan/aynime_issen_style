@@ -38,15 +38,32 @@ def get_nime_window_text(window_handle: WindowHandle) -> str:
     # Windows パス的な禁止文字を削除
     text = re.sub(r'[<>:"/\\|?*\x00-\x1F]', "", text)
 
+    # 見た目空白な文字を ASCII 半角スペースに統一
+    # NOTE
+    #   NBSP, 全角, 2000-系, 202F, 205F, 1680
+    text = re.sub(r"[\u00A0\u1680\u2000-\u200A\u202F\u205F\u3000]", " ", text)
+
+    # ゼロ幅系を削除
+    # NOTE
+    #   ZWSP/ZWNJ/ZWJ/WORD JOINER/BOM
+    #   歴史的に空白扱いの MVS
+    text = re.sub(r"[\u200B-\u200D\u2060\uFEFF\u180E]", "", text)
+
+    # ソフトハイフンを削除
+    # NOTE
+    #   通常は印字されず「改行位置の候補」だけを意味する。
+    #   可視の意図はないので 削除。
+    text = re.sub(r"\u00AD", "", text)
+
     # 区切り文字を ASCII のハイフンで統一
     # NOTE
-    #   - = dash(ASCII)
-    #   – = en dash(Unicode)
-    #   — = em dash(Unicode)
-    text = replace_multi(text, ["–", "—", "|", "｜"], "-")
-
-    # 空白文字を半角で統一
-    text = text.replace("　", " ")
+    #   \u2013 = en dash
+    #   \u2014 = em dash
+    #   \u2015 = horizontal bar
+    #   \u007C = vertical bar (ASCII |)
+    #   \uFF5C = fullwidth vertical bar
+    #   \u2011 = non-breaking hyphen
+    text = re.sub(r"[\u2013\u2014\u2015\u007C\uFF5C\u2011]", "-", text)
 
     # アンダースコア --> 半角空白
     text = text.replace("_", " ")
