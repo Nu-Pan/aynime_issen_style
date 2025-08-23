@@ -193,7 +193,7 @@ class CaptureContextWindows(CaptureContext):
             # ウィンドウ情報を生成して返す
             yield WindowHandle(hwnd)
 
-    def set_capture_window(self, window_handle: WindowHandle) -> None:
+    def set_capture_window(self, window_handle: Optional[WindowHandle]) -> None:
         self._window_handle = window_handle
 
     @property
