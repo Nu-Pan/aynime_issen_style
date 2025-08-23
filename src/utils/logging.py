@@ -1,12 +1,17 @@
 # std
-from datetime import datetime
+import datetime
 import io
 import logging
 from logging.handlers import TimedRotatingFileHandler
-from typing import Any, List
+from typing import Any, Optional
 import sys
 import threading
 import asyncio
+import warnings
+from pathlib import Path
+import gzip
+import shutil
+import os
 
 # tk
 import tkinter.messagebox
@@ -16,18 +21,48 @@ import customtkinter as ctk
 from utils.constants import LOG_DIR_PATH
 
 
-class _LoggingRedirector(io.TextIOBase):
+def _format_warning(message, category, filename, lineno, line=None):
+    """
+    warnings によるメッセージのカスタムフォーマッタ
+    vscode の Log モードに合わせたフォーマット
+    そのうえで１行にまとめている
+    """
+    base = os.path.basename(filename)
+    text = str(message).replace("\r", " ").replace("\n", " ").strip()
+    return f"{base}:{lineno}: {category.__name__}: {text}"
+
+
+def _get_actual_stream(
+    stream: Optional[io.TextIOWrapper] = None,
+) -> Optional[io.TextIOWrapper]:
+    """
+    書き込み可能な stream だけを非 None にするヘルパ
+    """
+    if getattr(stream, "write", None):
+        return stream
+    else:
+        return None
+
+
+class _LoggingTee(io.TextIOBase):
     """
     stdout, stderr に成り代わることで、書き込みを logging に流す用のクラス
     """
 
-    def __init__(self, dest_logger: logging.Logger, log_level: int):
+    def __init__(
+        self,
+        dest_logger: logging.Logger,
+        log_level: int,
+        mirror_stream: Optional[io.TextIOWrapper] = None,
+    ):
         """
         コンストラクタ
         """
+        # 引数を保存
         self._dest_logger = dest_logger
         self._log_level = log_level
-        self._buf: str = ""
+        self._buffer: str = ""
+        self._mirror_stream = mirror_stream
 
     def writable(self) -> bool:
         """
@@ -39,16 +74,22 @@ class _LoggingRedirector(io.TextIOBase):
         """
         書き込み
         """
-        # 引数をバッファに追加
-        self._buf += s if isinstance(s, str) else str(s)
+        # 先にコンソールに流す
+        if self._mirror_stream is not None:
+            try:
+                self._mirror_stream.write(s)
+                self._mirror_stream.flush()
+            except Exception:
+                pass
 
         # 改行単位でロガーに流す
+        self._buffer += s if isinstance(s, str) else str(s)
         while True:
-            nl_idx = self._buf.find("\n")
+            nl_idx = self._buffer.find("\n")
             if nl_idx < 0:
                 break
-            line = self._buf[:nl_idx]
-            self._buf = self._buf[nl_idx + 1 :]
+            line = self._buffer[:nl_idx]
+            self._buffer = self._buffer[nl_idx + 1 :]
             self._dest_logger.log(self._log_level, line)
 
         # 文字数を返す
@@ -59,9 +100,17 @@ class _LoggingRedirector(io.TextIOBase):
         吐き出し
         バッファに溜まったままの文字列を出力する
         """
-        if self._buf:
-            self._dest_logger.log(self._log_level, self._buf)
-            self._buf = ""
+        # コンソール
+        if self._mirror_stream is not None:
+            try:
+                self._mirror_stream.flush()
+            except Exception:
+                pass
+
+        # ロガー
+        if self._buffer:
+            self._dest_logger.log(self._log_level, self._buffer)
+            self._buffer = ""
 
 
 def _uncaught_exception_hook(exc_type, exc, tb):
@@ -109,16 +158,27 @@ def _asyncio_exception_handler(loop, context):
     logging.error("asyncio: %s", msg, exc_info=exc)
 
 
-def _tkinter_exception_handler(exc, val, tb):
-    """
-    未補足例外カスタムフック関数
-    tkinter 用
-    """
-    logging.getLogger("tk").error("Tk callback exception", exc_info=(exc, val, tb))
-    try:
-        tkinter.messagebox.showerror("エラー", "予期せぬエラーが発生しました。")
-    except Exception:
-        pass
+class TkInterExceptionHandler:
+
+    def __init__(self, log_file_path: Path):
+        """
+        コンストラクタ
+        """
+        self._log_file_path = log_file_path
+
+    def __call__(self, exc, val, tb):
+        """
+        未補足例外カスタムフック関数
+        tkinter 用
+        """
+        logging.getLogger("tk").error("Tk callback exception", exc_info=(exc, val, tb))
+        try:
+            tkinter.messagebox.showerror(
+                "エラー",
+                f"何かが失敗したよ。開発者にログファイルを送ってね。\n{self._log_file_path}",
+            )
+        except Exception:
+            pass
 
 
 def setup_logging(ctk_app: ctk.CTk):
@@ -130,44 +190,58 @@ def setup_logging(ctk_app: ctk.CTk):
     # 定数
     LOGGING_LEVEL = logging.DEBUG
 
+    # ログディレクトリを生成
+    LOG_DIR_PATH.mkdir(parents=True, exist_ok=True)
+
     # エイリアス
     root_logger = logging.getLogger()
 
-    # 警告をキャプチャ対象に含める
+    # warnings の設定
+    logging.addLevelName(logging.WARNING, "WARN")
     logging.captureWarnings(True)
+    warnings.formatwarning = _format_warning
 
-    # ログレベルを設定
+    # ルートロガーの設定を変更
     root_logger.setLevel(LOGGING_LEVEL)
-
-    # ログファイルパス
-    log_file_stem = datetime.now().strftime("%Y%m%d_%H%M%S")
-    log_file_path = LOG_DIR_PATH / f"{log_file_stem}.log"
-
-    # ログディレクトリを生成
-    log_file_path.parent.mkdir(parents=True, exist_ok=True)
 
     # フォーマットを生成
     formatter = logging.Formatter(
-        fmt="%(asctime)s.%(msecs)03d [%(levelname)s] %(name)s: %(message)s",
+        fmt="%(asctime)s.%(msecs)03d [%(levelname)-5s] %(name)s: %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
     )
 
     # ファイルハンドラーをログシステムに追加
     rotation_file_handler = TimedRotatingFileHandler(
-        log_file_path,
+        LOG_DIR_PATH / "latest.log",
         when="midnight",
         interval=1,
-        backupCount=5,
+        backupCount=14,
         encoding="utf-8",
-        delay=True,
+        delay=False,
+        utc=False,
+        atTime=datetime.time(0, 0),
+        errors=None,
     )
     rotation_file_handler.setFormatter(formatter)
     rotation_file_handler.setLevel(LOGGING_LEVEL)
+    rotation_file_handler.namer = lambda name: name.replace("latest.log.", "") + ".log"
     root_logger.addHandler(rotation_file_handler)
 
+    # 実際の stdout, stderr を解決
+    actual_stdout = _get_actual_stream(sys.__stdout__)
+    actual_stderr = _get_actual_stream(sys.__stderr__)
+
     # stdout, stderr を logging に流す
-    sys.stdout = _LoggingRedirector(logging.getLogger("stdout"), logging.INFO)
-    sys.stderr = _LoggingRedirector(logging.getLogger("stderr"), logging.ERROR)
+    sys.stdout = _LoggingTee(logging.getLogger("stdout"), logging.INFO, actual_stdout)
+    sys.stderr = _LoggingTee(logging.getLogger("stderr"), logging.ERROR, actual_stderr)
+
+    # logging をコンソールに流す
+    if actual_stdout or actual_stderr:
+        stream_handler = logging.StreamHandler(actual_stdout or actual_stderr)
+        stream_handler.setFormatter(formatter)
+        stream_handler.setLevel(LOGGING_LEVEL)
+        stream_handler.addFilter(lambda record: record.name not in ("stdout", "stderr"))
+        root_logger.addHandler(stream_handler)
 
     # 未補足例外のフックを設定
     sys.excepthook = _uncaught_exception_hook
@@ -176,10 +250,10 @@ def setup_logging(ctk_app: ctk.CTk):
         asyncio.get_event_loop().set_exception_handler(_asyncio_exception_handler)
     except Exception:
         pass
-    ctk_app.report_callback_exception = _tkinter_exception_handler
+    ctk_app.report_callback_exception = TkInterExceptionHandler(LOG_DIR_PATH)
 
     # ロギング開始をログ
-    logging.getLogger(__name__).info("Logging initialized. file=%s", log_file_path)
+    logging.getLogger(__name__).info("Logging initialized. file=%s", LOG_DIR_PATH)
 
     # 正常終了
     return

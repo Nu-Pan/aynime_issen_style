@@ -1,5 +1,7 @@
 # std
 import sys
+import logging
+import warnings
 
 # Tk/CTk
 import customtkinter as ctk
@@ -9,9 +11,11 @@ from utils.windows import SystemWideMutex
 from utils.constants import APP_NAME_EN
 from utils.ctk import show_error_dialog
 from utils.logging import setup_logging
+from utils.version_constants import COMMIT_HASH, BUILD_DATE
 
 # local
 from gui.aynime_issen_style_app import AynimeIssenStyleApp
+
 
 if __name__ == "__main__":
     # カラーテーマを設定
@@ -31,6 +35,10 @@ if __name__ == "__main__":
 
     # ロギング挙動を設定
     setup_logging(app)
+
+    # バージョン情報をログにダンプ
+    logging.info(f"COMMIT_HASH = {COMMIT_HASH}")
+    logging.info(f"BUILD_DATE = {BUILD_DATE}")
 
     # メインループ
     app.mainloop()
