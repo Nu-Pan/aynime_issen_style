@@ -92,7 +92,8 @@ class WindowSelectionFrame(ctk.CTkFrame):
         self.east_frame.grid(
             row=0, column=1, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
         )
-        self.east_frame.rowconfigure(1, weight=1)
+        self.east_frame.rowconfigure(0, weight=1)
+        self.east_frame.rowconfigure(1, weight=0)
         self.east_frame.columnconfigure(0, weight=1)
 
         # プレビュー画像表示用ラベル
@@ -100,6 +101,14 @@ class WindowSelectionFrame(ctk.CTkFrame):
             self.east_frame, model.window_selection_image, "Preview"
         )
         self.capture_target_preview_label.grid(
+            row=0, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
+        )
+
+        # フルサイズウィンドウ名表示用
+        self.capture_target_full_name_label = ctk.CTkLabel(
+            self.east_frame, font=default_font
+        )
+        self.capture_target_full_name_label.grid(
             row=1, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
         )
 
@@ -131,14 +140,29 @@ class WindowSelectionFrame(ctk.CTkFrame):
             except Exception as e:
                 edit.set_raw_image(None)
 
+        # フルサイズウィンドウ名ラベルを更新
+        self.capture_target_full_name_label.configure(text=selection.window_name)
+
     def update_list(self) -> None:
         """
         ウィンドウリストを更新する
         """
-        # リストボックスをクリアしてから、ウィンドウタイトルを取得して追加
         try:
+            # リスト更新ボタンを先に無効化
             self.reload_capture_target_list_button.configure(state=ctk.DISABLED)
+
+            # キャプチャ対象を未選択状態に戻す
+            self.model.capture.set_capture_window(None)
+
+            # プレビューをクリア
+            with ImageModelEditSession(self.model.window_selection_image) as edit:
+                edit.set_raw_image(None)
+            self.capture_target_full_name_label.configure(text="Window Full Name")
+
+            # リストをクリア
             self.capture_target_list_box.delete("all")
+
+            # ウィンドウリストを列挙・追加
             raw_items = [
                 WindowListBoxItem(
                     window_handle, self.model.capture.get_window_name(window_handle)
@@ -148,7 +172,7 @@ class WindowSelectionFrame(ctk.CTkFrame):
             nime_items = sorted(
                 [
                     WindowListBoxItem(
-                        item.window_handle, item.window_name.replace("<NIME>", "")
+                        item.window_handle, item.window_name.replace("<NIME>", "★")
                     )
                     for item in raw_items
                     if "<NIME>" in item.window_name
@@ -167,4 +191,5 @@ class WindowSelectionFrame(ctk.CTkFrame):
                 )
             self.capture_target_list_box.update()
         finally:
+            # 必ず最後にボタンを有効に戻す
             self.reload_capture_target_list_button.configure(state=ctk.NORMAL)
