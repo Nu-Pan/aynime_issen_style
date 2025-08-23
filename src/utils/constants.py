@@ -36,6 +36,7 @@ VERSION_FILE_PATH = Path("src\\utils\\version_constants.py")
 #   raw は処理適用前のオリジナルのキャプチャ画像の保存先
 NIME_DIR_PATH = Path.cwd() / "nime"
 RAW_DIR_PATH = Path.cwd() / "raw"
+LOG_DIR_PATH = Path.cwd() / "log"
 
 # サムネイルの高さ方向のサイズ
 THUMBNAIL_HEIGHT = 120
