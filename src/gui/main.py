@@ -3,23 +3,17 @@ import sys
 
 # Tk/CTk
 import customtkinter as ctk
-import tkinter.messagebox as mb
 
 # utils
-from utils.pyinstaller import is_frozen
-from utils.std import redirect_to_file
 from utils.windows import SystemWideMutex
-from utils.constants import APP_NAME_EN, APP_NAME_JP
+from utils.constants import APP_NAME_EN
 from utils.ctk import show_error_dialog
+from utils.logging import setup_logging
 
 # local
 from gui.aynime_issen_style_app import AynimeIssenStyleApp
 
 if __name__ == "__main__":
-    # ログファイルリダイレクト設定
-    if is_frozen():
-        redirect_to_file()
-
     # カラーテーマを設定
     ctk.set_appearance_mode("Dark")
     ctk.set_default_color_theme("blue")
@@ -32,8 +26,13 @@ if __name__ == "__main__":
         show_error_dialog("アプリはすでに起動しています")
         sys.exit(-1)
 
-    # CTk アプリを生成・開始
+    # CTk アプリを生成
     app = AynimeIssenStyleApp()
+
+    # ロギング挙動を設定
+    setup_logging(app)
+
+    # メインループ
     app.mainloop()
 
     # 正常終了
