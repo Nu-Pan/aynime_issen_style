@@ -94,12 +94,18 @@ def get_nime_window_text(window_handle: WindowHandle) -> str:
     #   最終的にそれを見た人間が認識できれば何でも良いので、一閃流として区別する必要がない。
     bc_pos = text.find("バンダイチャンネル")
     if text.endswith("dアニメストア"):
-        # NOTE
-        #   dアニメストアは「<アニメ名> - <話数> - <話タイトル>」形式。
-        #   <話タイトル> は冗長なので除外する。
-        #   区切り文字「 - 」は贅沢なので空白１文字に短縮。
-        text = text.replace(" dアニメストア", "")
-        text = " ".join(text.split(" - ")[:2])
+        if text.find("アニメ動画見放題") >= 0:
+            # NOTE
+            #   作品ページの場合「アニメ動画見放題」がついている
+            #   作品ページはタイトルに話数情報が含まれないのでアニメ名抽出の対象としない
+            return raw_text
+        else:
+            # NOTE
+            #   dアニメストアは「<アニメ名> - <話数> - <話タイトル>」形式。
+            #   <話タイトル> は冗長なので除外する。
+            #   区切り文字「 - 」は贅沢なので空白１文字に短縮。
+            text = text.replace(" dアニメストア", "")
+            text = " ".join(text.split(" - ")[:2])
     elif text.endswith("AnimeFesta"):
         # NOTE
         #   AnimeFest はアニメ名しか出てこないので、特別にすることも無い
