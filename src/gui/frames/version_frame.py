@@ -60,6 +60,10 @@ class VersionFrame(ctk.CTkFrame):
 
         俺は星間国家の悪徳領主!
         \thttps://seikankokka-anime.com/
+
+        無職の英雄 〜別にスキルなんか要らなかったんだが〜
+        \thttps://mushoku-eiyu-anime.com/
+        \thttps://ncode.syosetu.com/n6683ej/4/
         """
         version_text = cleandoc(version_text)
 
