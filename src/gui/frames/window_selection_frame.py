@@ -32,6 +32,8 @@ class WindowSelectionFrame(ctk.CTkFrame):
     ウィンドウ選択フレームクラス
     """
 
+    UI_TAB_NAME = "構え"
+
     def __init__(
         self, master: ctk.CTkBaseClass, model: AynimeIssenStyleModel, **kwargs
     ):
@@ -190,6 +192,11 @@ class WindowSelectionFrame(ctk.CTkFrame):
                     False,
                 )
             self.capture_target_list_box.update()
+
+            # NIME があるならそれを自動選択
+            if len(nime_items) > 0:
+                self.capture_target_list_box.select(0)
+
         finally:
             # 必ず最後にボタンを有効に戻す
             self.reload_capture_target_list_button.configure(state=ctk.NORMAL)

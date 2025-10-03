@@ -39,6 +39,8 @@ class StillCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
     スチル画像のキャプチャ操作を行う CTk フレーム
     """
 
+    UI_TAB_NAME = "「一閃」"
+
     def __init__(self, master, model: AynimeIssenStyleModel, **kwargs):
         """
         コンストラクタ

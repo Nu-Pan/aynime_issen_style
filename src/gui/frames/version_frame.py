@@ -29,6 +29,8 @@ class VersionFrame(ctk.CTkFrame):
     ウィンドウ選択フレームクラス
     """
 
+    UI_TAB_NAME = "バージョン"
+
     def __init__(self, master, **kwargs):
         """
         コンストラクタ

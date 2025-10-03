@@ -63,33 +63,38 @@ class AynimeIssenStyleApp(ctk.CTk, TkinterDnD.DnDWrapper):
         self.tabview.pack(fill="both", expand=True)
 
         # ウィンドウ選択タブを追加
-        self.tabview.add("構え")
-        self.select_frame = WindowSelectionFrame(self.tabview.tab("構え"), self.model)
-        self.select_frame.pack(fill="both", expand=True)
+        self.tabview.add(WindowSelectionFrame.UI_TAB_NAME)
+        self.window_select_frame = WindowSelectionFrame(
+            self.tabview.tab(WindowSelectionFrame.UI_TAB_NAME), self.model
+        )
+        self.window_select_frame.pack(fill="both", expand=True)
 
         # スチルキャプチャタブを追加
-        self.tabview.add("「一閃」")
+        self.tabview.add(StillCaptureFrame.UI_TAB_NAME)
         self.still_capture_frame = StillCaptureFrame(
-            self.tabview.tab("「一閃」"), self.model
+            self.tabview.tab(StillCaptureFrame.UI_TAB_NAME), self.model
         )
         self.still_capture_frame.pack(fill="both", expand=True)
 
         # # アニメキャプチャタブを追加
-        self.tabview.add(
-            "キンキンキンキンキンキンキンキンキンキンキンキンキンキンキンキン！"
-        )
+        self.tabview.add(AnimationCaptureFrame.UI_TAB_NAME)
         self.animation_capture_frame = AnimationCaptureFrame(
-            self.tabview.tab(
-                "キンキンキンキンキンキンキンキンキンキンキンキンキンキンキンキン！"
-            ),
+            self.tabview.tab(AnimationCaptureFrame.UI_TAB_NAME),
             self.model,
         )
         self.animation_capture_frame.pack(fill="both", expand=True)
 
         # バージョン情報タブを追加
-        self.tabview.add("バージョン")
-        self.version_frame = VersionFrame(self.tabview.tab("バージョン"))
+        self.tabview.add(VersionFrame.UI_TAB_NAME)
+        self.version_frame = VersionFrame(self.tabview.tab(VersionFrame.UI_TAB_NAME))
         self.version_frame.pack(fill="both", expand=True)
+        self.tabview.configure(command=self.on_tab_change)
 
         # 初期選択
-        self.tabview.set("構え")
+        self.tabview.set(WindowSelectionFrame.UI_TAB_NAME)
+
+    def on_tab_change(self, tab_name: str | None = None) -> None:
+        """タブ切り替え時に呼ばれるコールバック"""
+        current_tab_name = tab_name or self.tabview.get()
+        if current_tab_name == WindowSelectionFrame.UI_TAB_NAME:
+            self.window_select_frame.update_list()
