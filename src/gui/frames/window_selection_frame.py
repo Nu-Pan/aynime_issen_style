@@ -32,6 +32,8 @@ class WindowSelectionFrame(ctk.CTkFrame):
     ウィンドウ選択フレームクラス
     """
 
+    UI_TAB_NAME = "構え"
+
     def __init__(
         self, master: ctk.CTkBaseClass, model: AynimeIssenStyleModel, **kwargs
     ):

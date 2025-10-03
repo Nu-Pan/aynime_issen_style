@@ -45,6 +45,8 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
     スチル画像のキャプチャ操作を行う CTk フレーム
     """
 
+    UI_TAB_NAME = "キンキンキンキンキンキンキンキンキンキンキンキンキンキンキンキン！"
+
     def __init__(
         self, master: ctk.CTkBaseClass, model: AynimeIssenStyleModel, **kwargs
     ):
