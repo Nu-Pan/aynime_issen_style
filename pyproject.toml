@@ -1,0 +1,56 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "aynime-issen-style"
+version = "0.1.0"
+description = "Windows CustomTkinter tool for capturing still and animated frames from DXGI windows."
+readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">=3.11"
+authors = [{ name = "NU-Pan" }]
+keywords = ["customtkinter", "screen-capture", "discord", "windows"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: End Users/Desktop",
+  "Operating System :: Microsoft :: Windows",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "License :: OSI Approved :: MIT License"
+]
+dependencies = [
+  "customtkinter",
+  "CTkListbox",
+  "dxcam_cpp",
+  "dxgi-probe @ git+https://github.com/Nu-Pan/dxgi_probe.git@83ee78ae3b0a5c6f5feb346b1aed69a846d78898",
+  "numpy",
+  "packaging",
+  "pillow",
+  "scikit-image",
+  "tkinterdnd2",
+  "pywin32"
+]
+
+[project.optional-dependencies]
+dev = [
+  "black"
+]
+build = [
+  "pyinstaller"
+]
+
+[project.urls]
+Homepage = "https://github.com/Nu-Pan/aynime_issen_style"
+Repository = "https://github.com/Nu-Pan/aynime_issen_style"
+Issues = "https://github.com/Nu-Pan/aynime_issen_style/issues"
+Documentation = "https://github.com/Nu-Pan/aynime_issen_style/wiki"
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["src"]
+namespaces = true
