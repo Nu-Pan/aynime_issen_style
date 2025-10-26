@@ -12,10 +12,9 @@
 ## 開発環境セットアップ方法
 + vscode で aynime_issen_style.code-workspace を開く
 + 仮想環境を新規作成
-    - コマンドパレット（Ctrl+Shift+P）から「Python: Create New Environment」
+    - コマンドパレット（Ctrl+Shift+P）から「Python: Create Environment」
     - Venv を選択
     - システムの python を選択 
-    - requirement.txt にチェックを入れる
 
 ## 実行方法
 - 「App」構成でデバッグ実行（F5）

@@ -30,14 +30,8 @@ dependencies = [
   "pillow",
   "scikit-image",
   "tkinterdnd2",
-  "pywin32"
-]
-
-[project.optional-dependencies]
-dev = [
-  "black"
-]
-build = [
+  "pywin32",
+  "black",
   "pyinstaller"
 ]
 
