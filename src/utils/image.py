@@ -305,7 +305,7 @@ class AISImage:
         self._photo_image = None
 
     @classmethod
-    def empty(cls, mode: str, width: int, height: int) -> "AISImage":
+    def empty(cls, mode: str = "RGB", width: int = 8, height: int = 8) -> "AISImage":
         """
         空の画像を生成する
         """

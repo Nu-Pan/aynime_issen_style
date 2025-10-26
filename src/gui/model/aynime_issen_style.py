@@ -1,6 +1,5 @@
 # utils
-from utils.capture_context import WindowHandle
-from utils.capture_context_windows import CaptureContextWindows
+from utils.capture import *
 
 # model
 from gui.model.contents_cache import ImageModel, VideoModel, PlaybackMode
@@ -15,7 +14,7 @@ class AynimeIssenStyleModel:
         """
         コンストラクタ
         """
-        self.capture = CaptureContextWindows()
+        self.stream = CaptureStream()
         self.window_selection_image = ImageModel()
         self.still = ImageModel()
         self.video = VideoModel()

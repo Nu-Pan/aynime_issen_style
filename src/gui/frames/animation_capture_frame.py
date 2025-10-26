@@ -20,6 +20,7 @@ from utils.image import (
 from utils.constants import THUMBNAIL_HEIGHT
 from utils.windows import file_to_clipboard
 from utils.ctk import show_notify, show_error_dialog
+from utils.capture import *
 
 # gui
 from gui.widgets.thumbnail_bar import ThumbnailBar
@@ -396,7 +397,7 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
             if text != "":
                 edit.set_nime_name("<NIME>" + text)
             else:
-                edit.set_nime_name(self._model.capture.current_window_name)
+                edit.set_nime_name(self._model.stream.nime_window_text)
 
     def _on_resolution_changes(
         self, aspect_ratio: AspectRatioPattern, resolution: ResizeDesc.Pattern
@@ -611,13 +612,13 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
                     if self.nime_name_entry.text != "":
                         edit.set_nime_name(self.nime_name_entry.text)
                     else:
-                        edit.set_nime_name(self._model.capture.current_window_name)
+                        edit.set_nime_name(self._model.stream.nime_window_text)
                     edit.set_time_stamp(None)
                     edit.append_frames(
                         [
                             ImageModel(
                                 img,
-                                self._model.capture.current_window_name,
+                                self._model.stream.nime_window_text,
                                 self._model.video.time_stamp,
                             )
                             for img in record_raw_images
@@ -627,7 +628,7 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
 
         # キャプチャ
         try:
-            new_image = self._model.capture.capture()
+            new_image = self._model.stream.get_image()
         except Exception as e:
             show_error_dialog(
                 "キャプチャに失敗。多分キャプチャ対象のディスプレイ・ウィンドウの選択を忘れてるよ。",

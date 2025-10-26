@@ -21,6 +21,7 @@ from gui.model.contents_cache import (
 )
 from utils.windows import file_to_clipboard, register_global_hotkey_handler
 from utils.ctk import show_notify, show_error_dialog
+from utils.capture import *
 
 # gui
 from gui.widgets.still_label import StillLabel
@@ -110,7 +111,7 @@ class StillCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
         """
         # キャプチャ
         try:
-            pil_raw_capture_image = self.model.capture.capture()
+            pil_raw_capture_image = self.model.stream.get_image()
         except Exception as e:
             show_error_dialog(
                 "キャプチャに失敗。多分キャプチャ対象のディスプレイ・ウィンドウの選択を忘れてるよ。",
@@ -122,7 +123,7 @@ class StillCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
         if self.nime_name_entry.text != "":
             actual_nime_name = "<NIME>" + self.nime_name_entry.text
         else:
-            window_name = self.model.capture.current_window_name
+            window_name = self.model.stream.nime_window_text
             if window_name is not None and "<NIME>" in window_name:
                 actual_nime_name = window_name
             else:
@@ -144,7 +145,7 @@ class StillCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
             if text != "":
                 edit.set_nime_name(text)
             else:
-                edit.set_nime_name(self.model.capture.current_window_name)
+                edit.set_nime_name(self.model.stream.nime_window_text)
 
     def on_resolution_changes(
         self, aspect_ratio: AspectRatioPattern, resolution: ResizeDesc.Pattern

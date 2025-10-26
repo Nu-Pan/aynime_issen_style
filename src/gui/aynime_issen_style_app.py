@@ -12,6 +12,7 @@ from utils.constants import (
     DEFAULT_FONT_FAMILY,
 )
 from utils.pyinstaller import resource_path
+from utils.capture import *
 
 # gui
 from gui.frames.window_selection_frame import WindowSelectionFrame
@@ -57,6 +58,7 @@ class AynimeIssenStyleApp(ctk.CTk, TkinterDnD.DnDWrapper):
 
         # Model-View でいうところのモデル
         self.model = AynimeIssenStyleModel()
+        self.model.stream.set_strategy(CaptureBackendDxcam, CaptureBufferInstant)
 
         # タブビューを追加
         self.tabview = ctk.CTkTabview(self)

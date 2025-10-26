@@ -1205,7 +1205,7 @@ class VideoModelEditSession:
         #   よってグローバルモデルに新規生成した画像を渡して強制的に通知を発生させる
         if _does_notify:
             with ImageModelEditSession(model._global_model, _does_notify=False) as e:
-                e.set_raw_image(AISImage.empty("RGB", 8, 8))
+                e.set_raw_image(AISImage.empty())
 
         # 正常終了
         return self
@@ -1222,7 +1222,7 @@ class VideoModelEditSession:
 
         # グローバルモデルに状態を反映
         with ImageModelEditSession(model._global_model, _does_notify=False) as e:
-            e.set_raw_image(AISImage.empty("RGB", 8, 8))
+            e.set_raw_image(AISImage.empty())
 
         # 正常終了
         return self
@@ -1239,7 +1239,7 @@ class VideoModelEditSession:
 
         # グローバルモデルに状態を反映
         with ImageModelEditSession(model._global_model, _does_notify=False) as e:
-            e.set_raw_image(AISImage.empty("RGB", 8, 8))
+            e.set_raw_image(AISImage.empty())
 
         # 正常終了
         return self

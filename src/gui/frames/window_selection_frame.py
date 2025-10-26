@@ -8,7 +8,7 @@ import customtkinter as ctk
 from CTkListbox import CTkListbox
 
 # utils
-from utils.capture_context import WindowHandle
+from utils.capture import *
 from utils.constants import WIDGET_PADDING, WINDOW_MIN_WIDTH, DEFAULT_FONT_FAMILY
 
 # gui
@@ -133,12 +133,12 @@ class WindowSelectionFrame(ctk.CTkFrame):
                 self.capture_target_list_box.curselection()
             ),
         )
-        self.model.capture.set_capture_window(selection.window_handle)
+        self.model.stream.set_capture_window(selection.window_handle)
 
         # 描画更新
         with ImageModelEditSession(self.model.window_selection_image) as edit:
             try:
-                edit.set_raw_image(self.model.capture.capture())
+                edit.set_raw_image(self.model.stream.get_image())
             except Exception as e:
                 edit.set_raw_image(None)
 
@@ -154,7 +154,7 @@ class WindowSelectionFrame(ctk.CTkFrame):
             self.reload_capture_target_list_button.configure(state=ctk.DISABLED)
 
             # キャプチャ対象を未選択状態に戻す
-            self.model.capture.set_capture_window(None)
+            self.model.stream.set_capture_window(None)
 
             # プレビューをクリア
             with ImageModelEditSession(self.model.window_selection_image) as edit:
@@ -166,10 +166,8 @@ class WindowSelectionFrame(ctk.CTkFrame):
 
             # ウィンドウリストを列挙・追加
             raw_items = [
-                WindowListBoxItem(
-                    window_handle, self.model.capture.get_window_name(window_handle)
-                )
-                for window_handle in self.model.capture.enumerate_windows()
+                WindowListBoxItem(window_handle, get_nime_window_text(window_handle))
+                for window_handle in enumerate_windows()
             ]
             nime_items = sorted(
                 [
