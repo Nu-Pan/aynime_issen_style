@@ -40,3 +40,6 @@ LOG_DIR_PATH = Path.cwd() / "log"
 
 # サムネイルの高さ方向のサイズ
 THUMBNAIL_HEIGHT = 120
+
+# キャプチャフレームバッファの保持秒数
+CAPTURE_FRAME_BUFFER_HOLD_IN_SEC = 3.0

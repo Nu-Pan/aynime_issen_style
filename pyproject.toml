@@ -24,7 +24,7 @@ dependencies = [
   "customtkinter",
   "CTkListbox",
   "dxcam_cpp",
-  "dxgi-probe @ git+https://github.com/Nu-Pan/dxgi_probe.git@83ee78ae3b0a5c6f5feb346b1aed69a846d78898",
+  "aynime_capture @ git+https://github.com/Nu-Pan/aynime_capture",
   "numpy",
   "packaging",
   "pillow",

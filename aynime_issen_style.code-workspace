@@ -5,15 +5,13 @@
 		}
 	],
 	"settings": {
-		"python.defaultInterpreterPath": ".venv/bin/python",
+		"python.defaultInterpreterPath": ".venv/Scripts/python",
 		"python.terminal.activateEnvironment": true,
-		"python.envFile": "${workspaceFolder}/.env",
 		"python.analysis.extraPaths": [
 			"src"
 		],
 		"editor.defaultFormatter": "ms-python.black-formatter",
-		"editor.formatOnSave": true,
-		"autoDocstring.docstringFormat": "google",
+		"editor.formatOnSave": true
 	},
 	"extensions": {
 		"recommendations": [

@@ -58,7 +58,6 @@ class AynimeIssenStyleApp(ctk.CTk, TkinterDnD.DnDWrapper):
 
         # Model-View でいうところのモデル
         self.model = AynimeIssenStyleModel()
-        self.model.stream.set_strategy(CaptureBackendDxcam, CaptureBufferInstant)
 
         # タブビューを追加
         self.tabview = ctk.CTkTabview(self)
