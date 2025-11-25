@@ -111,7 +111,7 @@ class StillCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
         """
         # キャプチャ
         try:
-            pil_raw_capture_image = self.model.stream.get_image()
+            pil_raw_capture_image = self.model.stream.capture_still()
         except Exception as e:
             show_error_dialog(
                 "キャプチャに失敗。多分キャプチャ対象のディスプレイ・ウィンドウの選択を忘れてるよ。",

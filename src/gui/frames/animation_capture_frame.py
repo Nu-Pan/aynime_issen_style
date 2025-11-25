@@ -243,8 +243,9 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
         # レコード秒数スライダー
         # NOTE
         #   100msec 単位なのでスライダー上の 10 は 1000 msec の意味
-        MIN_RECORD_LENGTH = 5
-        MAX_RECORD_LENGTH = 30
+        MIN_RECORD_LENGTH = 10
+        MAX_RECORD_LENGTH = 50
+        DEFAULT_RECORD_LENGTH = 30
         self._record_length_slider = ctk.CTkSlider(
             self._record_ctrl_frame,
             from_=MIN_RECORD_LENGTH,
@@ -265,8 +266,8 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
         )
 
         # 初期レコード秒数を設定
-        self._record_length_slider.set(10)
-        self._on_record_length_slider_changed(10)
+        self._record_length_slider.set(DEFAULT_RECORD_LENGTH)
+        self._on_record_length_slider_changed(DEFAULT_RECORD_LENGTH)
 
         # レコードボタン
         self._record_button = ctk.CTkButton(
@@ -463,7 +464,31 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
         """
         レコードボタンクリックハンドラ
         """
-        self.after(0, self._record_handler, time() + self._record_length, [])
+        # キャプチャ
+        frames = self._model.stream.capture_animation(
+            fps=None, duration_in_sec=self._record_length
+        )
+
+        # アニメ名を解決
+        if self.nime_name_entry.text != "":
+            nime_name = self.nime_name_entry.text
+        else:
+            nime_name = self._model.stream.nime_window_text
+
+        # モデルに設定
+        with VideoModelEditSession(self._model.video) as edit:
+            edit.set_nime_name(nime_name)
+            edit.set_time_stamp(None)  # NOTE 現在時刻を適用
+            edit.append_frames(
+                [
+                    ImageModel(
+                        frame,
+                        self._model.video.nime_name,
+                        self._model.video.time_stamp,
+                    )
+                    for frame in frames
+                ]
+            )
 
     def _on_save_button_clicked(self):
         """
@@ -593,65 +618,6 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
         with VideoModelEditSession(self._model.video) as edit:
             for disabled_frame_index in disabled_frame_indices:
                 edit.delete_frame(disabled_frame_index)
-
-    def _record_handler(
-        self, stop_time_in_sec: float, record_raw_images: List[AISImage] = []
-    ):
-        """
-        レコード処理を実際に担うハンドラ
-        自分自身のディスパッチを繰り返すことで並行処理を実現、連続的なキャプチャを実現している
-
-        Args:
-            stop_time_in_sec (float): レコード処理終了時刻
-            record_frames (Optional[AISImage]): 今までに記録したフレーム
-        """
-        # 所定の時間を経過してたら終了
-        if time() > stop_time_in_sec:
-            if len(record_raw_images) > 0:
-                with VideoModelEditSession(self._model.video) as edit:
-                    if self.nime_name_entry.text != "":
-                        edit.set_nime_name(self.nime_name_entry.text)
-                    else:
-                        edit.set_nime_name(self._model.stream.nime_window_text)
-                    edit.set_time_stamp(None)
-                    edit.append_frames(
-                        [
-                            ImageModel(
-                                img,
-                                self._model.stream.nime_window_text,
-                                self._model.video.time_stamp,
-                            )
-                            for img in record_raw_images
-                        ]
-                    )
-            return
-
-        # キャプチャ
-        try:
-            new_image = self._model.stream.get_image()
-        except Exception as e:
-            show_error_dialog(
-                "キャプチャに失敗。多分キャプチャ対象のディスプレイ・ウィンドウの選択を忘れてるよ。",
-                e,
-            )
-            return
-
-        # 新しいフレームで差分が発生している場合のみ追加する
-        # NOTE
-        #   完全に同一なフレーム
-        #   PIL.Image.Image 同士の == での比較は、ピクセル値も含めた完全一致の場合のみ True になる
-        #   AISImage 同士の == での比較は
-        if len(record_raw_images) == 0:
-            next_frames = [new_image]
-        else:
-            last_frame = record_raw_images[-1]
-            if new_image == last_frame:
-                next_frames = record_raw_images
-            else:
-                next_frames = record_raw_images + [new_image]
-
-        # 次をディスパッチ
-        self.after(10, self._record_handler, stop_time_in_sec, next_frames)
 
     def _on_drop_file(self, event: DnDEvent):
         """

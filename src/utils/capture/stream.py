@@ -6,7 +6,7 @@ from time import sleep
 from PIL import Image
 
 # utils
-from utils.constants import CAPTURE_FRAME_BUFFER_HOLD_IN_SEC
+from utils.constants import CAPTURE_FRAME_BUFFER_DURATION_IN_SEC
 from utils.image import AISImage
 from utils.capture.target import WindowHandle, get_nime_window_text
 
@@ -38,7 +38,7 @@ class CaptureStream:
         if window_handle is not None:
             try:
                 self._session = ayc.Session(
-                    window_handle.value, CAPTURE_FRAME_BUFFER_HOLD_IN_SEC
+                    window_handle.value, CAPTURE_FRAME_BUFFER_DURATION_IN_SEC
                 )
                 self._window_handle = window_handle
             except Exception as e:
@@ -78,12 +78,12 @@ class CaptureStream:
         else:
             return get_nime_window_text(self._window_handle)
 
-    def get_image(
+    def capture_still(
         self,
         relative_time_in_sec: float | None = None,
     ) -> AISImage:
         """
-        キャプチャを実行する
+        スチル画像をキャプチャする
         """
         if self._session is None:
             return AISImage.empty()
@@ -93,10 +93,24 @@ class CaptureStream:
             width, height, frame_bytes = self._session.GetFrameByTime(
                 relative_time_in_sec
             )
-            pil_image = Image.frombuffer(
-                "RGBA", (width, height), frame_bytes, "raw", "BGRA", 0, 1
-            )
-            return AISImage(pil_image)
+            return AISImage.from_bytes(width, height, frame_bytes)
+
+    def capture_animation(
+        self, fps: int | None = None, duration_in_sec: float | None = None
+    ) -> list[AISImage]:
+        """
+        アニメ―ション（連番静止画）をキャプチャする
+        """
+        if self._session is None:
+            return []
+        else:
+            frames: list[AISImage] = []
+            with ayc.Snapshot(self._session, fps, duration_in_sec) as snapshot:
+                for frame_index in range(snapshot.size):
+                    frame_args = snapshot.GetFrame(frame_index)
+                    ais_image = AISImage.from_bytes(*frame_args)
+                    frames.append(ais_image)
+            return frames
 
     def release(self) -> None:
         """

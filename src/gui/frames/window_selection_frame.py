@@ -150,7 +150,7 @@ class WindowSelectionFrame(ctk.CTkFrame):
 
         # 描画更新
         with ImageModelEditSession(self.model.window_selection_image) as edit:
-            edit.set_raw_image(self.model.stream.get_image())
+            edit.set_raw_image(self.model.stream.capture_still())
 
         # フルサイズウィンドウ名ラベルを更新
         self.capture_target_full_name_label.configure(text=selection.window_name)

@@ -305,6 +305,16 @@ class AISImage:
         self._photo_image = None
 
     @classmethod
+    def from_bytes(cls, width: int, height: int, image_bytes: bytes) -> "AISImage":
+        """
+        bytes から画像を生成する。
+        """
+        pil_image = Image.frombuffer(
+            "RGBA", (width, height), image_bytes, "raw", "BGRA", 0, 1
+        )
+        return AISImage(pil_image)
+
+    @classmethod
     def empty(cls, mode: str = "RGB", width: int = 8, height: int = 8) -> "AISImage":
         """
         空の画像を生成する
