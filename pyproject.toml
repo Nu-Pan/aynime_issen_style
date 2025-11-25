@@ -10,7 +10,7 @@ readme = "README.md"
 license = { file = "LICENSE" }
 requires-python = ">=3.11"
 authors = [{ name = "NU-Pan" }]
-keywords = ["customtkinter", "screen-capture", "discord", "windows"]
+keywords = ["customtkinter", "screen-capture", "windows"]
 classifiers = [
   "Development Status :: 3 - Alpha",
   "Intended Audience :: End Users/Desktop",
@@ -23,7 +23,6 @@ classifiers = [
 dependencies = [
   "customtkinter",
   "CTkListbox",
-  "dxcam_cpp",
   "aynime_capture @ git+https://github.com/Nu-Pan/aynime_capture",
   "numpy",
   "packaging",

@@ -20,7 +20,7 @@ from gui.model.contents_cache import (
     ImageModelEditSession,
 )
 from utils.windows import file_to_clipboard, register_global_hotkey_handler
-from utils.ctk import show_notify, show_error_dialog
+from utils.ctk import show_notify_label, show_error_dialog
 from utils.capture import *
 
 # gui
@@ -191,8 +191,9 @@ class StillCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
         file_to_clipboard(nime_file_path)
 
         # クリップボード転送完了通知
-        show_notify(
+        show_notify_label(
             self,
+            "info",
             "「一閃」\nクリップボード転送完了",
             on_click_handler=self.on_preview_label_click,
         )

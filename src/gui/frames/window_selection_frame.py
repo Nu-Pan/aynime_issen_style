@@ -1,6 +1,7 @@
 # std
 from typing import cast
 from dataclasses import dataclass
+import logging
 
 # Tk/CTk
 from tkinter import Event
@@ -10,6 +11,8 @@ from CTkListbox import CTkListbox
 # utils
 from utils.capture import *
 from utils.constants import WIDGET_PADDING, WINDOW_MIN_WIDTH, DEFAULT_FONT_FAMILY
+from utils.ctk import show_notify_label
+from utils.std import traceback_str
 
 # gui
 from gui.widgets.still_label import StillLabel
@@ -133,14 +136,21 @@ class WindowSelectionFrame(ctk.CTkFrame):
                 self.capture_target_list_box.curselection()
             ),
         )
-        self.model.stream.set_capture_window(selection.window_handle)
+        try:
+            self.model.stream.set_capture_window(selection.window_handle)
+        except Exception as e:
+            # ユーザー向けにはラベルで通知
+            show_notify_label(
+                self, "error", f'"{selection.window_name}" のキャプチャ開始に失敗'
+            )
+            # 開発者向けにログを残す
+            logging.warning(
+                f'Failed to start window capture({selection.window_handle}, "{selection.window_name}")\n{traceback_str(e)}'
+            )
 
         # 描画更新
         with ImageModelEditSession(self.model.window_selection_image) as edit:
-            try:
-                edit.set_raw_image(self.model.stream.get_image())
-            except Exception as e:
-                edit.set_raw_image(None)
+            edit.set_raw_image(self.model.stream.get_image())
 
         # フルサイズウィンドウ名ラベルを更新
         self.capture_target_full_name_label.configure(text=selection.window_name)

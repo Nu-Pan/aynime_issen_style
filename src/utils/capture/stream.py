@@ -1,5 +1,6 @@
 # std
 from typing import Self
+from time import sleep
 
 # PIL
 from PIL import Image
@@ -35,10 +36,29 @@ class CaptureStream:
 
         # 新規セッションをスタート
         if window_handle is not None:
-            self._window_handle = window_handle
-            self._session = ayc.Session(
-                window_handle.value, CAPTURE_FRAME_BUFFER_HOLD_IN_SEC
-            )
+            try:
+                self._session = ayc.Session(
+                    window_handle.value, CAPTURE_FRAME_BUFFER_HOLD_IN_SEC
+                )
+                self._window_handle = window_handle
+            except Exception as e:
+                self._session = None
+                self._window_handle = None
+                raise
+
+        # 最初の１枚が来るまで待つ
+        if self._session:
+            TRY_LIMIT_IN_SEC = 2.0
+            TRY_COUNT = 10
+            width, height, frame_bytes = (None, None, None)
+            for _ in range(TRY_COUNT):
+                try:
+                    width, height, frame_bytes = self._session.GetFrameByTime(0.0)
+                except RuntimeError as e:
+                    sleep(TRY_LIMIT_IN_SEC / TRY_COUNT)
+                    continue
+            if frame_bytes is None:
+                raise RuntimeError(f"Fist frame not arrived in {TRY_LIMIT_IN_SEC} sec")
 
     @property
     def capture_window(self) -> WindowHandle | None:

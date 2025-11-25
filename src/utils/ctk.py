@@ -1,6 +1,7 @@
 # std
 import warnings
-from typing import Callable, Optional, Union, List
+from typing import Callable, Optional, Union, List, Literal
+import logging
 
 # PIL
 from PIL.ImageTk import PhotoImage
@@ -38,8 +39,9 @@ def configure_presence(widget: ctk.CTkBaseClass, content: Union[PhotoImage, str]
         raise TypeError(f"Invalid type({type(content)})")
 
 
-def show_notify(
+def show_notify_label(
     widget: ctk.CTkBaseClass,
+    level: Literal["info", "warning", "error"],
     message: str,
     duration_ms: int = 2000,
     on_click_handler: Optional[Callable[[Event], None]] = None,
@@ -54,8 +56,18 @@ def show_notify(
         duration_ms (int, optional): 表示時間（ミリ秒）. Defaults to 2000.
     """
     # フォントを生成
-
     default_font = ctk.CTkFont(DEFAULT_FONT_FAMILY)
+
+    # 通知色を解決
+    match level.lower():
+        case "info":
+            fg_color = "#3a8d3f"
+        case "warning":
+            fg_color = "#F5A623"
+        case "error":
+            fg_color = "#D32F2F"
+        case _:
+            raise ValueError(f"Invalid level {level}")
 
     # 通知ラベルを生成
     # NOTE
@@ -63,7 +75,7 @@ def show_notify(
     status_label = ctk.CTkLabel(
         widget,
         text=message,
-        fg_color="#3a8d3f",
+        fg_color=fg_color,
         text_color="white",
         corner_radius=0,
         font=default_font,

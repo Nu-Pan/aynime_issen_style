@@ -13,6 +13,8 @@ import subprocess
 import customtkinter as ctk
 
 # win32
+import ctypes
+from ctypes import wintypes
 import win32con, win32gui, win32api, win32event, winerror
 
 # dxcam
@@ -238,3 +240,15 @@ class SystemWideMutex:
             bool: すでに同名のミューテックスが存在しているなら True
         """
         return self._last_error == winerror.ERROR_ALREADY_EXISTS
+
+
+def is_cloaked(hwnd: int) -> bool:
+    """
+    hwnd が指すウィンドウがクローク状態なら True を返す
+    """
+    DWMWA_CLOAKED = 14
+    cloaked = wintypes.DWORD()
+    res = ctypes.windll.dwmapi.DwmGetWindowAttribute(
+        hwnd, DWMWA_CLOAKED, ctypes.byref(cloaked), ctypes.sizeof(cloaked)
+    )
+    return res == 0 and cloaked.value != 0

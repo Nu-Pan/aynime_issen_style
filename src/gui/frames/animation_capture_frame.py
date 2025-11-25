@@ -19,7 +19,7 @@ from utils.image import (
 )
 from utils.constants import THUMBNAIL_HEIGHT
 from utils.windows import file_to_clipboard
-from utils.ctk import show_notify, show_error_dialog
+from utils.ctk import show_notify_label, show_error_dialog
 from utils.capture import *
 
 # gui
@@ -487,7 +487,7 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
         file_to_clipboard(gif_file_path)
 
         # クリップボード転送完了通知
-        show_notify(self, "「一閃」\nクリップボード転送完了")
+        show_notify_label(self, "info", "「一閃」\nクリップボード転送完了")
 
     def _on_wipe_button_clicked(self):
         """

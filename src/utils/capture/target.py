@@ -5,10 +5,11 @@ from copy import deepcopy
 import re
 
 # win32
-import win32gui
+import win32gui, win32con
 
 # utils
 from utils.std import replace_multi
+from utils.windows import is_cloaked
 
 
 @dataclass
@@ -45,9 +46,31 @@ def enumerate_windows() -> Generator[WindowHandle, None, None]:
         if not win32gui.IsWindowVisible(hwnd):
             continue
 
-        # タイトルが空のウィンドウはスキップ
+        # 最小化されているウィンドウはスキップ
+        if win32gui.IsIconic(hwnd):
+            continue
+
+        # クローク状態のウィンドウはスキップ
+        if is_cloaked(hwnd):
+            continue
+
+        # サイズを持たないウィンドウはスキップ
+        left, top, right, bottom = win32gui.GetWindowRect(hwnd)
+        if right - left <= 0 or bottom - top <= 0:
+            continue
+
+        # オーナーが居るウィンドウはスキップ
+        if win32gui.GetWindow(hwnd, win32con.GW_OWNER):
+            continue
+
+        # タイトルでフィルタ
+        # NOTE
+        #   空タイトルはダメ
+        #   Program Manager は何故か残っちゃうので名指しで除外
         title = get_nime_window_text(WindowHandle(hwnd))
         if not title:
+            continue
+        elif title == "Program Manager":
             continue
 
         # ウィンドウ情報を生成して返す
