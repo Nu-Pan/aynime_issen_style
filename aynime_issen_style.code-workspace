@@ -5,6 +5,17 @@
 		}
 	],
 	"settings": {
+		"files.exclude": {
+			"**/.git": true,
+			"**/.svn": true,
+			"**/.hg": true,
+			"**/.DS_Store": true,
+			"**/Thumbs.db": true,
+			"build/**/*.*": true,
+			"**/__pycache__": true,
+			"**/*.egg-info": true,
+			".venv": true
+		},
 		"python.defaultInterpreterPath": ".venv/Scripts/python",
 		"python.terminal.activateEnvironment": true,
 		"python.analysis.extraPaths": [

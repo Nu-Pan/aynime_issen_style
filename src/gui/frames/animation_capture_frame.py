@@ -187,7 +187,7 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
 
         # フレームレートラベル
         self._frame_rate_label = ctk.CTkLabel(
-            self._frame_rate_frame, text="-- FPS", font=default_font, width=80
+            self._frame_rate_frame, text="-- FPS", font=default_font, width=60
         )
         self._frame_rate_label.grid(
             row=0, column=1, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
@@ -206,7 +206,7 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
         self._save_button = ctk.CTkButton(
             self._frame_rate_frame,
             text="SAVE",
-            width=80,
+            width=60,
             command=self._on_save_button_clicked,
         )
         self._save_button.grid(
@@ -259,7 +259,7 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
 
         # レコード秒数ラベル
         self._record_length_label = ctk.CTkLabel(
-            self._record_ctrl_frame, text=f"--.0 SEC", font=default_font, width=80
+            self._record_ctrl_frame, text=f"--.0 SEC", font=default_font, width=60
         )
         self._record_length_label.grid(
             row=0, column=1, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
@@ -273,7 +273,7 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
         self._record_button = ctk.CTkButton(
             self._record_ctrl_frame,
             text="REC",
-            width=80,
+            width=60,
             command=self._on_record_button_clicked,
         )
         self._record_button.grid(
@@ -310,7 +310,7 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
 
         # 重複しきい値ラベル
         self._duple_threshold_label = ctk.CTkLabel(
-            self._disable_dupe_frame, text=f"--", font=default_font, width=80
+            self._disable_dupe_frame, text=f"--", font=default_font, width=60
         )
         self._duple_threshold_label.grid(
             row=0, column=1, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
@@ -324,7 +324,7 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
         self._disable_dupe_button = ctk.CTkButton(
             self._disable_dupe_frame,
             text="DISABLE DUPE",
-            width=80,
+            width=60,
             command=self._on_disable_dup_button_clicked,
         )
         self._disable_dupe_button.grid(
@@ -342,7 +342,7 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
         self._disable_all_button = ctk.CTkButton(
             self._edit_ctrl_frame,
             text="ENABLE ALL",
-            width=80,
+            width=60,
             command=self._on_enable_all_button_clicked,
         )
         self._disable_all_button.grid(
@@ -354,7 +354,7 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
         self._disable_all_button = ctk.CTkButton(
             self._edit_ctrl_frame,
             text="DISABLE ALL",
-            width=80,
+            width=60,
             command=self._on_disable_all_button_clicked,
         )
         self._disable_all_button.grid(
@@ -366,7 +366,7 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
         self._remove_disable_button = ctk.CTkButton(
             self._edit_ctrl_frame,
             text="REMOVE DISABLED",
-            width=80,
+            width=60,
             command=self._on_remove_disable_button_clicked,
         )
         self._remove_disable_button.grid(
@@ -378,7 +378,7 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
         self._wipe_button = ctk.CTkButton(
             self._edit_ctrl_frame,
             text="REMOVE ALL",
-            width=80,
+            width=60,
             command=self._on_wipe_button_clicked,
         )
         self._wipe_button.grid(
