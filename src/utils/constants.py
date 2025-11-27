@@ -26,6 +26,11 @@ DEFAULT_FONT_FAMILY = "Yu Gothic UI"
 DEFAULT_FONT_PATH = Path("C:\\Windows\\Fonts\\YuGothM.ttc")
 OVERLAY_FONT_FAMILY = "Meiryo UI Bold"
 OVERLAY_FONT_PATH = Path("C:\\Windows\\Fonts\\Meiryob.ttc")
+NUMERIC_FONT_FAMILY = "Consolas"
+NUMERIC_FONT_PATH = Path("C:\\Windows\\Fonts\\Consolas.ttc")
+
+# DEFAULT_FONT_FAMILY = "Consolas"
+# DEFAULT_FONT_PATH = Path("C:\\Windows\\Fonts\\Consolas.ttc")
 
 # バージョン情報ファイルのパス
 VERSION_FILE_PATH = Path("src\\utils\\version_constants.py")
@@ -42,4 +47,4 @@ LOG_DIR_PATH = Path.cwd() / "log"
 THUMBNAIL_HEIGHT = 120
 
 # キャプチャフレームバッファの保持秒数
-CAPTURE_FRAME_BUFFER_DURATION_IN_SEC = 5.0
+CAPTURE_FRAME_BUFFER_DURATION_IN_SEC = 5

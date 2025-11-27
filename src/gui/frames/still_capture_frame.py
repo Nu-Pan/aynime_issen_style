@@ -29,6 +29,7 @@ from gui.widgets.size_pattern_selection_frame import (
     SizePatternSlectionFrame,
 )
 from gui.widgets.ais_entry import AISEntry
+from gui.widgets.ais_slider import AISSlider
 from gui.model.contents_cache import ImageLayer
 
 # local
@@ -42,10 +43,6 @@ class StillCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
     """
 
     UI_TAB_NAME = "「一閃」"
-
-    CAPTURE_TIMING_STEP_IN_SEC = 0.05
-    MIN_CAPTURE_TIMING_IN_SEC = 0
-    MAX_CAPTURE_TIMING_IN_SEC = min(1.0, CAPTURE_FRAME_BUFFER_DURATION_IN_SEC)
 
     def __init__(self, master, model: AynimeIssenStyleModel, **kwargs):
         """
@@ -78,55 +75,32 @@ class StillCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
         # グローバルホットキーを登録
         register_global_hotkey_handler(self, self.on_preview_label_click, None)
 
-        # キャプチャタイミング関係フレーム
-        self._capture_timing_frame = ctk.CTkFrame(self, width=0, height=0)
-        self._capture_timing_frame.grid(
-            row=1, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
-        )
-        self._capture_timing_frame.rowconfigure(0, weight=1)
-        self._capture_timing_frame.columnconfigure(1, weight=1)
-
-        # キャプチャタイミングラベル
-        self._capture_timing_desc_label = ctk.CTkLabel(
-            self._capture_timing_frame, text="TIMING", font=default_font, width=60
-        )
-        self._capture_timing_desc_label.grid(
-            row=0, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
-        )
-
         # キャプチャタイミングスライダー
-        MIN_CAPTURE_TIMING_IN_STEP = round(
-            self.MIN_CAPTURE_TIMING_IN_SEC / self.CAPTURE_TIMING_STEP_IN_SEC
+        CAPTURE_TIMING_STEP_IN_SEC = 0.05
+        MIN_CAPTURE_TIMING_IN_SEC = 0
+        MAX_CAPTURE_TIMING_IN_SEC = min(1, CAPTURE_FRAME_BUFFER_DURATION_IN_SEC)
+        NUM_CAPTURE_TIMING_STEPS = (
+            round(
+                (MAX_CAPTURE_TIMING_IN_SEC - MIN_CAPTURE_TIMING_IN_SEC)
+                / CAPTURE_TIMING_STEP_IN_SEC
+            )
+            + 1
         )
-        MAX_CAPTURE_TIMING_IN_STEP = round(
-            self.MAX_CAPTURE_TIMING_IN_SEC / self.CAPTURE_TIMING_STEP_IN_SEC
-        )
-        self._capture_timing_slider = ctk.CTkSlider(
-            self._capture_timing_frame,
-            from_=MAX_CAPTURE_TIMING_IN_STEP,
-            to=MIN_CAPTURE_TIMING_IN_STEP,
-            number_of_steps=MAX_CAPTURE_TIMING_IN_STEP - MIN_CAPTURE_TIMING_IN_STEP,
-            command=self._on_capture_timing_slider_changed,
+        self._capture_timing_slider = AISSlider(
+            self,
+            "TIMING",
+            [
+                CAPTURE_TIMING_STEP_IN_SEC * step + MIN_CAPTURE_TIMING_IN_SEC
+                for step in range(NUM_CAPTURE_TIMING_STEPS)
+            ],
+            lambda lho, rho: abs(lho - rho),
+            lambda x: f"{x:4.2f}",
+            "SEC",
         )
         self._capture_timing_slider.grid(
-            row=0, column=1, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
+            row=1, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
         )
-
-        # キャプチャタイミングラベル
-        self._capture_timing_label = ctk.CTkLabel(
-            self._capture_timing_frame, text="-.-- SEC", font=default_font, width=60
-        )
-        self._capture_timing_label.grid(
-            row=0, column=2, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
-        )
-
-        # 初期フレームレートを設定
-        DEFAULT_CAPTURE_TIMING_IN_SEC = min(0.4, self.MAX_CAPTURE_TIMING_IN_SEC)
-        DEFAULT_CAPTURE_TIMING_IN_STEP = round(
-            DEFAULT_CAPTURE_TIMING_IN_SEC / self.CAPTURE_TIMING_STEP_IN_SEC
-        )
-        self._capture_timing_slider.set(DEFAULT_CAPTURE_TIMING_IN_STEP)
-        self._on_capture_timing_slider_changed(DEFAULT_CAPTURE_TIMING_IN_STEP)
+        self._capture_timing_slider.set_value(0.35)
 
         # アニメ名テキストボックス
         self.nime_name_entry = AISEntry(self, placeholder_text="Override NIME name ...")
@@ -170,7 +144,7 @@ class StillCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
         # キャプチャ
         try:
             pil_raw_capture_image = self.model.stream.capture_still(
-                self._capture_timing_in_sec
+                self._capture_timing_slider.value
             )
         except Exception as e:
             show_error_dialog(
@@ -196,18 +170,6 @@ class StillCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
             edit.set_raw_image(pil_raw_capture_image)
             edit.set_nime_name(actual_nime_name)
             edit.set_time_stamp(None)
-
-    def _on_capture_timing_slider_changed(self, value: float):
-        """
-        キャプチャタイミングスライダーハンドラ
-
-        Args:
-            value (float): スライダー値
-        """
-        self._capture_timing_in_sec = float(value) * self.CAPTURE_TIMING_STEP_IN_SEC
-        self._capture_timing_label.configure(
-            text=f"{self._capture_timing_in_sec:.2f} SEC"
-        )
 
     def on_nime_name_entry_changed(self, text: str):
         """

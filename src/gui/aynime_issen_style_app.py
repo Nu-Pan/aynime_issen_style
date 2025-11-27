@@ -93,6 +93,7 @@ class AynimeIssenStyleApp(ctk.CTk, TkinterDnD.DnDWrapper):
 
         # 初期選択
         self.tabview.set(WindowSelectionFrame.UI_TAB_NAME)
+        self.window_select_frame.update_list()
 
     def on_tab_change(self, tab_name: str | None = None) -> None:
         """タブ切り替え時に呼ばれるコールバック"""
