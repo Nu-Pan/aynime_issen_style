@@ -207,7 +207,7 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
         self._save_button = ctk.CTkButton(
             self._save_frame,
             text="SAVE",
-            width=WIDGET_MIN_WIDTH,
+            width=2 * WIDGET_MIN_WIDTH,
             command=self._on_save_button_clicked,
         )
         self._save_button.grid(
@@ -231,7 +231,7 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
             row=0, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
         )
 
-        # フレームリスト操作フレーム
+        # 編集操作フレーム
         self._edit_ctrl_frame = ctk.CTkFrame(
             self._input_kind_frame, width=WIDGET_MIN_WIDTH, height=0
         )
@@ -239,58 +239,55 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
             row=1, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
         )
         self._edit_ctrl_frame.rowconfigure(0, weight=1)
+        self._edit_ctrl_frame.columnconfigure(0, weight=1)
 
         # 全有効化ボタン
         self._disable_all_button = ctk.CTkButton(
             self._edit_ctrl_frame,
             text="ENABLE ALL",
-            width=WIDGET_MIN_WIDTH,
+            width=2 * WIDGET_MIN_WIDTH,
             command=self._on_enable_all_button_clicked,
         )
         self._disable_all_button.grid(
-            row=0, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="ns"
+            row=0, column=1, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="ns"
         )
-        self._edit_ctrl_frame.columnconfigure(0, weight=1)
 
         # 全無効化ボタン
         self._disable_all_button = ctk.CTkButton(
             self._edit_ctrl_frame,
             text="DISABLE ALL",
-            width=WIDGET_MIN_WIDTH,
+            width=2 * WIDGET_MIN_WIDTH,
             command=self._on_disable_all_button_clicked,
         )
         self._disable_all_button.grid(
-            row=0, column=1, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="ns"
+            row=0, column=2, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="ns"
         )
-        self._edit_ctrl_frame.columnconfigure(1, weight=1)
 
-        # 無効化画像ワイプボタン
+        # 無効化画像削除ボタン
         self._remove_disable_button = ctk.CTkButton(
             self._edit_ctrl_frame,
             text="REMOVE DISABLED",
-            width=WIDGET_MIN_WIDTH,
+            width=2 * WIDGET_MIN_WIDTH,
             command=self._on_remove_disable_button_clicked,
         )
         self._remove_disable_button.grid(
-            row=0, column=2, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="ns"
+            row=0, column=3, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="ns"
         )
-        self._edit_ctrl_frame.columnconfigure(2, weight=1)
 
         # 全削除ボタン
         self._wipe_button = ctk.CTkButton(
             self._edit_ctrl_frame,
             text="REMOVE ALL",
-            width=WIDGET_MIN_WIDTH,
+            width=2 * WIDGET_MIN_WIDTH,
             command=self._on_remove_all_button_clicked,
         )
         self._wipe_button.grid(
-            row=0, column=3, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="ns"
+            row=0, column=4, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="ns"
         )
-        self._edit_ctrl_frame.columnconfigure(3, weight=1)
 
         # 重複無効化フレーム
         self._disable_dupe_frame = ctk.CTkFrame(
-            self._input_kind_frame, width=WIDGET_MIN_WIDTH, height=0
+            self._input_kind_frame, width=2 * WIDGET_MIN_WIDTH, height=0
         )
         self._disable_dupe_frame.grid(
             row=2, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
@@ -339,22 +336,11 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
         self._record_frame.rowconfigure(0, weight=1)
         self._record_frame.columnconfigure(0, weight=1)
 
-        # レコードスライダーフレーム
-        # NOTE
-        #   スライダー２種を縦積みするためのフレーム
-        self._record_sliders_frame = ctk.CTkFrame(
-            self._record_frame, width=WIDGET_MIN_WIDTH, height=0
-        )
-        self._record_sliders_frame.grid(
-            row=0, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
-        )
-        self._record_sliders_frame.columnconfigure(0, weight=1)
-
         # レコードフレームレートスライダー
         # NOTE
         #   レコード時はコンテンツ（オリジナル）のフレームレートが重要なので STANDARD_FRAME_RATES を候補とする。
         self._record_frame_rate_slider = AISSlider(
-            self._record_sliders_frame,
+            self._record_frame,
             None,
             STANDARD_FRAME_RATES,
             lambda lho, rho: abs(lho - rho),
@@ -374,7 +360,7 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
             round((RECORD_LENGTH_STOP - RECORD_LENGTH_START) / RECORD_LENGTH_STEP) + 1
         )
         self._record_length_slider = AISSlider(
-            self._record_sliders_frame,
+            self._record_frame,
             None,
             [
                 step * RECORD_LENGTH_STEP + RECORD_LENGTH_START
@@ -394,12 +380,17 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
         # レコードボタン
         self._record_button = ctk.CTkButton(
             self._record_frame,
-            text="REC.",
+            text="RECORD",
             width=2 * WIDGET_MIN_WIDTH,
             command=self._on_record_button_clicked,
         )
         self._record_button.grid(
-            row=0, column=1, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
+            row=0,
+            rowspan=2,
+            column=1,
+            padx=WIDGET_PADDING,
+            pady=WIDGET_PADDING,
+            sticky="nswe",
         )
 
         # ファイルドロップ関係

@@ -12,7 +12,6 @@ from utils.constants import (
     WIDGET_MIN_WIDTH,
 )
 
-
 T = TypeVar("T")
 
 
@@ -85,6 +84,7 @@ class AISSlider(ctk.CTkFrame, Generic[T]):
             to=len(value_list) - 1,
             number_of_steps=len(value_list) - 1,
             command=self._on_slider_changed,
+            height=1,
         )
         self._slider.grid(
             row=0,
@@ -106,7 +106,7 @@ class AISSlider(ctk.CTkFrame, Generic[T]):
             self,
             text=invalid_value_label_text,
             font=numeric_font,
-            width=WIDGET_MIN_WIDTH,
+            width=round(1.5 * WIDGET_MIN_WIDTH),
         )
         self._value_label.grid(
             row=0,
