@@ -17,9 +17,6 @@ import ctypes
 from ctypes import wintypes
 import win32con, win32gui, win32api, win32event, winerror
 
-# dxcam
-import dxcam_cpp as dxcam
-
 
 @dataclass
 class DXGIOutputInfo:
@@ -53,67 +50,6 @@ class DXGIOutputInfo:
 
         # 正常終了
         return " ".join(sub_strs)
-
-
-def enumerate_dxgi_outputs() -> Generator[DXGIOutputInfo, None, None]:
-    """
-    DXGI のアウトプット（モニター）情報を列挙する
-
-    Raises:
-        RuntimeError: 何らかの問題が発生した場合
-
-    Yields:
-        Generator[DXGIOutputInfo, None, None]: モニター情報のジェネレータ
-            有効なモニターの情報を順番に返す
-    """
-
-    """
-    :return: DXGI アウトプットの情報のリスト
-    """
-    # DXGI のアウトプット情報を取得
-    for output_str in dxcam.output_info().splitlines():
-        # GPU 番号をパース
-        m = re.search(r"Device\[(\d)+\]", output_str)
-        if m is None:
-            raise RuntimeError("Failed to parse DXGI output info(Device).")
-        else:
-            adapter_index = int(m.group(1))
-
-        # モニター番号をパース
-        m = re.search(r"Output\[(\d)+\]", output_str)
-        if m is None:
-            raise RuntimeError("Failed to parse DXGI output info(Output).")
-        else:
-            output_index = int(m.group(1))
-
-        # 解像度をパース
-        m = re.search(r"Res:\((\d+), (\d+)\)", output_str)
-        if m is None:
-            raise RuntimeError("Failed to parse DXGI output info(Res).")
-        else:
-            width = int(m.group(1))
-            height = int(m.group(2))
-
-        # プライマリモニターかどうかをパース
-        m = re.search(r"Primary:(\w+)", output_str)
-        if m is None:
-            raise RuntimeError("Failed to parse DXGI output info(Primary).")
-        else:
-            if m.group(1) == "True":
-                primary = True
-            elif m.group(1) == "False":
-                primary = False
-            else:
-                raise RuntimeError("Failed to parse DXGI output info(Primary).")
-
-        # 構造体に固めて返す
-        yield DXGIOutputInfo(
-            adapter_index=adapter_index,
-            output_index=output_index,
-            width=width,
-            height=height,
-            primary=primary,
-        )
 
 
 def file_to_clipboard(file_path: Path) -> None:

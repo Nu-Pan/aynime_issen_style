@@ -5,7 +5,12 @@ from typing import Callable, List, Any, TypeVar, Generic
 import customtkinter as ctk
 
 # utils
-from utils.constants import DEFAULT_FONT_FAMILY, NUMERIC_FONT_FAMILY, WIDGET_PADDING
+from utils.constants import (
+    DEFAULT_FONT_FAMILY,
+    NUMERIC_FONT_FAMILY,
+    WIDGET_PADDING,
+    WIDGET_MIN_WIDTH,
+)
 
 
 T = TypeVar("T")
@@ -63,7 +68,7 @@ class AISSlider(ctk.CTkFrame, Generic[T]):
             self._desc_label = None
         else:
             self._desc_label = ctk.CTkLabel(
-                self, text=description, font=default_font, width=0
+                self, text=description, font=default_font, width=WIDGET_MIN_WIDTH
             )
             self._desc_label.grid(
                 row=0,
@@ -98,7 +103,10 @@ class AISSlider(ctk.CTkFrame, Generic[T]):
         else:
             invalid_value_label_text = f"{value_placeholder_text} {value_unit}"
         self._value_label = ctk.CTkLabel(
-            self, text=invalid_value_label_text, font=numeric_font, width=0
+            self,
+            text=invalid_value_label_text,
+            font=numeric_font,
+            width=WIDGET_MIN_WIDTH,
         )
         self._value_label.grid(
             row=0,

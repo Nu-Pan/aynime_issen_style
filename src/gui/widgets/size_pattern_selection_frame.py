@@ -5,7 +5,7 @@ from typing import Callable, List, Tuple, Sequence
 import customtkinter as ctk
 
 # utils
-from utils.constants import WIDGET_PADDING, DEFAULT_FONT_FAMILY
+from utils.constants import WIDGET_PADDING, WIDGET_MIN_WIDTH, DEFAULT_FONT_FAMILY
 from utils.image import AspectRatioPattern, ResizeDesc
 
 
@@ -66,7 +66,7 @@ class SizePatternSlectionFrame(ctk.CTkFrame):
                 variable=self.aspect_ratio_var,
                 value=aspect_ratio.value,
                 command=self._on_radio_change,
-                width=0,
+                width=WIDGET_MIN_WIDTH,
                 font=default_font,
             )
             aspect_ratio_radio.grid(
@@ -94,7 +94,7 @@ class SizePatternSlectionFrame(ctk.CTkFrame):
                 variable=self.resolution_var,
                 value=resolution.value,
                 command=self._on_radio_change,
-                width=0,
+                width=WIDGET_MIN_WIDTH,
                 font=default_font,
             )
             resolution_radio.grid(

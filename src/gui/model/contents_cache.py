@@ -41,8 +41,8 @@ from utils.image import (
     ResizeDesc,
     ResizeMode,
     AISImage,
-    GIF_DURATION_MAP,
 )
+from utils.duration_and_frame_rate import DFR_MAP
 from utils.constants import NIME_DIR_PATH, RAW_DIR_PATH, OVERLAY_FONT_PATH
 from utils.std import replace_multi
 
@@ -900,7 +900,7 @@ class VideoModel:
         #   フレーム個別の情報は self._frame で管理する
         self._global_model = ImageModel()
         self._frames: List[ImageModel] = []
-        self._duration_in_msec = GIF_DURATION_MAP.default_entry.gif_duration_in_msec
+        self._duration_in_msec = DFR_MAP.default_entry.duration_in_msec
         self._duration_is_dirty = False
         self._duration_change_handlers: List[NotifyHandler] = []
 
@@ -1477,7 +1477,7 @@ def save_content_model(
 
 def load_content_model(
     file_path: Path,
-    default_duration_in_msec: int = GIF_DURATION_MAP[-1].gif_duration_in_msec,
+    default_duration_in_msec: int = DFR_MAP.default_entry.duration_in_msec,
 ) -> Union[ImageModel, VideoModel]:
     """
     file_path から画像を読み込む。
