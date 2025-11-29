@@ -56,23 +56,13 @@ class WindowSelectionFrame(ctk.CTkFrame):
         self.model = model
 
         # レイアウト設定
-        self.rowconfigure(0, weight=1)
+        self.rowconfigure(1, weight=1)
         self.columnconfigure(0, weight=0, minsize=self.winfo_width() // 2)
         self.columnconfigure(1, weight=1, minsize=self.winfo_width() // 2)
 
-        # 画面左側のフレーム
-        self.west_frame = ctk.CTkFrame(self)
-        self.west_frame.grid(
-            row=0, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
-        )
-        self.west_frame.configure(width=WINDOW_MIN_WIDTH // 2)
-        self.west_frame.columnconfigure(0, weight=1)
-        self.west_frame.rowconfigure(0, weight=0)
-        self.west_frame.rowconfigure(1, weight=1)
-
         # ウィンドウ一覧再読み込みボタン
         self.reload_capture_target_list_button = ctk.CTkButton(
-            self.west_frame,
+            self,
             text="RELOAD",
             command=self.update_list,
             font=default_font,
@@ -82,39 +72,32 @@ class WindowSelectionFrame(ctk.CTkFrame):
         )
 
         # キャプチャ対象リストボックス
-        self.capture_target_list_box = CTkListbox(
-            self.west_frame, multiple_selection=False
-        )
+        self.capture_target_list_box = CTkListbox(self, multiple_selection=False)
         self.capture_target_list_box.grid(
-            row=1, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
+            row=1,
+            column=0,
+            padx=WIDGET_PADDING,
+            pady=WIDGET_PADDING,
+            sticky="nswe",
         )
         self.capture_target_list_box.bind(
             "<<ListboxSelect>>", self.on_capture_target_select
         )
 
-        # 画面右側のフレーム
-        self.east_frame = ctk.CTkFrame(self)
-        self.east_frame.grid(
+        # フルサイズウィンドウ名表示用
+        self.capture_target_full_name_label = ctk.CTkLabel(
+            self, font=default_font, fg_color="transparent", bg_color="transparent"
+        )
+        self.capture_target_full_name_label.grid(
             row=0, column=1, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
         )
-        self.east_frame.rowconfigure(0, weight=1)
-        self.east_frame.rowconfigure(1, weight=0)
-        self.east_frame.columnconfigure(0, weight=1)
 
         # プレビュー画像表示用ラベル
         self.capture_target_preview_label = StillLabel(
-            self.east_frame, model.window_selection_image, "Preview"
+            self, model.window_selection_image, "Preview"
         )
         self.capture_target_preview_label.grid(
-            row=0, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
-        )
-
-        # フルサイズウィンドウ名表示用
-        self.capture_target_full_name_label = ctk.CTkLabel(
-            self.east_frame, font=default_font
-        )
-        self.capture_target_full_name_label.grid(
-            row=1, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
+            row=1, column=1, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
         )
 
         # 初回キャプチャターゲットリスト更新
