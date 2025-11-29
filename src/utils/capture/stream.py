@@ -38,27 +38,16 @@ class CaptureStream:
         if window_handle is not None:
             try:
                 self._session = ayc.Session(
-                    window_handle.value, CAPTURE_FRAME_BUFFER_DURATION_IN_SEC
+                    window_handle.value,
+                    CAPTURE_FRAME_BUFFER_DURATION_IN_SEC,
+                    None,
+                    None,
                 )
                 self._window_handle = window_handle
             except Exception as e:
                 self._session = None
                 self._window_handle = None
                 raise
-
-        # 最初の１枚が来るまで待つ
-        if self._session:
-            TRY_LIMIT_IN_SEC = 2.0
-            TRY_COUNT = 10
-            width, height, frame_bytes = (None, None, None)
-            for _ in range(TRY_COUNT):
-                try:
-                    width, height, frame_bytes = self._session.GetFrameByTime(0.0)
-                except RuntimeError as e:
-                    sleep(TRY_LIMIT_IN_SEC / TRY_COUNT)
-                    continue
-            if frame_bytes is None:
-                raise RuntimeError(f"Fist frame not arrived in {TRY_LIMIT_IN_SEC} sec")
 
     @property
     def capture_window(self) -> WindowHandle | None:
@@ -85,15 +74,37 @@ class CaptureStream:
         """
         スチル画像をキャプチャする
         """
+        # セッションが未初期化なら空画像を返す
         if self._session is None:
-            return AISImage.empty()
-        else:
-            if relative_time_in_sec is None:
-                relative_time_in_sec = 0.0
+            raise RuntimeError("Session is not initialized")
+
+        # 相対時刻を正規化
+        if relative_time_in_sec is None:
+            relative_time_in_sec = 0.0
+
+        # キャプチャ
+        # NOTE
+        #   有効なフレームが来るまで繰り返しリトライする
+        TRY_LIMIT_IN_SEC = 2.0
+        TRY_COUNT = 20
+        width, height, frame_bytes = (None, None, None)
+        for _ in range(TRY_COUNT + 1):
             width, height, frame_bytes = self._session.GetFrameByTime(
                 relative_time_in_sec
             )
-            return AISImage.from_bytes(width, height, frame_bytes)
+            if frame_bytes is not None:
+                break
+            else:
+                sleep(TRY_LIMIT_IN_SEC / TRY_COUNT)
+
+        # タイムアウト
+        if width is None or height is None or frame_bytes is None:
+            raise RuntimeError(
+                f"Failed to captures valid frame in {TRY_LIMIT_IN_SEC} sec"
+            )
+
+        # 正常終了
+        return AISImage.from_bytes(width, height, frame_bytes)
 
     def capture_animation(
         self, fps: float | None = None, duration_in_sec: float | None = None

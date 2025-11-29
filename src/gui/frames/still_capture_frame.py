@@ -147,9 +147,12 @@ class StillCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
                 self._capture_timing_slider.value
             )
         except Exception as e:
-            show_error_dialog(
-                "キャプチャに失敗。多分キャプチャ対象のディスプレイ・ウィンドウの選択を忘れてるよ。",
-                e,
+            show_notify_label(
+                self,
+                "error",
+                "キャプチャに失敗。\n"
+                "キャプチャ対象のディスプレイ・ウィンドウの選択を忘れている？\n"
+                f"what: {e}",
             )
             return
 
