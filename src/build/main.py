@@ -17,6 +17,7 @@ WORK_DIR_PATH = BUILD_DIR_PATH / "temp"
 SPEC_DIR_PATH = BUILD_DIR_PATH / "spec"
 ZIP_OUTPUT_DIR = Path("release")
 APP_ICO_FILE_ABS_PATH = Path("app.ico").resolve()
+LICENSE_FILE_ABS_PATH = Path("LICENSE").resolve()
 
 
 def clean_build_artifacts():
@@ -82,6 +83,16 @@ def run_pyinstaller():
     )
 
 
+def put_files():
+    """
+    その他同梱したいファイルを配置する
+    """
+    # ライセンスファイルを同梱
+    shutil.copyfile(
+        LICENSE_FILE_ABS_PATH, DIST_APP_DIR_PATH / (LICENSE_FILE_ABS_PATH.stem + ".txt")
+    )
+
+
 def zip_executable():
     """
     成果物を zip 圧縮する
@@ -107,6 +118,7 @@ def main():
     clean_build_artifacts()
     make_version_file()
     run_pyinstaller()
+    put_files()
     zip_executable()
 
 
