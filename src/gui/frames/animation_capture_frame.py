@@ -241,26 +241,15 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
         self._edit_ctrl_frame.rowconfigure(0, weight=1)
         self._edit_ctrl_frame.columnconfigure(0, weight=1)
 
-        # 全有効化ボタン
-        self._disable_all_button = ctk.CTkButton(
+        # 全削除ボタン
+        self._wipe_button = ctk.CTkButton(
             self._edit_ctrl_frame,
-            text="ENABLE ALL",
+            text="REMOVE ALL",
             width=2 * WIDGET_MIN_WIDTH,
-            command=self._on_enable_all_button_clicked,
+            command=self._on_remove_all_button_clicked,
         )
-        self._disable_all_button.grid(
+        self._wipe_button.grid(
             row=0, column=1, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="ns"
-        )
-
-        # 全無効化ボタン
-        self._disable_all_button = ctk.CTkButton(
-            self._edit_ctrl_frame,
-            text="DISABLE ALL",
-            width=2 * WIDGET_MIN_WIDTH,
-            command=self._on_disable_all_button_clicked,
-        )
-        self._disable_all_button.grid(
-            row=0, column=2, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="ns"
         )
 
         # 無効化画像削除ボタン
@@ -271,17 +260,28 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
             command=self._on_remove_disable_button_clicked,
         )
         self._remove_disable_button.grid(
+            row=0, column=2, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="ns"
+        )
+
+        # 全有効化ボタン
+        self._disable_all_button = ctk.CTkButton(
+            self._edit_ctrl_frame,
+            text="ENABLE ALL",
+            width=2 * WIDGET_MIN_WIDTH,
+            command=self._on_enable_all_button_clicked,
+        )
+        self._disable_all_button.grid(
             row=0, column=3, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="ns"
         )
 
-        # 全削除ボタン
-        self._wipe_button = ctk.CTkButton(
+        # 全無効化ボタン
+        self._disable_all_button = ctk.CTkButton(
             self._edit_ctrl_frame,
-            text="REMOVE ALL",
+            text="DISABLE ALL",
             width=2 * WIDGET_MIN_WIDTH,
-            command=self._on_remove_all_button_clicked,
+            command=self._on_disable_all_button_clicked,
         )
-        self._wipe_button.grid(
+        self._disable_all_button.grid(
             row=0, column=4, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="ns"
         )
 
@@ -472,19 +472,12 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
         # クリップボード転送完了通知
         show_notify_label(self, "info", "「一閃」\nクリップボード転送完了")
 
-    def _on_enable_all_button_clicked(self):
+    def _on_remove_all_button_clicked(self):
         """
-        全フレーム有効化ボタンハンドラ
-        """
-        with VideoModelEditSession(self._model.video) as edit:
-            edit.set_enable(None, True)
-
-    def _on_disable_all_button_clicked(self):
-        """
-        全フレーム無効化ボタンハンドラ
+        全削除ボタンクリックハンドラ
         """
         with VideoModelEditSession(self._model.video) as edit:
-            edit.set_enable(None, False)
+            edit.clear_frames()
 
     def _on_remove_disable_button_clicked(self):
         """
@@ -504,12 +497,19 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
             for disabled_frame_index in disabled_frame_indices:
                 edit.delete_frame(disabled_frame_index)
 
-    def _on_remove_all_button_clicked(self):
+    def _on_enable_all_button_clicked(self):
         """
-        ワイプボタンクリックハンドラ
+        全フレーム有効化ボタンハンドラ
         """
         with VideoModelEditSession(self._model.video) as edit:
-            edit.clear_frames()
+            edit.set_enable(None, True)
+
+    def _on_disable_all_button_clicked(self):
+        """
+        全フレーム無効化ボタンハンドラ
+        """
+        with VideoModelEditSession(self._model.video) as edit:
+            edit.set_enable(None, False)
 
     def _on_disable_dupe_button_clicked(self):
         """

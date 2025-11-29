@@ -67,29 +67,29 @@ class WindowSelectionFrame(ctk.CTkFrame):
         )
         self.west_frame.configure(width=WINDOW_MIN_WIDTH // 2)
         self.west_frame.columnconfigure(0, weight=1)
+        self.west_frame.rowconfigure(0, weight=0)
+        self.west_frame.rowconfigure(1, weight=1)
+
+        # ウィンドウ一覧再読み込みボタン
+        self.reload_capture_target_list_button = ctk.CTkButton(
+            self.west_frame,
+            text="RELOAD",
+            command=self.update_list,
+            font=default_font,
+        )
+        self.reload_capture_target_list_button.grid(
+            row=0, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
+        )
 
         # キャプチャ対象リストボックス
         self.capture_target_list_box = CTkListbox(
             self.west_frame, multiple_selection=False
         )
         self.capture_target_list_box.grid(
-            row=0, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
+            row=1, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
         )
-        self.west_frame.rowconfigure(0, weight=1)
         self.capture_target_list_box.bind(
             "<<ListboxSelect>>", self.on_capture_target_select
-        )
-
-        # ウィンドウ一覧再読み込みボタン
-        self.reload_capture_target_list_button = ctk.CTkButton(
-            self.west_frame,
-            text="リロード",
-            command=self.update_list,
-            font=default_font,
-        )
-        self.west_frame.rowconfigure(1, weight=0)
-        self.reload_capture_target_list_button.grid(
-            row=1, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
         )
 
         # 画面右側のフレーム

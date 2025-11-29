@@ -7,7 +7,7 @@ APP_NAME_EN = "aynime_issen_style"
 APP_NAME_JP = "えぃにめ一閃流奥義「一閃」"
 
 # ウィジェットのパディングサイズ
-WIDGET_PADDING = 3
+WIDGET_PADDING = 4
 
 # ウィジェットの最小幅
 WIDGET_MIN_WIDTH = 60
@@ -31,9 +31,6 @@ OVERLAY_FONT_FAMILY = "Meiryo UI Bold"
 OVERLAY_FONT_PATH = Path("C:\\Windows\\Fonts\\Meiryob.ttc")
 NUMERIC_FONT_FAMILY = "Consolas"
 NUMERIC_FONT_PATH = Path("C:\\Windows\\Fonts\\Consolas.ttc")
-
-# DEFAULT_FONT_FAMILY = "Consolas"
-# DEFAULT_FONT_PATH = Path("C:\\Windows\\Fonts\\Consolas.ttc")
 
 # バージョン情報ファイルのパス
 VERSION_FILE_PATH = Path("src\\utils\\version_constants.py")

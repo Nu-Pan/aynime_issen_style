@@ -75,6 +75,34 @@ class StillCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
         # グローバルホットキーを登録
         register_global_hotkey_handler(self, self.on_preview_label_click, None)
 
+        # アニメ名テキストボックス
+        self.nime_name_entry = AISEntry(self, placeholder_text="Override NIME name ...")
+        self.rowconfigure(2, weight=0)
+        self.nime_name_entry.grid(
+            row=1, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
+        )
+        self.nime_name_entry.register_handler(self.on_nime_name_entry_changed)
+
+        # 解像度選択フレーム
+        self._size_pattern_selection_frame = SizePatternSlectionFrame(
+            self,
+            self.on_resolution_changes,
+            AspectRatioPattern.E_RAW,
+            ResizeDesc.Pattern.E_HD,
+            [ar for ar in AspectRatioPattern],
+            [
+                ResizeDesc.Pattern.E_RAW,
+                ResizeDesc.Pattern.E_VGA,
+                ResizeDesc.Pattern.E_HD,
+                ResizeDesc.Pattern.E_FHD,
+                ResizeDesc.Pattern.E_4K,
+            ],
+        )
+        self.rowconfigure(3, weight=0)
+        self._size_pattern_selection_frame.grid(
+            row=2, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
+        )
+
         # キャプチャタイミングスライダー
         CAPTURE_TIMING_STEP_IN_SEC = 0.05
         MIN_CAPTURE_TIMING_IN_SEC = 0
@@ -98,37 +126,9 @@ class StillCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
             "SEC",
         )
         self._capture_timing_slider.grid(
-            row=1, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
-        )
-        self._capture_timing_slider.set_value(0.35)
-
-        # アニメ名テキストボックス
-        self.nime_name_entry = AISEntry(self, placeholder_text="Override NIME name ...")
-        self.rowconfigure(2, weight=0)
-        self.nime_name_entry.grid(
-            row=2, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
-        )
-        self.nime_name_entry.register_handler(self.on_nime_name_entry_changed)
-
-        # 解像度選択フレーム
-        self._size_pattern_selection_frame = SizePatternSlectionFrame(
-            self,
-            self.on_resolution_changes,
-            AspectRatioPattern.E_RAW,
-            ResizeDesc.Pattern.E_HD,
-            [ar for ar in AspectRatioPattern],
-            [
-                ResizeDesc.Pattern.E_RAW,
-                ResizeDesc.Pattern.E_VGA,
-                ResizeDesc.Pattern.E_HD,
-                ResizeDesc.Pattern.E_FHD,
-                ResizeDesc.Pattern.E_4K,
-            ],
-        )
-        self.rowconfigure(3, weight=0)
-        self._size_pattern_selection_frame.grid(
             row=3, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
         )
+        self._capture_timing_slider.set_value(0.35)
 
         # ファイルドロップ関係
         self.drop_target_register(DND_FILES)
