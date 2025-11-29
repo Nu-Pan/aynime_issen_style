@@ -308,9 +308,10 @@ class AISImage:
     def from_bytes(cls, width: int, height: int, image_bytes: bytes) -> "AISImage":
         """
         bytes から画像を生成する。
+        aynime_capture から取得したバッファを前提とする。
         """
         pil_image = Image.frombuffer(
-            "RGBA", (width, height), image_bytes, "raw", "BGRA", 0, 1
+            "RGB", (width, height), image_bytes, "raw", "BGR", 0, 1
         )
         return AISImage(pil_image)
 
