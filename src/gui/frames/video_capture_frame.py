@@ -28,7 +28,7 @@ from utils.std import MultiscaleSequence
 
 # gui
 from gui.widgets.thumbnail_bar import ThumbnailBar
-from gui.widgets.animation_label import AnimationLabel
+from gui.widgets.video_label import Videoabel
 from gui.widgets.size_pattern_selection_frame import SizePatternSlectionFrame
 from gui.widgets.ais_entry import AISEntry
 from gui.widgets.ais_slider import AISSlider
@@ -45,7 +45,7 @@ from gui.model.contents_cache import (
 from gui.model.aynime_issen_style import AynimeIssenStyleModel
 
 
-class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
+class VideoCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
     """
     スチル画像のキャプチャ操作を行う CTk フレーム
     """
@@ -84,11 +84,9 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
         self._output_kind_frame.rowconfigure(0, weight=1)
         self._output_kind_frame.columnconfigure(0, weight=1)
 
-        # アニメーションプレビュー
-        self._animation_preview_label = AnimationLabel(
-            self._output_kind_frame, self._model
-        )
-        self._animation_preview_label.grid(
+        # 動画プレビュー
+        self._video_preview_label = Videoabel(self._output_kind_frame, self._model)
+        self._video_preview_label.grid(
             row=0,
             column=0,
             columnspan=2,
@@ -399,7 +397,7 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
         """
         with VideoModelEditSession(self._model.video) as edit:
             if text != "":
-                edit.set_nime_name("<NIME>" + text)
+                edit.set_nime_name(text)
             else:
                 edit.set_nime_name(self._model.stream.nime_window_text)
 
@@ -555,7 +553,7 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
         レコードボタンクリックハンドラ
         """
         # キャプチャ
-        frames = self._model.stream.capture_animation(
+        frames = self._model.stream.capture_video(
             fps=self._record_frame_rate_slider.value,
             duration_in_sec=self._record_length_slider.value,
         )

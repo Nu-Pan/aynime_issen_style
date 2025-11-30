@@ -6,6 +6,7 @@ import warnings
 from inspect import cleandoc
 from pathlib import Path
 import struct
+import re
 
 # TK/CTk
 import customtkinter as ctk
@@ -152,3 +153,51 @@ def is_cloaked(hwnd: int) -> bool:
         hwnd, DWMWA_CLOAKED, ctypes.byref(cloaked), ctypes.sizeof(cloaked)
     )
     return res == 0 and cloaked.value != 0
+
+
+def sanitize_text(text: str) -> str:
+    """
+    text を「無毒化」する
+    無毒化されたテキストは、ファイル名に含めることができる。
+    """
+    # Windows パス的な禁止文字を削除
+    text = re.sub(r'[<>:"/\\|?*\x00-\x1F]', "　", text)
+
+    # 見た目空白な文字を ASCII 半角スペースに統一
+    # NOTE
+    #   NBSP, 全角, 2000-系, 202F, 205F, 1680
+    text = re.sub(r"[\u00A0\u1680\u2000-\u200A\u202F\u205F\u3000]", " ", text)
+
+    # ゼロ幅系を削除
+    # NOTE
+    #   ZWSP/ZWNJ/ZWJ/WORD JOINER/BOM
+    #   歴史的に空白扱いの MVS
+    text = re.sub(r"[\u200B-\u200D\u2060\uFEFF\u180E]", "", text)
+
+    # ソフトハイフンを削除
+    # NOTE
+    #   通常は印字されず「改行位置の候補」だけを意味する。
+    #   可視の意図はないので 削除。
+    text = re.sub(r"\u00AD", "", text)
+
+    # 区切り文字を ASCII のハイフンで統一
+    # NOTE
+    #   \u2013 = en dash
+    #   \u2014 = em dash
+    #   \u2015 = horizontal bar
+    #   \u007C = vertical bar (ASCII |)
+    #   \uFF5C = fullwidth vertical bar
+    #   \u2011 = non-breaking hyphen
+    text = re.sub(r"[\u2013\u2014\u2015\u007C\uFF5C\u2011]", "-", text)
+
+    # アンダースコア --> 半角空白
+    text = text.replace("_", " ")
+
+    # ２つ以上連続する空白を 1 文字に短縮
+    text = re.sub(r" {2,}", " ", text)
+
+    # 前後の空白系文字を削除
+    text = text.strip().rstrip()
+
+    # 正常終了
+    return text

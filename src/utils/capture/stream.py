@@ -129,7 +129,8 @@ class CaptureStream:
         if self._window_handle is None:
             return "None"
         else:
-            return get_nime_window_text(self._window_handle)
+            text, _ = get_nime_window_text(self._window_handle)
+            return text
 
     def capture_still(
         self,
@@ -170,11 +171,11 @@ class CaptureStream:
         # 正常終了
         return AISImage.from_bytes(width, height, frame_bytes)
 
-    def capture_animation(
+    def capture_video(
         self, fps: float | None = None, duration_in_sec: float | None = None
     ) -> list[AISImage]:
         """
-        アニメ―ション（連番静止画）をキャプチャする
+        動画（連番静止画）をキャプチャする
         """
         if self._session is None:
             return []

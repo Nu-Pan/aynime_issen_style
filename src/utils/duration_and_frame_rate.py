@@ -2,9 +2,7 @@
 from typing import Generator
 import math
 
-# 映画の標準的なフレームレート
-# NOTE
-#   アニメも基本これ
+# 映画・えぃにめの標準的なフレームレート
 FILM_TIMELINE_IN_FPS = 24 * 1000 / 1001
 
 # 世の中的に標準的なフレームレートのリスト
@@ -12,7 +10,7 @@ FILM_TIMELINE_IN_FPS = 24 * 1000 / 1001
 #   60 fps はツールのメモリフットプリント的にも gif 的にも過剰なので除外
 STANDARD_FRAME_RATES = sorted(
     [
-        # 映画・アニメ向け
+        # 映画・えぃにめ向け
         # 23.976 FPS ベース
         # 1 ~ 4 コマ打ちが対象
         FILM_TIMELINE_IN_FPS,

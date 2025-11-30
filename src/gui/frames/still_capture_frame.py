@@ -153,13 +153,9 @@ class StillCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
 
         # アニメ名を解決
         if self.nime_name_entry.text != "":
-            actual_nime_name = "<NIME>" + self.nime_name_entry.text
+            actual_nime_name = self.nime_name_entry.text
         else:
-            window_name = self.model.stream.nime_window_text
-            if window_name is not None and "<NIME>" in window_name:
-                actual_nime_name = window_name
-            else:
-                actual_nime_name = None
+            actual_nime_name = self.model.stream.nime_window_text
 
         # モデルに反映
         # NOTE
@@ -270,7 +266,7 @@ class StillCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
             show_error_dialog(f"ファイルロードに失敗。", TypeError(type(load_result)))
             return
 
-        # アニメ名を解決
+        # NIEM 名を解決
         if self.nime_name_entry.text != "":
             actual_nime_name = self.nime_name_entry.text
         else:

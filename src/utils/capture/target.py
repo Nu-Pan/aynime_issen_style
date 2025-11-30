@@ -9,7 +9,7 @@ import win32gui, win32con
 
 # utils
 from utils.std import replace_multi
-from utils.windows import is_cloaked
+from utils.windows import is_cloaked, sanitize_text
 
 
 @dataclass
@@ -67,7 +67,7 @@ def enumerate_windows() -> Generator[WindowHandle, None, None]:
         # NOTE
         #   空タイトルはダメ
         #   Program Manager は何故か残っちゃうので名指しで除外
-        title = get_nime_window_text(WindowHandle(hwnd))
+        title, _ = get_nime_window_text(WindowHandle(hwnd))
         if not title:
             continue
         elif title == "Program Manager":
@@ -77,76 +77,39 @@ def enumerate_windows() -> Generator[WindowHandle, None, None]:
         yield WindowHandle(hwnd)
 
 
-def get_nime_window_text(window_handle: WindowHandle) -> str:
+def get_nime_window_text(window_handle: WindowHandle) -> tuple[str, bool]:
     """
     一閃流的に都合の良いように加工されたウィンドウ名を取得する。
     平たく言えば、ウィンドウ名からアニメ名を抽出する。
+    (加工された名前, えぃにめか？) を返す。
     """
     # None は空文字列化
     if window_handle is None:
-        return ""
+        return "", False
 
     # ウィンドウ名を取得
     text = win32gui.GetWindowText(window_handle.value)
-    text = text.strip().rstrip()
+    text = sanitize_text(text)
     if len(text) == 0:
-        return ""
-
-    # 色々やる前のウィンドウ名を保存しておく
-    raw_text = deepcopy(text)
-
-    # Windows パス的な禁止文字を削除
-    text = re.sub(r'[<>:"/\\|?*\x00-\x1F]', "", text)
-
-    # 見た目空白な文字を ASCII 半角スペースに統一
-    # NOTE
-    #   NBSP, 全角, 2000-系, 202F, 205F, 1680
-    text = re.sub(r"[\u00A0\u1680\u2000-\u200A\u202F\u205F\u3000]", " ", text)
-
-    # ゼロ幅系を削除
-    # NOTE
-    #   ZWSP/ZWNJ/ZWJ/WORD JOINER/BOM
-    #   歴史的に空白扱いの MVS
-    text = re.sub(r"[\u200B-\u200D\u2060\uFEFF\u180E]", "", text)
-
-    # ソフトハイフンを削除
-    # NOTE
-    #   通常は印字されず「改行位置の候補」だけを意味する。
-    #   可視の意図はないので 削除。
-    text = re.sub(r"\u00AD", "", text)
-
-    # 区切り文字を ASCII のハイフンで統一
-    # NOTE
-    #   \u2013 = en dash
-    #   \u2014 = em dash
-    #   \u2015 = horizontal bar
-    #   \u007C = vertical bar (ASCII |)
-    #   \uFF5C = fullwidth vertical bar
-    #   \u2011 = non-breaking hyphen
-    text = re.sub(r"[\u2013\u2014\u2015\u007C\uFF5C\u2011]", "-", text)
-
-    # アンダースコア --> 半角空白
-    text = text.replace("_", " ")
-
-    # ２つ以上連続する空白を 1 文字に短縮
-    text = re.sub(r" {2,}", " ", text)
+        return "", False
 
     # アプリの種類で分岐
     # NOTE
     #   ブラウザの場合はアニメ名が取れるので、末尾のアプリ名だけ取って続行。
-    #   それ以外は断念して UNKNOWN を返す
+    #   それ以外は断念
     if text.endswith("Mozilla Firefox"):
         text = text.replace(" - Mozilla Firefox", "")
     elif text.endswith("Google Chrome"):
         text = text.replace(" - Google Chrome", "")
-    elif text.endswith("Discord"):
+    elif text.endswith(" - Discord"):
         # NOTE
         #   Discord の配信画面は、チャンネル名が返ってくる
-        #   そこにアニメは無い
-        return raw_text
+        #   そこにえぃにめは無い
+        text = text.replace(" - Discord", "")
+        return text, False
     else:
         # それ以外の非対応アプリ
-        return raw_text
+        return text, False
 
     # 配信サービス別の処理
     # NOTE
@@ -158,7 +121,7 @@ def get_nime_window_text(window_handle: WindowHandle) -> str:
             # NOTE
             #   作品ページの場合「アニメ動画見放題」がついている
             #   作品ページはタイトルに話数情報が含まれないのでアニメ名抽出の対象としない
-            return raw_text
+            return text, False
         else:
             # NOTE
             #   dアニメストアは「<アニメ名> - <話数> - <話タイトル>」形式。
@@ -168,7 +131,7 @@ def get_nime_window_text(window_handle: WindowHandle) -> str:
             text = " ".join(text.split(" - ")[:2])
     elif text.endswith("AnimeFesta"):
         # NOTE
-        #   AnimeFest はアニメ名しか出てこないので、特別にすることも無い
+        #   AnimeFesta はアニメ名しか出てこないので、特別にすることも無い
         text = text.replace("を見る AnimeFesta", "")
     elif bc_pos != -1:
         # NOTE
@@ -182,13 +145,11 @@ def get_nime_window_text(window_handle: WindowHandle) -> str:
         #   Amazon Prime Video の場合、前後に余計な文字が付くので、それらをカット。
         text = replace_multi(text, ["Amazon.co.jp ", "を観る Prime Video"], "")
     else:
-        return raw_text
+        return text, False
 
-    # 前後の空白系文字を削除
+    # 余計な空白を除去
     text = text.strip().rstrip()
-
-    # ２つ以上連続する空白を 1 文字に短縮
     text = re.sub(r" {2,}", " ", text)
 
     # 正常終了
-    return "<NIME>" + text
+    return text, True

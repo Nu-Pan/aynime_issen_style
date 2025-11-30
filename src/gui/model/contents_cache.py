@@ -37,6 +37,7 @@ from utils.image import (
 )
 from utils.duration_and_frame_rate import DFR_MAP
 from utils.constants import NIME_DIR_PATH, RAW_DIR_PATH, OVERLAY_FONT_PATH
+from utils.windows import sanitize_text
 
 
 class FontCache:
@@ -404,9 +405,6 @@ def overlay_nime_name(source_image: AISImage, nime_name: str | None) -> AISImage
     # 名前が無い場合は何もしない
     if nime_name is None:
         return AISImage(source_image.pil_image.copy())
-
-    # <NIME> タグを削除
-    nime_name = nime_name.replace("<NIME>", "")
 
     # フォントサイズを決定
     # NOTE
@@ -812,6 +810,10 @@ class ImageModelEditSession:
         アニメ名を設定する。
         NIME 画像が影響を受ける。
         """
+        # サニタイズ
+        if nime_name is not None:
+            nime_name = sanitize_text(nime_name)
+
         # アニメ名更新・通知
         model = self._model
         if model._nime_name != nime_name:
@@ -1243,32 +1245,6 @@ class VideoModelEditSession:
         return self
 
 
-def encode_valid_nime_name(text: str | None) -> str:
-    """
-    text を合法なアニメ名にエンコードする
-    """
-    if text is None:
-        # 名前なしの場合、 UNKNOWN に置き換え
-        return "UNKNOWN"
-    elif text.startswith("<NIME>"):
-        # 先頭が NIME の場合、適切に抽出されたアニメ名が続いているはずなのでそれを採用
-        # ただし空白文字は _ で置き換えて無害化
-        return text.replace("<NIME>", "").replace(" ", "_")
-    else:
-        # それ以外の場合、 UNKNOWN を返す
-        return "UNKNOWN"
-
-
-def decode_valid_nime_name(text: str) -> str | None:
-    """
-    text からアニメ名をデコードする
-    """
-    if text == "UNKNOWN":
-        return None
-    else:
-        return "<NIME>" + text.replace("_", " ")
-
-
 class PlaybackMode(Enum):
     FORWARD = "FORWARD"
     BACKWARD = "BACKWARD"
@@ -1312,14 +1288,11 @@ def save_content_model(
         if not isinstance(nime_image, AISImage):
             raise ValueError("Invalid NIME Image")
 
-        # 合法なアニメ名を生成
-        valid_nime_name = encode_valid_nime_name(model.nime_name)
-
         # raw png ファイルの保存が必要か判定
         # NOTE
         #   スチル画像の場合は raw 画像に後から変更が入ることはありえない。
         #   よって、ローカルにファイルが無い場合だけ保存する。
-        png_file_path = RAW_DIR_PATH / f"{valid_nime_name}__{model.time_stamp}.png"
+        png_file_path = RAW_DIR_PATH / f"{model.nime_name}__{model.time_stamp}.png"
         save_png = not png_file_path.exists()
 
         # raw ディレクトリに png 画像を保存
@@ -1335,7 +1308,7 @@ def save_content_model(
         # nime ディレクトリに jpeg 画像を保存
         # NOTE
         #   NIME 画像はサイズ変更がかかっている可能性があるので、必ず保存処理を通す。
-        jpeg_file_path = NIME_DIR_PATH / f"{valid_nime_name}__{model.time_stamp}.jpg"
+        jpeg_file_path = NIME_DIR_PATH / f"{model.nime_name}__{model.time_stamp}.jpg"
         nime_image.pil_image.convert("RGB").save(
             str(jpeg_file_path),
             format="JPEG",
@@ -1350,9 +1323,6 @@ def save_content_model(
     elif isinstance(model, VideoModel):
         # VideoModel
 
-        # 合法なアニメ名を生成
-        valid_nime_name = encode_valid_nime_name(model.nime_name)
-
         # raw ディレクトリに zip ファイルを保存
         # NOTE
         #   raw zip ファイルの差分確認は処理的にも対応コスト的に重い。
@@ -1363,7 +1333,7 @@ def save_content_model(
         #   ここがかなり重たいので最適化を入れている
         #   特に zip 圧縮が重いので ZIP_STORED にするのが大事
         #   png 圧縮率は大した影響はない
-        zip_file_path = RAW_DIR_PATH / f"{valid_nime_name}__{model.time_stamp}.zip"
+        zip_file_path = RAW_DIR_PATH / f"{model.nime_name}__{model.time_stamp}.zip"
         with ZipFile(zip_file_path, "w", compression=ZIP_STORED) as zip_file:
             for idx, img in enumerate(model.iter_frames(ImageLayer.RAW, False)):
                 # 無効なフレームはスキップ
@@ -1445,7 +1415,7 @@ def save_content_model(
                 raise RuntimeError()
 
         # nime ディレクトリに gif ファイルを保存
-        gif_file_path = NIME_DIR_PATH / f"{valid_nime_name}__{model.time_stamp}.gif"
+        gif_file_path = NIME_DIR_PATH / f"{model.nime_name}__{model.time_stamp}.gif"
         nime_frames[0].save(
             str(gif_file_path),
             save_all=True,
@@ -1517,7 +1487,7 @@ def load_content_model(
             f"Unsuported file type. Only extensions {IMAGE_EXTENSIONS + MOVIE_EXTENSIONS} are supported."
         )
 
-    # 使用するアニメ名・タイムスタンプを解決
+    # 使用する NIEM 名・タイムスタンプを解決
     file_stem_match = re.match("(.+)__(.+)", actual_file_path.stem)
     if file_stem_match is None:
         nime_name = None
@@ -1526,7 +1496,7 @@ def load_content_model(
         else:
             time_stamp = current_time_stamp()
     else:
-        nime_name = decode_valid_nime_name(file_stem_match.group(1))
+        nime_name = file_stem_match.group(1)
         if is_time_stamp(file_stem_match.group(2)):
             time_stamp = file_stem_match.group(2)
         else:

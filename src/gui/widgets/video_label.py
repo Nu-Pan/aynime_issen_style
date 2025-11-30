@@ -10,9 +10,9 @@ from gui.model.aynime_issen_style import AynimeIssenStyleModel
 from gui.model.contents_cache import ImageLayer, PlaybackMode, VideoModelEditSession
 
 
-class AnimationLabel(ctk.CTkLabel):
+class Videoabel(ctk.CTkLabel):
     """
-    連番静止画をアニメーション再生する用のラベル
+    動画（連番静止画）を再生する用のラベル
     """
 
     def __init__(
@@ -40,7 +40,7 @@ class AnimationLabel(ctk.CTkLabel):
         self._model = model
         self._frame_index = None
         if blank_text is None:
-            self._blank_text = "Animation Preview"
+            self._blank_text = "Video Preview"
         else:
             self._blank_text = blank_text
 
