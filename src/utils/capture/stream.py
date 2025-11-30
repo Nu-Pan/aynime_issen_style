@@ -1,9 +1,5 @@
 # std
-from typing import Self
 from time import sleep
-
-# PIL
-from PIL import Image
 
 # utils
 from utils.constants import CAPTURE_FRAME_BUFFER_DURATION_IN_SEC

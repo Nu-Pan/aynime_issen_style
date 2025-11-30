@@ -1,8 +1,6 @@
 # std
 from pathlib import Path
-from typing import List, Tuple, cast
-from time import time
-import math
+from typing import cast
 
 # Tk/CTk
 import customtkinter as ctk
@@ -14,7 +12,6 @@ from utils.constants import WIDGET_PADDING, WIDGET_MIN_WIDTH, DEFAULT_FONT_FAMIL
 from utils.image import (
     AspectRatioPattern,
     ResizeDesc,
-    AISImage,
     calc_ssim,
 )
 from utils.duration_and_frame_rate import (
@@ -38,7 +35,6 @@ from gui.widgets.ais_slider import AISSlider
 from gui.model.contents_cache import (
     ImageLayer,
     ImageModel,
-    VideoModel,
     PlaybackMode,
     save_content_model,
     load_content_model,
@@ -170,7 +166,7 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
         self._playback_mode_var = ctk.StringVar(value=self._model.playback_mode.value)
 
         # 再生モードラジオボタン
-        self._playback_mode_radios: List[ctk.CTkRadioButton] = []
+        self._playback_mode_radios: list[ctk.CTkRadioButton] = []
         for i, playback_mode in enumerate(PlaybackMode):
             playback_mode_radio = ctk.CTkRadioButton(
                 self._playback_mode_frame,
@@ -599,7 +595,7 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
             return
 
         # 読み込み対象を解決
-        file_paths = cast(Tuple[str], self.tk.splitlist(event_data))
+        file_paths = cast(tuple[str], self.tk.splitlist(event_data))
         if len(file_paths) > 1:
             show_error_dialog("ファイルは１つだけドロップしてね。")
             return

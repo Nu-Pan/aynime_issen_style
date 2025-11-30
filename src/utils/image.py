@@ -1,7 +1,6 @@
 # std
-from typing import Tuple, Optional, Union, Any, cast, List, Callable
+from typing import Any, cast
 from enum import Enum
-from dataclasses import dataclass
 from enum import Enum, auto
 from math import gcd
 
@@ -14,9 +13,6 @@ import numpy as np
 
 # scikit
 from skimage.metrics import structural_similarity as ssim
-
-# util
-from utils.constants import THUMBNAIL_HEIGHT
 
 
 class AspectRatioPattern(Enum):
@@ -35,7 +31,7 @@ class AspectRatio:
     アスペクト比を表すクラス
     """
 
-    def __init__(self, width: Optional[int], height: Optional[int]):
+    def __init__(self, width: int | None, height: int | None):
         """
         コンストラクタ
         指定されたアスペクト比を約分した状態で保持する
@@ -81,21 +77,21 @@ class AspectRatio:
         return self._name
 
     @property
-    def width(self) -> Optional[int]:
+    def width(self) -> int | None:
         """
         アスペクト比の水平方向成分
         """
         return self._width
 
     @property
-    def height(self) -> Optional[int]:
+    def height(self) -> int | None:
         """
         アスペクト比の垂直方向成分
         """
         return self._height
 
     @property
-    def size(self) -> Optional[Tuple[int, int]]:
+    def size(self) -> tuple[int, int] | None:
         """
         スペクト比の水平・垂直方向成分を返す
         """
@@ -148,9 +144,9 @@ class ResizeDesc:
 
     def __init__(
         self,
-        aspect_ratio: Union[AspectRatioPattern, AspectRatio],
-        width: Optional[int],
-        height: Optional[int],
+        aspect_ratio: AspectRatioPattern | AspectRatio,
+        width: int | None,
+        height: int | None,
     ):
         """
         コンストラクタ
@@ -167,7 +163,7 @@ class ResizeDesc:
     @classmethod
     def from_pattern(
         cls,
-        aspect_ratio: Union[AspectRatioPattern, AspectRatio],
+        aspect_ratio: AspectRatioPattern | AspectRatio,
         pattern: "ResizeDesc.Pattern",
     ) -> "ResizeDesc":
         """
@@ -192,14 +188,14 @@ class ResizeDesc:
         return self._aspect_ratio
 
     @property
-    def width(self) -> Optional[int]:
+    def width(self) -> int | None:
         """
         目標横幅を取得する
         """
         return self._width
 
     @property
-    def height(self) -> Optional[int]:
+    def height(self) -> int | None:
         """
         目標高さを取得する
         """
@@ -207,7 +203,7 @@ class ResizeDesc:
 
     def resolve(
         self, source_width: int, source_height: int, mode: ResizeMode
-    ) -> Tuple[int, int]:
+    ) -> tuple[int, int]:
         """
         サイズ (source_width, source_height) の画像をリサイズする場合の適切な目標サイズを解決する。
 

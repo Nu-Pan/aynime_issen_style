@@ -1,6 +1,3 @@
-# std
-from typing import Optional
-
 # TK/CTk
 import customtkinter as ctk
 
@@ -24,7 +21,7 @@ class StillLabel(ctk.CTkLabel):
         master: ctk.CTkBaseClass,
         image_model: ImageModel,
         blank_text: str,
-        **kwargs
+        **kwargs,
     ):
         """
         コンストラクタ

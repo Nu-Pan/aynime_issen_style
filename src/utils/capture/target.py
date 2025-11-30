@@ -1,5 +1,5 @@
 # std
-from typing import Generator, Any
+from typing import Generator
 from dataclasses import dataclass
 from copy import deepcopy
 import re

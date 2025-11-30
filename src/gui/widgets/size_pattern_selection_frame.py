@@ -1,5 +1,5 @@
 # std
-from typing import Callable, List, Tuple, Sequence
+from typing import Callable, Sequence
 
 # Tk/CTk
 import customtkinter as ctk
@@ -65,7 +65,7 @@ class SizePatternSlectionFrame(ctk.CTkFrame):
 
         # アス比選択ラジオボタン
         self.aspect_ratio_frame.rowconfigure(0, weight=1)
-        self.aspect_ratio_radios: List[ctk.CTkRadioButton] = []
+        self.aspect_ratio_radios: list[ctk.CTkRadioButton] = []
         for i, aspect_ratio in enumerate(shown_aspect_raios):
             aspect_ratio_radio = ctk.CTkRadioButton(
                 self.aspect_ratio_frame,
@@ -93,7 +93,7 @@ class SizePatternSlectionFrame(ctk.CTkFrame):
 
         # 解像度選択ラジオボタン
         self.resolution_frame.rowconfigure(0, weight=1)
-        self.resolution_radios: List[ctk.CTkRadioButton] = []
+        self.resolution_radios: list[ctk.CTkRadioButton] = []
         for i, resolution in enumerate(shown_resolutions):
             resolution_radio = ctk.CTkRadioButton(
                 self.resolution_frame,

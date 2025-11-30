@@ -1,7 +1,6 @@
 # std
 import warnings
-from typing import Callable, Optional, Union, List, Literal
-import logging
+from typing import Callable, Literal
 
 # PIL
 from PIL.ImageTk import PhotoImage
@@ -26,7 +25,7 @@ def silent_configure(widget: ctk.CTkBaseClass, **kwargs):
         widget.configure(**kwargs)
 
 
-def configure_presence(widget: ctk.CTkBaseClass, content: Union[PhotoImage, str]):
+def configure_presence(widget: ctk.CTkBaseClass, content: PhotoImage | str):
     """
     widget に対して configure を呼び出して content を設定する。
     ただし configure 内で発生した警告は抑制される。
@@ -44,7 +43,7 @@ def show_notify_label(
     level: Literal["info", "warning", "error"],
     message: str,
     duration_ms: int = 2000,
-    on_click_handler: Optional[Callable[[Event], None]] = None,
+    on_click_handler: Callable[[Event], None] | None = None,
 ) -> None:
     """
     通知ラベルを表示する
@@ -90,7 +89,7 @@ def show_notify_label(
 
 
 def show_error_dialog(
-    message: str, exception: Union[Exception, List[Exception], None] = None
+    message: str, exception: Exception | list[Exception] | None = None
 ):
     """
     エラーダイアログを表示する。

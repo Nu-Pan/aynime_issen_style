@@ -1,5 +1,5 @@
 # std
-from typing import Callable, List, Any, TypeVar, Generic
+from typing import Callable, Any, TypeVar, Generic
 
 # ctk
 import customtkinter as ctk
@@ -117,7 +117,7 @@ class AISSlider(ctk.CTkFrame, Generic[T]):
         )
 
         # ハンドラリスト
-        self._handlers: List[Callable[[T], None]] = []
+        self._handlers: list[Callable[[T], None]] = []
 
     @property
     def value(self) -> T:

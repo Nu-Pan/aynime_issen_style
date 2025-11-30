@@ -1,7 +1,6 @@
 # std
 from dataclasses import dataclass
-from typing import Generator, Union, Callable, Any
-import re
+from typing import Callable, Any
 import threading
 import queue
 import warnings
@@ -16,40 +15,6 @@ import customtkinter as ctk
 import ctypes
 from ctypes import wintypes
 import win32con, win32gui, win32api, win32event, winerror
-
-
-@dataclass
-class DXGIOutputInfo:
-    """
-    DXGI のアウトプット（モニター）情報を保持するクラス
-    """
-
-    adapter_index: int
-    output_index: int
-    width: int
-    height: int
-    primary: bool
-
-    def __str__(self) -> str:
-        """
-        DXGI アウトプットの情報を文字列として返す
-
-        Returns:
-            str: DXGI アウトプットの情報の文字列
-        """
-        # 必ず表示するベース部分
-        sub_strs = [
-            f"GPU{self.adapter_index}",
-            f"Monitor{self.output_index}",
-            f"{self.width}x{self.height}",
-        ]
-
-        # プライマリモニターの場合
-        if self.primary:
-            sub_strs += ["Primary"]
-
-        # 正常終了
-        return " ".join(sub_strs)
 
 
 def file_to_clipboard(file_path: Path) -> None:
@@ -85,7 +50,7 @@ def file_to_clipboard(file_path: Path) -> None:
 
 
 def register_global_hotkey_handler(
-    ctk_kind: Union[ctk.CTk, ctk.CTkBaseClass], handler: Callable[[Any], None], *args
+    ctk_kind: ctk.CTk | ctk.CTkBaseClass, handler: Callable[[Any], None], *args
 ) -> None:
     """
     グローバルホットキー `Ctrl+Alt+P` をトリガーに handler が呼ばれるように設定する。

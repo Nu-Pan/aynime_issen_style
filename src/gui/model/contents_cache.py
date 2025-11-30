@@ -1,16 +1,11 @@
 # std
 from typing import (
-    Optional,
-    Union,
-    List,
     Callable,
     Generator,
     Self,
     Any,
-    Tuple,
     cast,
     Iterable,
-    Dict,
 )
 from pathlib import Path
 from datetime import datetime
@@ -30,9 +25,7 @@ from PIL import (
     ImageFont,
     ImageEnhance,
     ImageOps,
-    ImageStat,
     ImageFilter,
-    ImageChops,
 )
 
 # utils
@@ -44,7 +37,6 @@ from utils.image import (
 )
 from utils.duration_and_frame_rate import DFR_MAP
 from utils.constants import NIME_DIR_PATH, RAW_DIR_PATH, OVERLAY_FONT_PATH
-from utils.std import replace_multi
 
 
 class FontCache:
@@ -52,7 +44,7 @@ class FontCache:
     フォントをキャッシュするクラス
     """
 
-    _cache: Dict[float, ImageFont.FreeTypeFont] = dict()
+    _cache: dict[float, ImageFont.FreeTypeFont] = dict()
 
     @classmethod
     def query(cls, font_size: float):
@@ -103,7 +95,7 @@ class CachedContent(ABC):
     キャッシュツリーの基底クラス
     """
 
-    def __init__(self, parent: Optional["CachedContent"]):
+    def __init__(self, parent: "CachedContent | None"):
         """
         コンストラクタ
         """
@@ -113,7 +105,7 @@ class CachedContent(ABC):
         self._is_dirty = False
 
     @property
-    def parent_output(self) -> Optional[AISImage]:
+    def parent_output(self) -> AISImage | None:
         if self._parent is None:
             return None
         else:
@@ -154,7 +146,7 @@ class CachedContent(ABC):
 
     @property
     @abstractmethod
-    def output(self) -> Optional[AISImage]:
+    def output(self) -> AISImage | None:
         """
         出力を取得する
         ダーティー状態は暗黙に解決される。
@@ -176,7 +168,7 @@ class CachedSourceImage(CachedContent):
         super().__init__(None)
         self._source = None
 
-    def set_source(self, source: Optional[AISImage]) -> Self:
+    def set_source(self, source: AISImage | None) -> Self:
         """
         ソース画像を設定する
         """
@@ -186,7 +178,7 @@ class CachedSourceImage(CachedContent):
         return self
 
     @property
-    def output(self) -> Optional[AISImage]:
+    def output(self) -> AISImage | None:
         """
         出力を取得する
         ダーティー状態は暗黙に解決される。
@@ -209,7 +201,7 @@ class CachedScalableImage(CachedContent):
         self,
         parent: CachedContent,
         mode: ResizeMode,
-        aux_process: Optional[AuxProcess] = None,
+        aux_process: AuxProcess | None = None,
     ):
         """
         コンストラクタ
@@ -244,7 +236,7 @@ class CachedScalableImage(CachedContent):
         return self._size
 
     @property
-    def output(self) -> Optional[AISImage]:
+    def output(self) -> AISImage | None:
         """
         スケーリング済み画像
         ダーティー状態は暗黙に解決される。
@@ -283,8 +275,8 @@ class ImageLayer(Enum):
 
 
 def get_text_bbox_size(
-    image_size: Tuple[int, int], text: str, font: ImageFont.FreeTypeFont
-) -> Tuple[int, int]:
+    image_size: tuple[int, int], text: str, font: ImageFont.FreeTypeFont
+) -> tuple[int, int]:
     """
     指定された条件でのテキストバウンディングボックスのサイズを返す
 
@@ -294,7 +286,7 @@ def get_text_bbox_size(
         font (ImageFont.FreeTypeFont): フォント
 
     Returns:
-        Tuple[int, int]: バウンディングボックスの幅・高さ
+        tuple[int, int]: バウンディングボックスの幅・高さ
     """
     dummy_image = Image.new("L", image_size, None)
     dummy_draw = ImageDraw.Draw(dummy_image)
@@ -309,8 +301,8 @@ def make_disabled_image(
     source_image を元に「無効っぽい見た目の画像」を生成する
 
     Args:
-        text (str, optional): オーバーレイする文字列
-        darkness (float, optional): 画像の暗さ
+        text: オーバーレイする文字列
+        darkness: 画像の暗さ
 
     Returns:
         AISImage: 無効っぽい見た目の画像
@@ -356,7 +348,7 @@ def np_to_pil(np_image: np.ndarray) -> Image.Image:
     return Image.fromarray(np_image)
 
 
-def split_rgba(np_image: np.ndarray) -> Tuple[np.ndarray, Optional[np.ndarray]]:
+def split_rgba(np_image: np.ndarray) -> tuple[np.ndarray, np.ndarray | None]:
     """
     np_image を RGB, A に分離する
     A がない場合は None が返る
@@ -371,9 +363,7 @@ def split_rgba(np_image: np.ndarray) -> Tuple[np.ndarray, Optional[np.ndarray]]:
         return np_image_rgb, np_image_a
 
 
-def concat_rgba(
-    np_image_rgb: np.ndarray, np_image_a: Optional[np.ndarray]
-) -> np.ndarray:
+def concat_rgba(np_image_rgb: np.ndarray, np_image_a: np.ndarray | None) -> np.ndarray:
     """
     np_image_rgb, np_image_a を結合して RGBA 画像を生成する
     """
@@ -407,7 +397,7 @@ def normalize(np_image: np.ndarray) -> np.ndarray:
     return np_image
 
 
-def overlay_nime_name(source_image: AISImage, nime_name: Optional[str]) -> AISImage:
+def overlay_nime_name(source_image: AISImage, nime_name: str | None) -> AISImage:
     """
     source_image に nime_name をオーバーレイする。
     """
@@ -622,9 +612,9 @@ class ImageModel:
 
     def __init__(
         self,
-        raw_image: Optional[AISImage] = None,
-        nime_name: Optional[str] = None,
-        time_stamp: Optional[str] = None,
+        raw_image: AISImage | None = None,
+        nime_name: str | None = None,
+        time_stamp: str | None = None,
         enable: bool = True,
     ):
         """
@@ -652,7 +642,7 @@ class ImageModel:
 
         # 通知ハンドラ
         self._notify_handlers = {
-            image_layer: cast(List[NotifyHandler], []) for image_layer in ImageLayer
+            image_layer: cast(list[NotifyHandler], []) for image_layer in ImageLayer
         }
 
         # 初期設定
@@ -662,14 +652,14 @@ class ImageModel:
         self._enable = enable
 
     @property
-    def nime_name(self) -> Optional[str]:
+    def nime_name(self) -> str | None:
         """
         アニメ名を取得する
         """
         return self._nime_name
 
     @property
-    def time_stamp(self) -> Optional[str]:
+    def time_stamp(self) -> str | None:
         """
         この画像の撮影日時を表すタイムスタンプ
         """
@@ -698,7 +688,7 @@ class ImageModel:
             case _:
                 raise ValueError(layer)
 
-    def get_image(self, layer: ImageLayer) -> Optional[AISImage]:
+    def get_image(self, layer: ImageLayer) -> AISImage | None:
         """
         指定 layer の画像を取得する。
         """
@@ -806,7 +796,7 @@ class ImageModelEditSession:
         # 正常終了
         return self
 
-    def set_raw_image(self, raw_image: Optional[AISImage]) -> Self:
+    def set_raw_image(self, raw_image: AISImage | None) -> Self:
         """
         RAW 画像を設定する。
         タイムスタンプなどの関連要素は触らないので注意
@@ -817,7 +807,7 @@ class ImageModelEditSession:
         # 正常終了
         return self
 
-    def set_nime_name(self, nime_name: Optional[str]) -> Self:
+    def set_nime_name(self, nime_name: str | None) -> Self:
         """
         アニメ名を設定する。
         NIME 画像が影響を受ける。
@@ -831,7 +821,7 @@ class ImageModelEditSession:
         # 正常終了
         return self
 
-    def set_time_stamp(self, time_stamp: Optional[str]) -> Self:
+    def set_time_stamp(self, time_stamp: str | None) -> Self:
         """
         タイムスタンプを設定する
         RAW 画像は更新されない。
@@ -899,20 +889,20 @@ class VideoModel:
         #   サイズとかの全フレーム共通の情報は self._global_model をマスターとして管理する
         #   フレーム個別の情報は self._frame で管理する
         self._global_model = ImageModel()
-        self._frames: List[ImageModel] = []
+        self._frames: list[ImageModel] = []
         self._duration_in_msec = DFR_MAP.default_entry.duration_in_msec
         self._duration_is_dirty = False
-        self._duration_change_handlers: List[NotifyHandler] = []
+        self._duration_change_handlers: list[NotifyHandler] = []
 
     @property
-    def nime_name(self) -> Optional[str]:
+    def nime_name(self) -> str | None:
         """
         アニメ名
         """
         return self._global_model.nime_name
 
     @property
-    def time_stamp(self) -> Optional[str]:
+    def time_stamp(self) -> str | None:
         """
         この動画の撮影日時を表すタイムスタンプ
         """
@@ -952,7 +942,7 @@ class VideoModel:
 
     def iter_frames(
         self, layer: ImageLayer, enable_only: bool = True
-    ) -> Generator[Optional[AISImage], None, None]:
+    ) -> Generator[AISImage | None, None, None]:
         """
         全てのフレームをイテレートする
         """
@@ -960,7 +950,7 @@ class VideoModel:
             if not enable_only or f.enable:
                 yield f.get_image(layer)
 
-    def get_frame(self, layer: ImageLayer, frame_index: int) -> Optional[AISImage]:
+    def get_frame(self, layer: ImageLayer, frame_index: int) -> AISImage | None:
         """
         指定レイヤー・インデックスのフレームを取得する。
         インデックスは有効・無効を考慮しないトータルの番号。
@@ -1033,7 +1023,7 @@ class VideoModelEditSession:
         # 正常終了
         return self
 
-    def set_nime_name(self, nime_name: Optional[str]) -> Self:
+    def set_nime_name(self, nime_name: str | None) -> Self:
         """
         アニメ名を設定する。
         """
@@ -1052,7 +1042,7 @@ class VideoModelEditSession:
         # 正常終了
         return self
 
-    def set_time_stamp(self, time_stamp: Optional[str]) -> Self:
+    def set_time_stamp(self, time_stamp: str | None) -> Self:
         """
         動画のタイムスタンプを設定する。
         """
@@ -1071,9 +1061,7 @@ class VideoModelEditSession:
         # 正常終了
         return self
 
-    def set_enable(
-        self, frame_indices: Union[int, List[int], None], enable: bool
-    ) -> Self:
+    def set_enable(self, frame_indices: int | list[int] | None, enable: bool) -> Self:
         """
         指定フレームの有効・無効を設定する
         """
@@ -1091,7 +1079,7 @@ class VideoModelEditSession:
         else:
             raise TypeError()
 
-    def set_enable_batch(self, entries: List[Tuple[int, bool]]) -> Self:
+    def set_enable_batch(self, entries: list[tuple[int, bool]]) -> Self:
         """
         指定フレームの有効・無効を設定する
         indices は (インデックス, 有効・無効) のリスト
@@ -1141,14 +1129,14 @@ class VideoModelEditSession:
 
     def append_frames(
         self,
-        new_obj: Union[
-            AISImage,
-            Iterable[AISImage],
-            ImageModel,
-            Iterable[ImageModel],
-            "VideoModel",
-            Iterable["VideoModel"],
-        ],
+        new_obj: (
+            AISImage
+            | Iterable[AISImage]
+            | ImageModel
+            | Iterable[ImageModel]
+            | "VideoModel"
+            | Iterable["VideoModel"]
+        ),
         *,
         _does_notify: bool = True,
     ) -> Self:
@@ -1156,7 +1144,7 @@ class VideoModelEditSession:
         動画フレームを末尾に追加する
 
         Args:
-            frames (List[ImageModel]): 挿入するフレーム
+            frames (list[ImageModel]): 挿入するフレーム
 
         Returns:
             VideoModel: 自分自身
@@ -1255,7 +1243,7 @@ class VideoModelEditSession:
         return self
 
 
-def encode_valid_nime_name(text: Optional[str]) -> str:
+def encode_valid_nime_name(text: str | None) -> str:
     """
     text を合法なアニメ名にエンコードする
     """
@@ -1271,7 +1259,7 @@ def encode_valid_nime_name(text: Optional[str]) -> str:
         return "UNKNOWN"
 
 
-def decode_valid_nime_name(text: str) -> Optional[str]:
+def decode_valid_nime_name(text: str) -> str | None:
     """
     text からアニメ名をデコードする
     """
@@ -1288,7 +1276,7 @@ class PlaybackMode(Enum):
 
 
 def save_content_model(
-    model: Union[ImageModel, VideoModel],
+    model: ImageModel | VideoModel,
     playback_mode: PlaybackMode = PlaybackMode.FORWARD,
 ) -> Path:
     """
@@ -1296,8 +1284,8 @@ def save_content_model(
     画像・動画の両方に対応している。
 
     Args:
-        model (Union[IntegratedImage, IntegratedVideo]): 保存したいモデル
-        palyback_mode (PlaybackMode):
+        model: 保存したいモデル
+        palyback_mode:
 
     Return:
         Path: 保存先ファイルパス
@@ -1478,7 +1466,7 @@ def save_content_model(
 def load_content_model(
     file_path: Path,
     default_duration_in_msec: int = DFR_MAP.default_entry.duration_in_msec,
-) -> Union[ImageModel, VideoModel]:
+) -> ImageModel | VideoModel:
     """
     file_path から画像を読み込む。
     画像・動画の両方に対応している。

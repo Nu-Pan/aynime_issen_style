@@ -1,17 +1,16 @@
 # std
-from typing import List, Tuple, cast
+from typing import cast
 from pathlib import Path
 
 # Tk/CTk
 import customtkinter as ctk
 from tkinterdnd2 import TkinterDnD, DND_FILES
 from tkinterdnd2.TkinterDnD import DnDEvent
-import tkinter.messagebox as mb
 from tkinter import Event
 
 # utils
 from utils.constants import WIDGET_PADDING
-from utils.image import AspectRatioPattern, ResizeDesc, AISImage
+from utils.image import AspectRatioPattern, ResizeDesc
 from gui.model.contents_cache import (
     ImageModel,
     VideoModel,
@@ -22,7 +21,7 @@ from gui.model.contents_cache import (
 from utils.windows import file_to_clipboard, register_global_hotkey_handler
 from utils.ctk import show_notify_label, show_error_dialog
 from utils.capture import *
-from utils.constants import CAPTURE_FRAME_BUFFER_DURATION_IN_SEC, DEFAULT_FONT_FAMILY
+from utils.constants import CAPTURE_FRAME_BUFFER_DURATION_IN_SEC
 
 # gui
 from gui.widgets.still_label import StillLabel
@@ -244,7 +243,7 @@ class StillCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
             return
 
         # 読み込み対象を解決
-        file_paths = cast(Tuple[str], self.tk.splitlist(event_data))
+        file_paths = cast(tuple[str], self.tk.splitlist(event_data))
         if len(file_paths) > 1:
             show_error_dialog("ファイルは１つだけドロップしてね。")
             return

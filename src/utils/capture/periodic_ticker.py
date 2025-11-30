@@ -1,6 +1,5 @@
 import time
 import threading
-from typing import Callable, Optional
 
 
 class PeriodicTicker:
@@ -25,7 +24,7 @@ class PeriodicTicker:
         self.next_t = time.perf_counter()
         self.overrun_count = 0
 
-    def wait_next(self) -> Optional[float]:
+    def wait_next(self) -> float | None:
         """
         次の理想時刻まで待つ。戻り値は “このフレームの予定開始時刻”。
         stop が立ったら None を返す。

@@ -10,7 +10,7 @@ from CTkListbox import CTkListbox
 
 # utils
 from utils.capture import *
-from utils.constants import WIDGET_PADDING, WINDOW_MIN_WIDTH, DEFAULT_FONT_FAMILY
+from utils.constants import WIDGET_PADDING, DEFAULT_FONT_FAMILY
 from utils.ctk import show_notify_label
 from utils.std import traceback_str
 

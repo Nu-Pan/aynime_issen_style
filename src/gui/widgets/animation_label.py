@@ -1,6 +1,3 @@
-# std
-from typing import List, Optional
-
 # Tk/CTk
 import customtkinter as ctk
 
@@ -22,7 +19,7 @@ class AnimationLabel(ctk.CTkLabel):
         self,
         master: ctk.CTkBaseClass,
         model: AynimeIssenStyleModel,
-        blank_text: Optional[str] = None,
+        blank_text: str | None = None,
         **kwargs,
     ):
         """

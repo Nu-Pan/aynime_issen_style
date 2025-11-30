@@ -1,13 +1,9 @@
-# std
-from typing import Callable, List, Iterable
-import time
-
 # Tk/CTk
 from tkinter import Event
 import customtkinter as ctk
 
 # utils
-from utils.constants import WIDGET_PADDING, DEFAULT_FONT_FAMILY
+from utils.constants import DEFAULT_FONT_FAMILY
 from utils.ctk import configure_presence
 from utils.image import AISImage
 
