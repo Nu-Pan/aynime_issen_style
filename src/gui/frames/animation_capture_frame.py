@@ -571,6 +571,7 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
 
         # モデルに設定
         with VideoModelEditSession(self._model.video) as edit:
+            edit.clear_frames()
             edit.set_nime_name(nime_name)
             edit.set_time_stamp(None)  # NOTE 現在時刻を適用
             edit.append_frames(
