@@ -25,6 +25,7 @@ class WindowListBoxItem:
 
     window_handle: WindowHandle
     window_name: str
+    is_aynime: bool
 
     def __str__(self) -> str:
         return self.window_name
@@ -157,23 +158,31 @@ class WindowSelectionFrame(ctk.CTkFrame):
             # リストをクリア
             self.capture_target_list_box.delete("all")
 
-            # ウィンドウリストを列挙・追加
+            # ウィンドウリストを列挙
             raw_items = [
-                WindowListBoxItem(window_handle, get_nime_window_text(window_handle))
+                WindowListBoxItem(window_handle, *get_nime_window_text(window_handle))
                 for window_handle in enumerate_windows()
             ]
+
+            # 無名ウィンドウを除外
+            raw_items = [item for item in raw_items if item.window_name != ""]
+
+            # ソート
+            # NOTE
+            #   NIME を先頭に持ってくる
+            #   それ以外は ABC 順
             nime_items = sorted(
                 [
                     WindowListBoxItem(
-                        item.window_handle, item.window_name.replace("<NIME>", "★")
+                        item.window_handle, "★" + item.window_name, item.is_aynime
                     )
                     for item in raw_items
-                    if "<NIME>" in item.window_name
+                    if item.is_aynime
                 ],
                 key=lambda item: item.window_name,
             )
             other_items = sorted(
-                [item for item in raw_items if "<NIME>" not in item.window_name],
+                [item for item in raw_items if not item.is_aynime],
                 key=lambda item: item.window_name,
             )
             for item in nime_items + other_items:

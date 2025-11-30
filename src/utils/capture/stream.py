@@ -129,7 +129,8 @@ class CaptureStream:
         if self._window_handle is None:
             return "None"
         else:
-            return get_nime_window_text(self._window_handle)
+            text, _ = get_nime_window_text(self._window_handle)
+            return text
 
     def capture_still(
         self,

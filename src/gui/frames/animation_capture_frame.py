@@ -399,7 +399,7 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
         """
         with VideoModelEditSession(self._model.video) as edit:
             if text != "":
-                edit.set_nime_name("<NIME>" + text)
+                edit.set_nime_name(text)
             else:
                 edit.set_nime_name(self._model.stream.nime_window_text)
 
