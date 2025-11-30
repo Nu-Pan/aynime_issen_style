@@ -1,10 +1,9 @@
 # std
-from typing import Callable, List
+from typing import Callable
 import time
 
 # ctk
 import customtkinter as ctk
-import tkinter as tk
 
 # utils
 from utils.constants import DEFAULT_FONT_FAMILY
@@ -27,7 +26,7 @@ class AISEntry(ctk.CTkEntry):
         self.configure(font=default_font)
 
         # ハンドラリスト
-        self._handlers: List[Callable[[str], None]] = []
+        self._handlers: list[Callable[[str], None]] = []
 
         # Entry の内容変更監視
         self._polled_value = ""

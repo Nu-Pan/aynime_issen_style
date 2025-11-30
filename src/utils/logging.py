@@ -3,14 +3,12 @@ import datetime
 import io
 import logging
 from logging.handlers import TimedRotatingFileHandler
-from typing import Any, Optional
+from typing import Any
 import sys
 import threading
 import asyncio
 import warnings
 from pathlib import Path
-import gzip
-import shutil
 import os
 
 # tk
@@ -33,8 +31,8 @@ def _format_warning(message, category, filename, lineno, line=None):
 
 
 def _get_actual_stream(
-    stream: Optional[io.TextIOWrapper] = None,
-) -> Optional[io.TextIOWrapper]:
+    stream: io.TextIOWrapper | None = None,
+) -> io.TextIOWrapper | None:
     """
     書き込み可能な stream だけを非 None にするヘルパ
     """
@@ -53,7 +51,7 @@ class _LoggingTee(io.TextIOBase):
         self,
         dest_logger: logging.Logger,
         log_level: int,
-        mirror_stream: Optional[io.TextIOWrapper] = None,
+        mirror_stream: io.TextIOWrapper | None = None,
     ):
         """
         コンストラクタ

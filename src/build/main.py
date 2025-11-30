@@ -1,5 +1,4 @@
 import subprocess
-import zipfile
 import shutil
 from datetime import datetime
 from pathlib import Path
@@ -18,6 +17,7 @@ WORK_DIR_PATH = BUILD_DIR_PATH / "temp"
 SPEC_DIR_PATH = BUILD_DIR_PATH / "spec"
 ZIP_OUTPUT_DIR = Path("release")
 APP_ICO_FILE_ABS_PATH = Path("app.ico").resolve()
+LICENSE_FILE_ABS_PATH = Path("LICENSE").resolve()
 
 
 def clean_build_artifacts():
@@ -69,9 +69,9 @@ def run_pyinstaller():
             "--strip",
             "--noconsole",
             "--log-level=WARN",
-            "--collect-binaries=dxgi_probe",
+            "--collect-binaries=aynime_capture",
             "--collect-submodules=numpy",
-            "--collect-submodules=dxgi_probe",
+            "--collect-submodules=aynime_capture",
             "--collect-data=numpy",
             f"--icon={APP_ICO_FILE_ABS_PATH}",
             f"--add-data={APP_ICO_FILE_ABS_PATH}:.",
@@ -80,6 +80,16 @@ def run_pyinstaller():
             f"--specpath={SPEC_DIR_PATH}",
         ],
         check=True,
+    )
+
+
+def put_files():
+    """
+    その他同梱したいファイルを配置する
+    """
+    # ライセンスファイルを同梱
+    shutil.copyfile(
+        LICENSE_FILE_ABS_PATH, DIST_APP_DIR_PATH / (LICENSE_FILE_ABS_PATH.stem + ".txt")
     )
 
 
@@ -108,6 +118,7 @@ def main():
     clean_build_artifacts()
     make_version_file()
     run_pyinstaller()
+    put_files()
     zip_executable()
 
 

@@ -1,7 +1,6 @@
 # std
-from typing import Tuple, Optional, Union, Any, cast, List, Callable
+from typing import Any, cast
 from enum import Enum
-from dataclasses import dataclass
 from enum import Enum, auto
 from math import gcd
 
@@ -14,9 +13,6 @@ import numpy as np
 
 # scikit
 from skimage.metrics import structural_similarity as ssim
-
-# util
-from utils.constants import THUMBNAIL_HEIGHT
 
 
 class AspectRatioPattern(Enum):
@@ -35,7 +31,7 @@ class AspectRatio:
     アスペクト比を表すクラス
     """
 
-    def __init__(self, width: Optional[int], height: Optional[int]):
+    def __init__(self, width: int | None, height: int | None):
         """
         コンストラクタ
         指定されたアスペクト比を約分した状態で保持する
@@ -81,21 +77,21 @@ class AspectRatio:
         return self._name
 
     @property
-    def width(self) -> Optional[int]:
+    def width(self) -> int | None:
         """
         アスペクト比の水平方向成分
         """
         return self._width
 
     @property
-    def height(self) -> Optional[int]:
+    def height(self) -> int | None:
         """
         アスペクト比の垂直方向成分
         """
         return self._height
 
     @property
-    def size(self) -> Optional[Tuple[int, int]]:
+    def size(self) -> tuple[int, int] | None:
         """
         スペクト比の水平・垂直方向成分を返す
         """
@@ -148,9 +144,9 @@ class ResizeDesc:
 
     def __init__(
         self,
-        aspect_ratio: Union[AspectRatioPattern, AspectRatio],
-        width: Optional[int],
-        height: Optional[int],
+        aspect_ratio: AspectRatioPattern | AspectRatio,
+        width: int | None,
+        height: int | None,
     ):
         """
         コンストラクタ
@@ -167,7 +163,7 @@ class ResizeDesc:
     @classmethod
     def from_pattern(
         cls,
-        aspect_ratio: Union[AspectRatioPattern, AspectRatio],
+        aspect_ratio: AspectRatioPattern | AspectRatio,
         pattern: "ResizeDesc.Pattern",
     ) -> "ResizeDesc":
         """
@@ -192,14 +188,14 @@ class ResizeDesc:
         return self._aspect_ratio
 
     @property
-    def width(self) -> Optional[int]:
+    def width(self) -> int | None:
         """
         目標横幅を取得する
         """
         return self._width
 
     @property
-    def height(self) -> Optional[int]:
+    def height(self) -> int | None:
         """
         目標高さを取得する
         """
@@ -207,7 +203,7 @@ class ResizeDesc:
 
     def resolve(
         self, source_width: int, source_height: int, mode: ResizeMode
-    ) -> Tuple[int, int]:
+    ) -> tuple[int, int]:
         """
         サイズ (source_width, source_height) の画像をリサイズする場合の適切な目標サイズを解決する。
 
@@ -305,7 +301,18 @@ class AISImage:
         self._photo_image = None
 
     @classmethod
-    def empty(cls, mode: str, width: int, height: int) -> "AISImage":
+    def from_bytes(cls, width: int, height: int, image_bytes: bytes) -> "AISImage":
+        """
+        bytes から画像を生成する。
+        aynime_capture から取得したバッファを前提とする。
+        """
+        pil_image = Image.frombuffer(
+            "RGB", (width, height), image_bytes, "raw", "BGR", 0, 1
+        )
+        return AISImage(pil_image)
+
+    @classmethod
+    def empty(cls, mode: str = "RGB", width: int = 8, height: int = 8) -> "AISImage":
         """
         空の画像を生成する
         """
@@ -530,118 +537,3 @@ def calc_ssim(image_A: AISImage, image_B: AISImage) -> float:
 
     # 正常終了
     return score
-
-
-class GifDurationEntry:
-    """
-    gif duration マップを構成するエントリー
-    """
-
-    def __init__(self, frame_rate: int):
-        self._frame_rate_int = frame_rate
-        self._float_duration_in_msec = 1000 / frame_rate
-        self._gif_duration_in_msec = round(self._float_duration_in_msec / 10) * 10
-        self._qerror = abs(self._float_duration_in_msec - self._gif_duration_in_msec)
-        self._frame_rate_float = 1000 / self._gif_duration_in_msec
-        self._index = -1
-
-    @property
-    def frame_rate_int(self) -> int:
-        return self._frame_rate_int
-
-    @property
-    def frame_rate_float(self) -> float:
-        return self._frame_rate_float
-
-    @property
-    def float_duration_in_msec(self) -> float:
-        return self._float_duration_in_msec
-
-    @property
-    def gif_duration_in_msec(self) -> int:
-        return self._gif_duration_in_msec
-
-    @property
-    def qerror(self) -> float:
-        return self.qerror
-
-    @property
-    def index(self) -> int:
-        return self._index
-
-
-class _GifDurationMap:
-    """
-    gif の更新周期の最小分解能が 10msec であることに端を発する、フレームレート・更新周期のマップ
-    モジュール外からのアクセスは GIF_DURATION_MAP の方を使うこと
-    """
-
-    MIN_FRAME_RATE = 1
-    MAX_FRAME_RATE = 25
-
-    def __init__(self):
-        """
-        コンストラクタ
-        """
-        # 種となる全エントリーを生成
-        self._entries = [
-            GifDurationEntry(frame_rate)
-            for frame_rate in range(
-                _GifDurationMap.MIN_FRAME_RATE, _GifDurationMap.MAX_FRAME_RATE + 1
-            )
-        ]
-
-        # gif duration のグループ毎に、最も誤差の少ないフレームレートを１つ選ぶ
-        gif_duration_set = {e._gif_duration_in_msec for e in self._entries}
-        new_entries: List[GifDurationEntry] = []
-        for gif_duration_in_msec in gif_duration_set:
-            group = [
-                e
-                for e in self._entries
-                if e._gif_duration_in_msec == gif_duration_in_msec
-            ]
-            group.sort(key=lambda e: e._qerror)
-            new_entries.append(group[0])
-        self._entries = new_entries
-
-        # フレームレート順でソート
-        self._entries.sort(key=lambda e: e.frame_rate_float)
-
-        # インデックス値を割り当て
-        for i, e in enumerate(self._entries):
-            e._index = i
-
-    def __len__(self) -> int:
-        """
-        エントリー数
-        """
-        return len(self._entries)
-
-    def __getitem__(self, index: int) -> GifDurationEntry:
-        """
-        添字アクセス
-        """
-        return self._entries[index]
-
-    def from_gif_duration_in_msec(self, gif_duration_in_msec: int) -> GifDurationEntry:
-        """
-        gif duration からエントリーを得る
-        一番値が近いものが選ばれる
-        """
-        candidates = [
-            (abs(e.gif_duration_in_msec - gif_duration_in_msec), e)
-            for e in self._entries
-        ]
-        candidates.sort(key=lambda t: t[0])
-        return candidates[0][1]
-
-    @property
-    def default_entry(self) -> GifDurationEntry:
-        """
-        デフォルト値のエントリーを得る
-        """
-        return self._entries[-1]
-
-
-# gif の仕様に基づいたフレームレート・周期のマップ
-GIF_DURATION_MAP = _GifDurationMap()

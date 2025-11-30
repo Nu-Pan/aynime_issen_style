@@ -8,3 +8,4 @@ __pycache__
 /src/utils/version_constants.py
 /log/
 /memo.md
+*.egg-info

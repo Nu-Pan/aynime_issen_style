@@ -1,6 +1,7 @@
 # std
 from typing import cast
 from dataclasses import dataclass
+import logging
 
 # Tk/CTk
 from tkinter import Event
@@ -8,8 +9,10 @@ import customtkinter as ctk
 from CTkListbox import CTkListbox
 
 # utils
-from utils.capture_context import WindowHandle
-from utils.constants import WIDGET_PADDING, WINDOW_MIN_WIDTH, DEFAULT_FONT_FAMILY
+from utils.capture import *
+from utils.constants import WIDGET_PADDING, DEFAULT_FONT_FAMILY
+from utils.ctk import show_notify_label
+from utils.std import traceback_str
 
 # gui
 from gui.widgets.still_label import StillLabel
@@ -53,65 +56,48 @@ class WindowSelectionFrame(ctk.CTkFrame):
         self.model = model
 
         # レイアウト設定
-        self.rowconfigure(0, weight=1)
+        self.rowconfigure(1, weight=1)
         self.columnconfigure(0, weight=0, minsize=self.winfo_width() // 2)
         self.columnconfigure(1, weight=1, minsize=self.winfo_width() // 2)
 
-        # 画面左側のフレーム
-        self.west_frame = ctk.CTkFrame(self)
-        self.west_frame.grid(
+        # ウィンドウ一覧再読み込みボタン
+        self.reload_capture_target_list_button = ctk.CTkButton(
+            self,
+            text="RELOAD",
+            command=self.update_list,
+            font=default_font,
+        )
+        self.reload_capture_target_list_button.grid(
             row=0, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
         )
-        self.west_frame.configure(width=WINDOW_MIN_WIDTH // 2)
-        self.west_frame.columnconfigure(0, weight=1)
 
         # キャプチャ対象リストボックス
-        self.capture_target_list_box = CTkListbox(
-            self.west_frame, multiple_selection=False
-        )
+        self.capture_target_list_box = CTkListbox(self, multiple_selection=False)
         self.capture_target_list_box.grid(
-            row=0, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
+            row=1,
+            column=0,
+            padx=WIDGET_PADDING,
+            pady=WIDGET_PADDING,
+            sticky="nswe",
         )
-        self.west_frame.rowconfigure(0, weight=1)
         self.capture_target_list_box.bind(
             "<<ListboxSelect>>", self.on_capture_target_select
         )
 
-        # ウィンドウ一覧再読み込みボタン
-        self.reload_capture_target_list_button = ctk.CTkButton(
-            self.west_frame,
-            text="リロード",
-            command=self.update_list,
-            font=default_font,
+        # フルサイズウィンドウ名表示用
+        self.capture_target_full_name_label = ctk.CTkLabel(
+            self, font=default_font, fg_color="transparent", bg_color="transparent"
         )
-        self.west_frame.rowconfigure(1, weight=0)
-        self.reload_capture_target_list_button.grid(
-            row=1, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
-        )
-
-        # 画面右側のフレーム
-        self.east_frame = ctk.CTkFrame(self)
-        self.east_frame.grid(
+        self.capture_target_full_name_label.grid(
             row=0, column=1, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
         )
-        self.east_frame.rowconfigure(0, weight=1)
-        self.east_frame.rowconfigure(1, weight=0)
-        self.east_frame.columnconfigure(0, weight=1)
 
         # プレビュー画像表示用ラベル
         self.capture_target_preview_label = StillLabel(
-            self.east_frame, model.window_selection_image, "Preview"
+            self, model.window_selection_image, "Preview"
         )
         self.capture_target_preview_label.grid(
-            row=0, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
-        )
-
-        # フルサイズウィンドウ名表示用
-        self.capture_target_full_name_label = ctk.CTkLabel(
-            self.east_frame, font=default_font
-        )
-        self.capture_target_full_name_label.grid(
-            row=1, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
+            row=1, column=1, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
         )
 
         # 初回キャプチャターゲットリスト更新
@@ -133,14 +119,21 @@ class WindowSelectionFrame(ctk.CTkFrame):
                 self.capture_target_list_box.curselection()
             ),
         )
-        self.model.capture.set_capture_window(selection.window_handle)
+        try:
+            self.model.stream.set_capture_window(selection.window_handle)
+        except Exception as e:
+            # ユーザー向けにはラベルで通知
+            show_notify_label(
+                self, "error", f'"{selection.window_name}" のキャプチャ開始に失敗'
+            )
+            # 開発者向けにログを残す
+            logging.warning(
+                f'Failed to start window capture({selection.window_handle}, "{selection.window_name}")\n{traceback_str(e)}'
+            )
 
         # 描画更新
         with ImageModelEditSession(self.model.window_selection_image) as edit:
-            try:
-                edit.set_raw_image(self.model.capture.capture())
-            except Exception as e:
-                edit.set_raw_image(None)
+            edit.set_raw_image(self.model.stream.capture_still())
 
         # フルサイズウィンドウ名ラベルを更新
         self.capture_target_full_name_label.configure(text=selection.window_name)
@@ -154,7 +147,7 @@ class WindowSelectionFrame(ctk.CTkFrame):
             self.reload_capture_target_list_button.configure(state=ctk.DISABLED)
 
             # キャプチャ対象を未選択状態に戻す
-            self.model.capture.set_capture_window(None)
+            self.model.stream.set_capture_window(None)
 
             # プレビューをクリア
             with ImageModelEditSession(self.model.window_selection_image) as edit:
@@ -166,10 +159,8 @@ class WindowSelectionFrame(ctk.CTkFrame):
 
             # ウィンドウリストを列挙・追加
             raw_items = [
-                WindowListBoxItem(
-                    window_handle, self.model.capture.get_window_name(window_handle)
-                )
-                for window_handle in self.model.capture.enumerate_windows()
+                WindowListBoxItem(window_handle, get_nime_window_text(window_handle))
+                for window_handle in enumerate_windows()
             ]
             nime_items = sorted(
                 [

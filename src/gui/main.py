@@ -1,7 +1,6 @@
 # std
 import sys
 import logging
-import warnings
 
 # Tk/CTk
 import customtkinter as ctk

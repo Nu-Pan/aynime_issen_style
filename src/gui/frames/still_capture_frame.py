@@ -1,17 +1,16 @@
 # std
-from typing import List, Tuple, cast
+from typing import cast
 from pathlib import Path
 
 # Tk/CTk
 import customtkinter as ctk
 from tkinterdnd2 import TkinterDnD, DND_FILES
 from tkinterdnd2.TkinterDnD import DnDEvent
-import tkinter.messagebox as mb
 from tkinter import Event
 
 # utils
 from utils.constants import WIDGET_PADDING
-from utils.image import AspectRatioPattern, ResizeDesc, AISImage
+from utils.image import AspectRatioPattern, ResizeDesc
 from gui.model.contents_cache import (
     ImageModel,
     VideoModel,
@@ -20,7 +19,9 @@ from gui.model.contents_cache import (
     ImageModelEditSession,
 )
 from utils.windows import file_to_clipboard, register_global_hotkey_handler
-from utils.ctk import show_notify, show_error_dialog
+from utils.ctk import show_notify_label, show_error_dialog
+from utils.capture import *
+from utils.constants import CAPTURE_FRAME_BUFFER_DURATION_IN_SEC
 
 # gui
 from gui.widgets.still_label import StillLabel
@@ -28,9 +29,8 @@ from gui.widgets.size_pattern_selection_frame import (
     SizePatternSlectionFrame,
 )
 from gui.widgets.ais_entry import AISEntry
+from gui.widgets.ais_slider import AISSlider
 from gui.model.contents_cache import ImageLayer
-
-# local
 from gui.model.aynime_issen_style import AynimeIssenStyleModel
 
 
@@ -71,7 +71,7 @@ class StillCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
 
         # アニメ名テキストボックス
         self.nime_name_entry = AISEntry(self, placeholder_text="Override NIME name ...")
-        self.rowconfigure(1, weight=0)
+        self.rowconfigure(2, weight=0)
         self.nime_name_entry.grid(
             row=1, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
         )
@@ -80,6 +80,7 @@ class StillCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
         # 解像度選択フレーム
         self._size_pattern_selection_frame = SizePatternSlectionFrame(
             self,
+            model,
             self.on_resolution_changes,
             AspectRatioPattern.E_RAW,
             ResizeDesc.Pattern.E_HD,
@@ -92,10 +93,37 @@ class StillCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
                 ResizeDesc.Pattern.E_4K,
             ],
         )
-        self.rowconfigure(2, weight=0)
+        self.rowconfigure(3, weight=0)
         self._size_pattern_selection_frame.grid(
             row=2, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
         )
+
+        # キャプチャタイミングスライダー
+        CAPTURE_TIMING_STEP_IN_SEC = 0.05
+        MIN_CAPTURE_TIMING_IN_SEC = 0
+        MAX_CAPTURE_TIMING_IN_SEC = min(1, CAPTURE_FRAME_BUFFER_DURATION_IN_SEC)
+        NUM_CAPTURE_TIMING_STEPS = (
+            round(
+                (MAX_CAPTURE_TIMING_IN_SEC - MIN_CAPTURE_TIMING_IN_SEC)
+                / CAPTURE_TIMING_STEP_IN_SEC
+            )
+            + 1
+        )
+        self._capture_timing_slider = AISSlider(
+            self,
+            "TIMING",
+            [
+                CAPTURE_TIMING_STEP_IN_SEC * step + MIN_CAPTURE_TIMING_IN_SEC
+                for step in range(NUM_CAPTURE_TIMING_STEPS)
+            ],
+            lambda lho, rho: abs(lho - rho),
+            lambda x: f"{x:4.2f}",
+            "SEC",
+        )
+        self._capture_timing_slider.grid(
+            row=3, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
+        )
+        self._capture_timing_slider.set_value(0.35)
 
         # ファイルドロップ関係
         self.drop_target_register(DND_FILES)
@@ -110,11 +138,16 @@ class StillCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
         """
         # キャプチャ
         try:
-            pil_raw_capture_image = self.model.capture.capture()
+            pil_raw_capture_image = self.model.stream.capture_still(
+                self._capture_timing_slider.value
+            )
         except Exception as e:
-            show_error_dialog(
-                "キャプチャに失敗。多分キャプチャ対象のディスプレイ・ウィンドウの選択を忘れてるよ。",
-                e,
+            show_notify_label(
+                self,
+                "error",
+                "キャプチャに失敗。\n"
+                "キャプチャ対象のディスプレイ・ウィンドウの選択を忘れている？\n"
+                f"what: {e}",
             )
             return
 
@@ -122,7 +155,7 @@ class StillCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
         if self.nime_name_entry.text != "":
             actual_nime_name = "<NIME>" + self.nime_name_entry.text
         else:
-            window_name = self.model.capture.current_window_name
+            window_name = self.model.stream.nime_window_text
             if window_name is not None and "<NIME>" in window_name:
                 actual_nime_name = window_name
             else:
@@ -144,7 +177,7 @@ class StillCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
             if text != "":
                 edit.set_nime_name(text)
             else:
-                edit.set_nime_name(self.model.capture.current_window_name)
+                edit.set_nime_name(self.model.stream.nime_window_text)
 
     def on_resolution_changes(
         self, aspect_ratio: AspectRatioPattern, resolution: ResizeDesc.Pattern
@@ -190,8 +223,9 @@ class StillCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
         file_to_clipboard(nime_file_path)
 
         # クリップボード転送完了通知
-        show_notify(
+        show_notify_label(
             self,
+            "info",
             "「一閃」\nクリップボード転送完了",
             on_click_handler=self.on_preview_label_click,
         )
@@ -209,7 +243,7 @@ class StillCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
             return
 
         # 読み込み対象を解決
-        file_paths = cast(Tuple[str], self.tk.splitlist(event_data))
+        file_paths = cast(tuple[str], self.tk.splitlist(event_data))
         if len(file_paths) > 1:
             show_error_dialog("ファイルは１つだけドロップしてね。")
             return

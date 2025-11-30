@@ -5,22 +5,32 @@
 		}
 	],
 	"settings": {
-		"python.defaultInterpreterPath": ".venv/bin/python",
+		"files.exclude": {
+			"**/.git": true,
+			"**/.svn": true,
+			"**/.hg": true,
+			"**/.DS_Store": true,
+			"**/Thumbs.db": true,
+			"build/**/*.*": true,
+			"**/__pycache__": true,
+			"**/*.egg-info": true,
+			".venv": true
+		},
+		"python.defaultInterpreterPath": ".venv/Scripts/python",
 		"python.terminal.activateEnvironment": true,
-		"python.envFile": "${workspaceFolder}/.env",
 		"python.analysis.extraPaths": [
 			"src"
 		],
 		"editor.defaultFormatter": "ms-python.black-formatter",
-		"editor.formatOnSave": true,
-		"autoDocstring.docstringFormat": "google",
+		"editor.formatOnSave": true
 	},
 	"extensions": {
 		"recommendations": [
 			"ms-python.vscode-pylance",
 			"ms-python.python",
 			"ms-python.debugpy",
-			"ms-python.black-formatter"
+			"ms-python.black-formatter",
+			"tamasfe.even-better-toml"
 		]
 	}
 }

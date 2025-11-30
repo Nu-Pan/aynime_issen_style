@@ -12,6 +12,7 @@ from utils.constants import (
     DEFAULT_FONT_FAMILY,
 )
 from utils.pyinstaller import resource_path
+from utils.capture import *
 
 # gui
 from gui.frames.window_selection_frame import WindowSelectionFrame
@@ -76,7 +77,7 @@ class AynimeIssenStyleApp(ctk.CTk, TkinterDnD.DnDWrapper):
         )
         self.still_capture_frame.pack(fill="both", expand=True)
 
-        # # アニメキャプチャタブを追加
+        # アニメキャプチャタブを追加
         self.tabview.add(AnimationCaptureFrame.UI_TAB_NAME)
         self.animation_capture_frame = AnimationCaptureFrame(
             self.tabview.tab(AnimationCaptureFrame.UI_TAB_NAME),
@@ -88,10 +89,11 @@ class AynimeIssenStyleApp(ctk.CTk, TkinterDnD.DnDWrapper):
         self.tabview.add(VersionFrame.UI_TAB_NAME)
         self.version_frame = VersionFrame(self.tabview.tab(VersionFrame.UI_TAB_NAME))
         self.version_frame.pack(fill="both", expand=True)
-        self.tabview.configure(command=self.on_tab_change)
 
         # 初期選択
+        self.tabview.configure(command=self.on_tab_change)
         self.tabview.set(WindowSelectionFrame.UI_TAB_NAME)
+        self.window_select_frame.update_list()
 
     def on_tab_change(self, tab_name: str | None = None) -> None:
         """タブ切り替え時に呼ばれるコールバック"""
