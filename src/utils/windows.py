@@ -1,12 +1,11 @@
 # std
-from dataclasses import dataclass
 from typing import Callable, Any
 import threading
 import queue
 import warnings
 from inspect import cleandoc
 from pathlib import Path
-import subprocess
+import struct
 
 # TK/CTk
 import customtkinter as ctk
@@ -14,7 +13,7 @@ import customtkinter as ctk
 # win32
 import ctypes
 from ctypes import wintypes
-import win32con, win32gui, win32api, win32event, winerror
+import win32con, win32gui, win32api, win32event, winerror, win32clipboard
 
 
 def file_to_clipboard(file_path: Path) -> None:
@@ -32,21 +31,21 @@ def file_to_clipboard(file_path: Path) -> None:
     if not file_path.exists():
         raise FileNotFoundError(str(file_path))
 
-    # pwershell でやる
-    subprocess.run(
-        [
-            "powershell",
-            "-NoLogo",
-            "-NoProfile",
-            "Set-Clipboard",
-            "-LiteralPath",
-            str(file_path),
-        ],
-        check=True,
-        creationflags=subprocess.CREATE_NO_WINDOW,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-    )
+    # データを組み立てる
+    # NOTE
+    #   DROPFILES ヘッダ (sizeof=20, wide char)
+    #   パス列 (UTF-16LE, ダブル終端)
+    dropfiles = struct.pack("IiiII", 20, 0, 0, 0, 1)
+    files = (str(file_path) + "\0\0").encode("utf-16le")
+    data = dropfiles + files
+
+    # クリップボードを開いて CF_HDROP をセット
+    win32clipboard.OpenClipboard()
+    try:
+        win32clipboard.EmptyClipboard()
+        win32clipboard.SetClipboardData(win32con.CF_HDROP, data)
+    finally:
+        win32clipboard.CloseClipboard()
 
 
 def register_global_hotkey_handler(
