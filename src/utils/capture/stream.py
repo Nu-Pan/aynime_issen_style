@@ -7,7 +7,7 @@ from PIL import Image
 
 # utils
 from utils.constants import CAPTURE_FRAME_BUFFER_DURATION_IN_SEC
-from utils.image import AISImage
+from utils.image import AISImage, AspectRatio, AspectRatioPattern, ResizeDesc
 from utils.capture.target import WindowHandle, get_nime_window_text
 
 # ayc
@@ -25,29 +25,97 @@ class CaptureStream:
         コンストラクタ
         """
         self._window_handle = None
+        self._max_width = None
+        self._max_height = None
+        self._req_max_size: dict[str, tuple[int | None, int | None]] = dict()
         self._session = None
+
+    def restart_session(self) -> None:
+        """
+        現在の内部状態に基づいてセッションを破棄・再スタートする。
+        """
+        self.release()
+        if self._window_handle is not None:
+            try:
+                self._session = ayc.Session(
+                    self._window_handle.value,
+                    CAPTURE_FRAME_BUFFER_DURATION_IN_SEC,
+                    self._max_width,
+                    self._max_height,
+                )
+            except Exception as e:
+                self._session = None
+                raise
 
     def set_capture_window(self, window_handle: WindowHandle | None) -> None:
         """
         キャプチャ対象のウィンドウを変更する
         """
-        # 既存セッションを停止
-        self.release()
+        if window_handle is None:
+            self._window_handle = None
+            self.release()
+        elif self._window_handle is None or window_handle != self._window_handle:
+            self._window_handle = window_handle
+            self.restart_session()
 
-        # 新規セッションをスタート
-        if window_handle is not None:
-            try:
-                self._session = ayc.Session(
-                    window_handle.value,
-                    CAPTURE_FRAME_BUFFER_DURATION_IN_SEC,
-                    None,
-                    None,
-                )
-                self._window_handle = window_handle
-            except Exception as e:
-                self._session = None
-                self._window_handle = None
-                raise
+    def set_max_size(
+        self, key: str, max_width: int | None, max_height: int | None
+    ) -> None:
+        """
+        キャプチャの最大サイズを変更する
+        複数箇所で異なる最大サイズを要求されるはずなので、それらを key で区別して個別に保持する。
+        それらの中でもっとも大きいサイズが要求として選択される。
+        """
+        # 最大サイズ辞書を更新
+        self._req_max_size[key] = (max_width, max_height)
+
+        # 最大サイズ情報をマージ
+        # NOTE merged_max_width, merged_min_height
+        mmw, mmh = (None, None)
+        for w, h in self._req_max_size.values():
+            if w is not None and (mmw is None or w > mmw):
+                mmw = w
+            if h is not None and (mmh is None or h > mmh):
+                mmh = h
+
+        # セッションリスタート
+        self._max_width = mmw
+        self._max_height = mmh
+        self.restart_session()
+
+    def set_max_size_pattern(
+        self,
+        key: str,
+        aspect_ratio_pattern: AspectRatioPattern,
+        resize_desc_patetrn: ResizeDesc.Pattern,
+    ) -> None:
+        """
+        キャプチャの最大サイズを変更する
+        パターン指定版
+        """
+        # ResizeDesc.Pattern
+        if resize_desc_patetrn == ResizeDesc.Pattern.E_RAW:
+            max_width = None
+        else:
+            max_width = int(resize_desc_patetrn.value)
+
+        # AspectRatioPattern
+        if max_width is None or aspect_ratio_pattern == AspectRatioPattern.E_RAW:
+            max_height = None
+        else:
+            aspect_ratio = AspectRatio.from_pattern(aspect_ratio_pattern)
+            if aspect_ratio.width is None:
+                raise RuntimeError("Logic Error")
+            else:
+                arw = aspect_ratio.width
+            if aspect_ratio.height is None:
+                raise RuntimeError("Logic Error")
+            else:
+                arh = aspect_ratio.height
+            max_height = round(max_width * arh / arw)
+
+        # 通常版を呼び出す
+        self.set_max_size(key, max_width, max_height)
 
     @property
     def capture_window(self) -> WindowHandle | None:
@@ -128,7 +196,6 @@ class CaptureStream:
         内部リソースを開放する。
         インスタンスを del する直前に呼び出すことで、確実に内部リソースを開放できる。
         """
-        self._window_handle = None
         if self._session is not None:
             self._session.Close()
             self._session = None

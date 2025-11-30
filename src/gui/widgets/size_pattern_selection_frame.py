@@ -8,6 +8,9 @@ import customtkinter as ctk
 from utils.constants import WIDGET_PADDING, WIDGET_MIN_WIDTH, DEFAULT_FONT_FAMILY
 from utils.image import AspectRatioPattern, ResizeDesc
 
+# gui
+from gui.model.aynime_issen_style import AynimeIssenStyleModel
+
 
 class SizePatternSlectionFrame(ctk.CTkFrame):
     """
@@ -17,6 +20,7 @@ class SizePatternSlectionFrame(ctk.CTkFrame):
     def __init__(
         self,
         master: ctk.CTkBaseClass,
+        model: AynimeIssenStyleModel,
         aux_on_radio_change: Callable[[AspectRatioPattern, ResizeDesc.Pattern], None],
         initial_aspect_ratio: AspectRatioPattern = AspectRatioPattern.E_RAW,
         initial_resolution: ResizeDesc.Pattern = ResizeDesc.Pattern.E_RAW,
@@ -36,6 +40,9 @@ class SizePatternSlectionFrame(ctk.CTkFrame):
             aux_on_radio_change (Callable): 変更があった時に呼び出されるハンドラ
         """
         super().__init__(master, **kwargs)
+
+        # モデル
+        self._model = model
 
         # フォントを生成
         default_font = ctk.CTkFont(DEFAULT_FONT_FAMILY)
@@ -110,9 +117,17 @@ class SizePatternSlectionFrame(ctk.CTkFrame):
         """
         ラジオボタンに変化が合った時に呼び出されるハンドラ
         """
-        aspect_raio = AspectRatioPattern(self.aspect_ratio_var.get())
-        resize_desc = ResizeDesc.Pattern(self.resolution_var.get())
-        self._aux_on_radio_change(aspect_raio, resize_desc)
+        # 状態を取得
+        aspect_raio_pat = AspectRatioPattern(self.aspect_ratio_var.get())
+        resize_desc_pat = ResizeDesc.Pattern(self.resolution_var.get())
+
+        # モデルに反映
+        self._model.stream.set_max_size_pattern(
+            str(id(self)), aspect_raio_pat, resize_desc_pat
+        )
+
+        # コールバック
+        self._aux_on_radio_change(aspect_raio_pat, resize_desc_pat)
 
     @property
     def aspect_ratio(self) -> AspectRatioPattern:

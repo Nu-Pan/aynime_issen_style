@@ -22,6 +22,7 @@ from gui.model.contents_cache import (
 from utils.windows import file_to_clipboard, register_global_hotkey_handler
 from utils.ctk import show_notify_label, show_error_dialog
 from utils.capture import *
+from utils.constants import CAPTURE_FRAME_BUFFER_DURATION_IN_SEC, DEFAULT_FONT_FAMILY
 
 # gui
 from gui.widgets.still_label import StillLabel
@@ -31,9 +32,6 @@ from gui.widgets.size_pattern_selection_frame import (
 from gui.widgets.ais_entry import AISEntry
 from gui.widgets.ais_slider import AISSlider
 from gui.model.contents_cache import ImageLayer
-
-# local
-from utils.constants import CAPTURE_FRAME_BUFFER_DURATION_IN_SEC, DEFAULT_FONT_FAMILY
 from gui.model.aynime_issen_style import AynimeIssenStyleModel
 
 
@@ -57,9 +55,6 @@ class StillCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
         # モデル
         self.model = model
         self.model.still.register_notify_handler(ImageLayer.NIME, self.on_nime_changed)
-
-        # フォントを生成
-        default_font = ctk.CTkFont(DEFAULT_FONT_FAMILY)
 
         # レイアウト設定
         self.columnconfigure(0, weight=1)
@@ -86,6 +81,7 @@ class StillCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
         # 解像度選択フレーム
         self._size_pattern_selection_frame = SizePatternSlectionFrame(
             self,
+            model,
             self.on_resolution_changes,
             AspectRatioPattern.E_RAW,
             ResizeDesc.Pattern.E_HD,

@@ -120,6 +120,7 @@ class AnimationCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
         # 解像度選択フレーム
         self._size_pattern_selection_frame = SizePatternSlectionFrame(
             self._output_kind_frame,
+            model,
             self._on_resolution_changes,
             AspectRatioPattern.E_RAW,
             ResizeDesc.Pattern.E_VGA,
