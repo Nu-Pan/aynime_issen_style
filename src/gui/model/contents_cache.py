@@ -1487,7 +1487,7 @@ def load_content_model(
             f"Unsuported file type. Only extensions {IMAGE_EXTENSIONS + MOVIE_EXTENSIONS} are supported."
         )
 
-    # 使用するアニメ名・タイムスタンプを解決
+    # 使用する NIEM 名・タイムスタンプを解決
     file_stem_match = re.match("(.+)__(.+)", actual_file_path.stem)
     if file_stem_match is None:
         nime_name = None

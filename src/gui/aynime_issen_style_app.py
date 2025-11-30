@@ -17,7 +17,7 @@ from utils.capture import *
 # gui
 from gui.frames.window_selection_frame import WindowSelectionFrame
 from gui.frames.still_capture_frame import StillCaptureFrame
-from gui.frames.animation_capture_frame import AnimationCaptureFrame
+from gui.frames.video_capture_frame import VideoCaptureFrame
 from gui.frames.version_frame import VersionFrame
 
 # local
@@ -77,13 +77,13 @@ class AynimeIssenStyleApp(ctk.CTk, TkinterDnD.DnDWrapper):
         )
         self.still_capture_frame.pack(fill="both", expand=True)
 
-        # アニメキャプチャタブを追加
-        self.tabview.add(AnimationCaptureFrame.UI_TAB_NAME)
-        self.animation_capture_frame = AnimationCaptureFrame(
-            self.tabview.tab(AnimationCaptureFrame.UI_TAB_NAME),
+        # ビデオキャプチャタブを追加
+        self.tabview.add(VideoCaptureFrame.UI_TAB_NAME)
+        self.video_capture_frame = VideoCaptureFrame(
+            self.tabview.tab(VideoCaptureFrame.UI_TAB_NAME),
             self.model,
         )
-        self.animation_capture_frame.pack(fill="both", expand=True)
+        self.video_capture_frame.pack(fill="both", expand=True)
 
         # バージョン情報タブを追加
         self.tabview.add(VersionFrame.UI_TAB_NAME)

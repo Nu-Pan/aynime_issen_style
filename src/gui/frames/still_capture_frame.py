@@ -266,7 +266,7 @@ class StillCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
             show_error_dialog(f"ファイルロードに失敗。", TypeError(type(load_result)))
             return
 
-        # アニメ名を解決
+        # NIEM 名を解決
         if self.nime_name_entry.text != "":
             actual_nime_name = self.nime_name_entry.text
         else:
