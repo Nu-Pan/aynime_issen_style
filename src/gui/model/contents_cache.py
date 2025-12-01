@@ -1594,3 +1594,25 @@ def load_content_model(
         return video_model
     else:
         raise ValueError("Logic Error")
+
+
+def remove_unmatched_raw_file():
+    """
+    対応する NIME ファイルが存在しない RAW ファイルを削除する。
+    要するに、 RAW 側の削除のみが許可された NIME / RAW 同期処理。
+    """
+    # NIME 側を列挙
+    nime_stems = [p.stem for p in NIME_DIR_PATH.glob("**/*.jpg")]
+
+    # RAW 側の削除対象を列挙
+    raw_unmatched = [
+        p
+        for p in RAW_DIR_PATH.glob("**/*.*")
+        if p.is_file()
+        and p.suffix.lower() in [".png", ".zip"]
+        and p.stem not in nime_stems
+    ]
+
+    # 削除
+    for p in raw_unmatched:
+        p.unlink(True)
