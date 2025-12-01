@@ -12,9 +12,9 @@ from utils.ctk import show_error_dialog
 from utils.logging import setup_logging
 from utils.version_constants import COMMIT_HASH, BUILD_DATE
 
-# local
+# gui
 from gui.aynime_issen_style_app import AynimeIssenStyleApp
-
+from gui.model.contents_cache import remove_unmatched_raw_file
 
 if __name__ == "__main__":
     # カラーテーマを設定
@@ -28,6 +28,9 @@ if __name__ == "__main__":
     if system_wide_mutex.already_exists:
         show_error_dialog("アプリはすでに起動しています")
         sys.exit(-1)
+
+    # 不要な RAW ファイルを削除
+    remove_unmatched_raw_file()
 
     # CTk アプリを生成
     app = AynimeIssenStyleApp()
