@@ -57,7 +57,7 @@ class AynimeIssenStyleApp(ctk.CTk, TkinterDnD.DnDWrapper):
         self.minsize(WINDOW_MIN_WIDTH, WINDOW_MIN_HEIGHT)
 
         # Model-View でいうところのモデル
-        self.model = AynimeIssenStyleModel()
+        self.model = AynimeIssenStyleModel(self)
 
         # タブビューを追加
         self.tabview = ctk.CTkTabview(self)
@@ -94,6 +94,14 @@ class AynimeIssenStyleApp(ctk.CTk, TkinterDnD.DnDWrapper):
         self.tabview.configure(command=self.on_tab_change)
         self.tabview.set(WindowSelectionFrame.UI_TAB_NAME)
         self.window_select_frame.update_list()
+
+        # グローバルホットキーを設定
+        self.model.global_hotkey.register(
+            "I", lambda: self.tabview.set(StillCaptureFrame.UI_TAB_NAME)
+        )
+        self.model.global_hotkey.register(
+            "K", lambda: self.tabview.set(VideoCaptureFrame.UI_TAB_NAME)
+        )
 
     def on_tab_change(self, tab_name: str | None = None) -> None:
         """タブ切り替え時に呼ばれるコールバック"""

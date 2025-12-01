@@ -18,7 +18,7 @@ from gui.model.contents_cache import (
     load_content_model,
     ImageModelEditSession,
 )
-from utils.windows import file_to_clipboard, register_global_hotkey_handler
+from utils.windows import file_to_clipboard
 from utils.ctk import show_notify_label, show_error_dialog
 from utils.capture import *
 from utils.constants import CAPTURE_FRAME_BUFFER_DURATION_IN_SEC
@@ -52,8 +52,8 @@ class StillCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
         super().__init__(master, **kwargs)
 
         # モデル
-        self.model = model
-        self.model.still.register_notify_handler(ImageLayer.NIME, self.on_nime_changed)
+        self._model = model
+        self._model.still.register_notify_handler(ImageLayer.NIME, self.on_nime_changed)
 
         # レイアウト設定
         self.columnconfigure(0, weight=1)
@@ -67,7 +67,11 @@ class StillCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
         self.preview_label.bind("<Button-1>", self.on_preview_label_click)
 
         # グローバルホットキーを登録
-        register_global_hotkey_handler(self, self.on_preview_label_click, None)
+        # NOTE
+        #   I は一閃流の頭文字
+        self._model.global_hotkey.register(
+            "I", lambda: self.on_preview_label_click(None)
+        )
 
         # アニメ名テキストボックス
         self.nime_name_entry = AISEntry(self, placeholder_text="Override NIME name ...")
@@ -129,7 +133,7 @@ class StillCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
         self.drop_target_register(DND_FILES)
         self.dnd_bind("<<Drop>>", self._on_drop_file)
 
-    def on_preview_label_click(self, event: Event) -> None:
+    def on_preview_label_click(self, event: Event | None) -> None:
         """
         プレビューラベルクリックイベントハンドラ
 
@@ -138,7 +142,7 @@ class StillCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
         """
         # キャプチャ
         try:
-            pil_raw_capture_image = self.model.stream.capture_still(
+            pil_raw_capture_image = self._model.stream.capture_still(
                 self._capture_timing_slider.value
             )
         except Exception as e:
@@ -155,12 +159,12 @@ class StillCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
         if self.nime_name_entry.text != "":
             actual_nime_name = self.nime_name_entry.text
         else:
-            actual_nime_name = self.model.stream.nime_window_text
+            actual_nime_name = self._model.stream.nime_window_text
 
         # モデルに反映
         # NOTE
         #   通知の結果エクスポートも行われる
-        with ImageModelEditSession(self.model.still) as edit:
+        with ImageModelEditSession(self._model.still) as edit:
             edit.set_raw_image(pil_raw_capture_image)
             edit.set_nime_name(actual_nime_name)
             edit.set_time_stamp(None)
@@ -169,11 +173,11 @@ class StillCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
         """
         アニメ名テキストボックスが変更されたときに呼び出される
         """
-        with ImageModelEditSession(self.model.still) as edit:
+        with ImageModelEditSession(self._model.still) as edit:
             if text != "":
                 edit.set_nime_name(text)
             else:
-                edit.set_nime_name(self.model.stream.nime_window_text)
+                edit.set_nime_name(self._model.stream.nime_window_text)
 
     def on_resolution_changes(
         self, aspect_ratio: AspectRatioPattern, resolution: ResizeDesc.Pattern
@@ -188,7 +192,7 @@ class StillCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
         # リサイズを適用
         # NOTE
         #   リサイズさえすればコールバック経由でエクスポートまで走るはず
-        with ImageModelEditSession(self.model.still) as edit:
+        with ImageModelEditSession(self._model.still) as edit:
             edit.set_size(
                 ImageLayer.NIME, ResizeDesc.from_pattern(aspect_ratio, resolution)
             )
@@ -204,11 +208,11 @@ class StillCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
         画像のエクスポート処理を行う
         """
         # キャプチャがない場合は何もしない
-        if self.model.still.get_image(ImageLayer.NIME) is None:
+        if self._model.still.get_image(ImageLayer.NIME) is None:
             return
 
         # キャプチャをローカルにファイルに保存する
-        nime_file_path = save_content_model(self.model.still)
+        nime_file_path = save_content_model(self._model.still)
         if not isinstance(nime_file_path, Path):
             raise TypeError(
                 f"Expected Path, got {type(nime_file_path)}. "
@@ -273,7 +277,7 @@ class StillCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
             actual_nime_name = nime_name
 
         # AIS モデルに設定
-        with ImageModelEditSession(self.model.still) as edit:
+        with ImageModelEditSession(self._model.still) as edit:
             edit.set_raw_image(image)
             edit.set_nime_name(actual_nime_name)
             edit.set_time_stamp(time_stamp)

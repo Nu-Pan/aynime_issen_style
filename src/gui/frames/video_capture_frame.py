@@ -387,6 +387,13 @@ class VideoCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
             sticky="nswe",
         )
 
+        # グローバルホットキーを登録
+        # NOTE
+        #   K はキンキン！　の頭文字
+        self._model.global_hotkey.register(
+            "K", lambda: self._on_record_button_clicked()
+        )
+
         # ファイルドロップ関係
         self.drop_target_register(DND_FILES)
         self.dnd_bind("<<Drop>>", self._on_drop_file)
