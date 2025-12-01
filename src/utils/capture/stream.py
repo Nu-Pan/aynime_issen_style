@@ -23,7 +23,7 @@ class CaptureStream:
         self._window_handle = None
         self._max_width = None
         self._max_height = None
-        self._req_max_size: dict[str, tuple[int | None, int | None]] = dict()
+        self._max_size_dict: dict[str, tuple[int | None, int | None]] = dict()
         self._session = None
 
     def restart_session(self) -> None:
@@ -63,15 +63,28 @@ class CaptureStream:
         それらの中でもっとも大きいサイズが要求として選択される。
         """
         # 最大サイズ辞書を更新
-        self._req_max_size[key] = (max_width, max_height)
+        self._max_size_dict[key] = (max_width, max_height)
 
         # 最大サイズ情報をマージ
-        # NOTE merged_max_width, merged_min_height
-        mmw, mmh = (None, None)
-        for w, h in self._req_max_size.values():
-            if w is not None and (mmw is None or w > mmw):
+        # NOTE
+        #   None は制限無しなので最大とみなす。
+        #   mmw = merged_max_width
+        #   mmh = merged_min_height
+        #   len(_max_size_dict) > 0 なので、
+        #   mmw, mmh が 0 から更新されないパターンは考えなくて良い。
+        mmw, mmh = (0, 0)
+        for w, h in self._max_size_dict.values():
+            if w is None:
+                mmw = None
+            elif mmw is None:
+                pass
+            elif w > mmw:
                 mmw = w
-            if h is not None and (mmh is None or h > mmh):
+            if h is None:
+                mmh = None
+            elif mmh is None:
+                pass
+            elif h > mmh:
                 mmh = h
 
         # セッションリスタート
