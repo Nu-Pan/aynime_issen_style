@@ -14,6 +14,7 @@ from io import BytesIO
 import re
 from abc import ABC, abstractmethod
 from enum import Enum
+import logging
 
 # numpy
 import numpy as np
@@ -85,6 +86,29 @@ def is_time_stamp(text: str) -> bool:
 
     # どちらでもない
     return False
+
+
+def parse_nime_file_stem(stem: str) -> tuple[str | None, str | None]:
+    """
+    stem をパースして (アニメ名, タイムスタンプ) を返す。
+    NOTE
+        最初は新形式を仮定してパースして、ダメだった場合は旧形式を仮定する。
+        パースに失敗した要素は None を返す。
+    """
+    file_stem_match = re.match("(.+)__(.+)", stem)
+    if file_stem_match is None:
+        nime_name = None
+        if is_time_stamp(stem):
+            time_stamp = stem
+        else:
+            time_stamp = None
+    else:
+        nime_name = file_stem_match.group(1)
+        if is_time_stamp(file_stem_match.group(2)):
+            time_stamp = file_stem_match.group(2)
+        else:
+            time_stamp = None
+    return nime_name, time_stamp
 
 
 type AuxProcess = Callable[[AISImage], AISImage]
@@ -1457,25 +1481,33 @@ def load_content_model(
     MOVIE_EXTENSIONS = (".gif",)
     RAW_ZIP_EXTENSIONS = (".zip",)
     if file_path.suffix.lower() in IMAGE_EXTENSIONS:
-        raw_png_file_path = RAW_DIR_PATH / (file_path.stem + ".png")
-        if raw_png_file_path.exists():
-            actual_file_path = raw_png_file_path
+        raw_png_file_path_cand = list(RAW_DIR_PATH.glob(f"**/{file_path.stem}.*"))
+        if len(raw_png_file_path_cand) == 1:
+            actual_file_path = raw_png_file_path_cand[0]
             gif_file_path = None
-        elif file_path.exists():
+        elif len(raw_png_file_path_cand) == 0 and file_path.exists():
             actual_file_path = file_path
             gif_file_path = None
+        elif len(raw_png_file_path_cand) > 1:
+            raise ValueError(f"Multiple {file_path.name} hits in {RAW_DIR_PATH}")
         else:
-            raise FileNotFoundError(f"{raw_png_file_path} or {file_path}")
+            raise FileNotFoundError(
+                f"{RAW_DIR_PATH}/**/{file_path.stem}.* or {file_path}"
+            )
     elif file_path.suffix.lower() in MOVIE_EXTENSIONS:
-        raw_zip_file_path = RAW_DIR_PATH / (file_path.stem + ".zip")
-        if raw_zip_file_path.exists():
-            actual_file_path = raw_zip_file_path
+        raw_zip_file_path_cand = list(RAW_DIR_PATH.glob(f"**/{file_path.stem}.*"))
+        if len(raw_zip_file_path_cand) == 1:
+            actual_file_path = raw_zip_file_path_cand[0]
             gif_file_path = file_path
-        elif file_path.exists():
+        elif len(raw_zip_file_path_cand) == 0 and file_path.exists():
             actual_file_path = file_path
             gif_file_path = file_path
+        elif len(raw_zip_file_path_cand) > 1:
+            raise ValueError(f"Multiple {file_path.name} hits in {RAW_DIR_PATH}")
         else:
-            raise FileNotFoundError(f"{raw_zip_file_path} or {file_path}")
+            raise FileNotFoundError(
+                f"{RAW_DIR_PATH}/**/{file_path.stem}.* or {file_path}"
+            )
     elif file_path.suffix.lower() in RAW_ZIP_EXTENSIONS:
         if file_path.exists():
             actual_file_path = file_path
@@ -1488,19 +1520,9 @@ def load_content_model(
         )
 
     # 使用する NIEM 名・タイムスタンプを解決
-    file_stem_match = re.match("(.+)__(.+)", actual_file_path.stem)
-    if file_stem_match is None:
-        nime_name = None
-        if is_time_stamp(actual_file_path.stem):
-            time_stamp = actual_file_path.stem
-        else:
-            time_stamp = current_time_stamp()
-    else:
-        nime_name = file_stem_match.group(1)
-        if is_time_stamp(file_stem_match.group(2)):
-            time_stamp = file_stem_match.group(2)
-        else:
-            time_stamp = current_time_stamp()
+    nime_name, time_stamp = parse_nime_file_stem(actual_file_path.stem)
+    if time_stamp is None:
+        time_stamp = current_time_stamp()
 
     # 画像・動画を読み込む
     if actual_file_path.suffix.lower() in IMAGE_EXTENSIONS:
@@ -1596,23 +1618,141 @@ def load_content_model(
         raise ValueError("Logic Error")
 
 
-def remove_unmatched_raw_file():
+def _remove_unmatched_nime_raw_file():
     """
-    対応する NIME ファイルが存在しない RAW ファイルを削除する。
-    要するに、 RAW 側の削除のみが許可された NIME / RAW 同期処理。
+    nime に無いけど raw にあるファイルを削除する。
     """
     # NIME 側を列挙
     nime_stems = [p.stem for p in NIME_DIR_PATH.glob("**/*.jpg")]
 
     # RAW 側の削除対象を列挙
-    raw_unmatched = [
+    raw_unmatched_paths = [
         p
-        for p in RAW_DIR_PATH.glob("**/*.*")
+        for p in RAW_DIR_PATH.glob("**/**.*")
         if p.is_file()
         and p.suffix.lower() in [".png", ".zip"]
         and p.stem not in nime_stems
     ]
 
     # 削除
-    for p in raw_unmatched:
+    for p in raw_unmatched_paths:
         p.unlink(True)
+
+
+def _archive_old_nime_files():
+    """
+    先月よりも古い（先月を含まない） nime ファイルを `nime/older/YYYY_MM` に退避する。
+    NOTE
+        退避の対象は nime ファイルだけなので、 nime, raw 間で相対パスがズレるが、
+        これは `_sync_nime_raw_relative_path` でまとめて修正されることを前提している。
+    """
+    # 現在の年月文字列
+    YEAR_MONTH_PATTERN = r"^(\d{4}-\d{2})"
+    m = re.search(YEAR_MONTH_PATTERN, current_time_stamp())
+    if m is None:
+        raise ValueError("Invalid timestamp format.")
+    else:
+        current_year_month = m.group(1)
+
+    # １ヶ月前の年月文字列
+    current_year_int = int(current_year_month[0:4])
+    current_month_int = int(current_year_month[5:7])
+    prev_month_int = current_month_int - 1
+    if prev_month_int <= 0:
+        prev_year_int = current_year_int - 1
+    else:
+        prev_year_int = current_year_int
+    prev_year_month = f"{prev_year_int:04d}-{prev_month_int:02d}"
+
+    # すべての直下 NIME 画像に対して処理
+    # NOTE
+    #   ユーザーが手動でフォルダ分けしてる可能性もあるので、対象は直下だけに絞る。
+    for nime_path in NIME_DIR_PATH.glob("*.*"):
+        # ファイルのみが対象
+        if not nime_path.is_file():
+            continue
+
+        # jpg, gif が対象
+        if nime_path.suffix not in [".jpg", ".gif"]:
+            continue
+
+        # タイムスタンプ文字列を解決
+        _, time_stamp = parse_nime_file_stem(nime_path.stem)
+        if time_stamp is None:
+            continue
+
+        # タイムスタンプから年月をパース
+        m = re.search(YEAR_MONTH_PATTERN, time_stamp)
+        if m is None:
+            continue
+        else:
+            nime_year_month = m.group(1)
+
+        # 今月・先月の NIME 画像ならそのままにする
+        if nime_year_month in [current_year_month, prev_year_month]:
+            continue
+
+        # older に移動
+        older_file_path = NIME_DIR_PATH / "older" / nime_year_month / nime_path.name
+        older_file_path.parent.mkdir(parents=True, exist_ok=True)
+        nime_path.rename(older_file_path)
+
+
+def _sync_nime_raw_relative_path():
+    """
+    「nime 画像の nime フォルダからの相対パス」
+    「raw 画像の raw フォルダからの相対パス」
+    この２つを一致させる。
+    不一致があった場合は raw 側を移動する。
+    """
+    # RAW 側を事前に列挙
+    # NOTE
+    #   ファイルシステムへのアクセスを最小化したい
+    raw_abs_paths = [
+        p
+        for p in RAW_DIR_PATH.glob("**/*.*")
+        if p.is_file() and p.suffix.lower() in [".png", ".zip"]
+    ]
+    # すべての NIME 画像に対して処理
+    for nime_path in NIME_DIR_PATH.glob("**/*.*"):
+        # ファイルのみが対象
+        if not nime_path.is_file():
+            continue
+
+        # gif, jpg が対象
+        if nime_path.suffix not in [".jpg", ".gif"]:
+            continue
+
+        # NIME ファイルのパスを解決
+        nime_abs_path = nime_path.absolute()
+        nime_rel_path = nime_abs_path.relative_to(NIME_DIR_PATH)
+
+        # RAW ファイルのパスを解決
+        raw_abs_path_cand = [p for p in raw_abs_paths if p.stem == nime_path.stem]
+        if len(raw_abs_path_cand) == 1:
+            raw_abs_path = raw_abs_path_cand[0]
+        else:
+            continue
+
+        # RAW ファイルをあるべき場所に移動する
+        # NOTE
+        #   NIME ファイルの相対パスを元に「あるべき RAW ファイルパス」を解決する
+        expected_raw_abs_path = RAW_DIR_PATH / nime_rel_path.with_suffix(
+            raw_abs_path.suffix
+        )
+        if expected_raw_abs_path != raw_abs_path:
+            expected_raw_abs_path.parent.mkdir(parents=True, exist_ok=True)
+            raw_abs_path.rename(expected_raw_abs_path)
+
+
+def standardize_nime_raw_dile():
+    """
+    nime, raw ディレクトリ下のファイル配置を「標準化」する。
+    標準化とは、
+    - 対応する NIME ファイルが存在しない RAW ファイルを削除する
+    - nime, raw からの相対パスを一致させる
+    - nime, raw 直下の古いファイルを `<nime or raw>/older/YYYY_MM` に退避する
+    """
+    _remove_unmatched_nime_raw_file()
+    _archive_old_nime_files()
+    _sync_nime_raw_relative_path()
