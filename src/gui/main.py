@@ -14,7 +14,7 @@ from utils.version_constants import COMMIT_HASH, BUILD_DATE
 
 # gui
 from gui.aynime_issen_style_app import AynimeIssenStyleApp
-from gui.model.contents_cache import remove_unmatched_raw_file
+from gui.model.contents_cache import standardize_nime_raw_dile
 
 if __name__ == "__main__":
     # カラーテーマを設定
@@ -30,7 +30,7 @@ if __name__ == "__main__":
         sys.exit(-1)
 
     # 不要な RAW ファイルを削除
-    remove_unmatched_raw_file()
+    standardize_nime_raw_dile()
 
     # CTk アプリを生成
     app = AynimeIssenStyleApp()
