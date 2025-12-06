@@ -8,7 +8,8 @@ import sys
 import customtkinter as ctk
 
 # utils
-from utils.constants import WIDGET_PADDING, DEFAULT_FONT_FAMILY, VERSION_FILE_PATH
+from utils.constants import DEFAULT_FONT_FAMILY, VERSION_FILE_PATH
+from gui.widgets.ais_frame import AISFrame
 
 # バージョン情報のインポート
 # NOTE
@@ -24,9 +25,9 @@ if not hasattr(sys, "_MEIPASS") and not VERSION_FILE_PATH.exists():
 from utils.version_constants import COMMIT_HASH, BUILD_DATE
 
 
-class VersionFrame(ctk.CTkFrame):
+class VersionFrame(AISFrame):
     """
-    ウィンドウ選択フレームクラス
+    バージョン情報フレーム
     """
 
     UI_TAB_NAME = "バージョン"
@@ -73,9 +74,9 @@ class VersionFrame(ctk.CTkFrame):
         self.version_text_box = ctk.CTkTextbox(
             self, font=default_font, border_width=0, fg_color="transparent", wrap="word"
         )
-        self.version_text_box.pack(
-            fill="both", expand=True, padx=WIDGET_PADDING, pady=WIDGET_PADDING
-        )
+        self.ais.grid_child(self.version_text_box, 0, 0)
+        self.ais.rowconfigure(0, weight=1)
+        self.ais.columnconfigure(0, weight=1)
 
         # クリックで URL を開けるようにタグを仕込む
         url_regex = re.compile(r"https?://\S+")
@@ -111,7 +112,8 @@ class VersionFrame(ctk.CTkFrame):
 
             pos = m.end()
 
-        # 残りのテキスト
+        # 残りのテキストを追加
         self.version_text_box.insert(ctk.END, version_text[pos:])
 
+        # 表示用なので変更不可
         self.version_text_box.configure(state="disabled")

@@ -8,14 +8,17 @@ import customtkinter as ctk
 from utils.constants import (
     DEFAULT_FONT_FAMILY,
     NUMERIC_FONT_FAMILY,
-    WIDGET_PADDING,
     WIDGET_MIN_WIDTH,
 )
+
+# gui
+from gui.widgets.ais_frame import AISFrame
+
 
 T = TypeVar("T")
 
 
-class AISSlider(ctk.CTkFrame, Generic[T]):
+class AISSlider(AISFrame, Generic[T]):
     """
     使いやすくした CTkSlider
     """
@@ -57,10 +60,17 @@ class AISSlider(ctk.CTkFrame, Generic[T]):
         numeric_font = ctk.CTkFont(NUMERIC_FONT_FAMILY)
 
         # レイアウト設定
-        self.rowconfigure(0, weight=1)
-        self.columnconfigure(0, weight=0)
-        self.columnconfigure(1, weight=1)
-        self.columnconfigure(2, weight=0)
+        self.ais.rowconfigure(0, weight=1)
+
+        # 列方向の配置を解決
+        if description is None:
+            desc_label_column = -1
+            slider_colunm = 0
+            value_label_colunn = 1
+        else:
+            desc_label_column = 0
+            slider_colunm = 1
+            value_label_colunn = 2
 
         # 説明ラベル
         if description is None:
@@ -69,13 +79,8 @@ class AISSlider(ctk.CTkFrame, Generic[T]):
             self._desc_label = ctk.CTkLabel(
                 self, text=description, font=default_font, width=WIDGET_MIN_WIDTH
             )
-            self._desc_label.grid(
-                row=0,
-                column=0,
-                padx=WIDGET_PADDING,
-                pady=WIDGET_PADDING,
-                sticky="nswe",
-            )
+            self.ais.grid_child(self._desc_label, 0, desc_label_column)
+            self.ais.columnconfigure(desc_label_column, weight=0)
 
         # スライダー
         self._slider = ctk.CTkSlider(
@@ -86,13 +91,8 @@ class AISSlider(ctk.CTkFrame, Generic[T]):
             command=self._on_slider_changed,
             height=1,
         )
-        self._slider.grid(
-            row=0,
-            column=1,
-            padx=WIDGET_PADDING,
-            pady=WIDGET_PADDING,
-            sticky="nswe",
-        )
+        self.ais.grid_child(self._slider, 0, slider_colunm)
+        self.ais.columnconfigure(slider_colunm, weight=1)
 
         # 値ラベル
         value_placeholder_text = "-" * max(
@@ -108,13 +108,8 @@ class AISSlider(ctk.CTkFrame, Generic[T]):
             font=numeric_font,
             width=round(1.5 * WIDGET_MIN_WIDTH),
         )
-        self._value_label.grid(
-            row=0,
-            column=2,
-            padx=WIDGET_PADDING,
-            pady=WIDGET_PADDING,
-            sticky="nswe",
-        )
+        self.ais.grid_child(self._value_label, 0, value_label_colunn)
+        self.ais.columnconfigure(value_label_colunn, weight=0)
 
         # ハンドラリスト
         self._handlers: list[Callable[[T], None]] = []
