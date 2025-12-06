@@ -11,6 +11,7 @@ from tkinterdnd2.TkinterDnD import DnDEvent
 from utils.constants import WIDGET_MIN_WIDTH, DEFAULT_FONT_FAMILY
 from utils.image import (
     AspectRatioPattern,
+    ResolutionPattern,
     ResizeDesc,
     calc_ssim,
 )
@@ -149,19 +150,18 @@ class VideoCaptureFrame(AISFrame, TkinterDnD.DnDWrapper):
             model,
             self._on_resolution_changes,
             AspectRatioPattern.E_RAW,
-            ResizeDesc.Pattern.E_VGA,
+            ResolutionPattern.E_VGA,
             [
-                AspectRatioPattern.E_RAW,
                 AspectRatioPattern.E_16_9,
                 AspectRatioPattern.E_4_3,
                 AspectRatioPattern.E_1_1,
+                AspectRatioPattern.E_RAW,
             ],
             [
-                ResizeDesc.Pattern.E_RAW,
-                ResizeDesc.Pattern.E_HVGA,
-                ResizeDesc.Pattern.E_VGA,
-                ResizeDesc.Pattern.E_QHD,
-                ResizeDesc.Pattern.E_HD,
+                ResolutionPattern.E_DISCORD_EMOJI,
+                ResolutionPattern.E_DISCORD_STAMP,
+                ResolutionPattern.E_VGA,
+                ResolutionPattern.E_RAW,
             ],
         )
         self._output_kind_frame.ais.grid_child(
@@ -172,7 +172,7 @@ class VideoCaptureFrame(AISFrame, TkinterDnD.DnDWrapper):
         with VideoModelEditSession(self._model.video) as edit:
             edit.set_size(
                 ImageLayer.NIME,
-                ResizeDesc.from_pattern(
+                ResizeDesc(
                     self._size_pattern_selection_frame.aspect_ratio,
                     self._size_pattern_selection_frame.resolution,
                 ),
@@ -366,7 +366,7 @@ class VideoCaptureFrame(AISFrame, TkinterDnD.DnDWrapper):
                 edit.set_nime_name(self._model.stream.nime_window_text)
 
     def _on_resolution_changes(
-        self, aspect_ratio: AspectRatioPattern, resolution: ResizeDesc.Pattern
+        self, aspect_ratio: AspectRatioPattern, resolution: ResolutionPattern
     ):
         """
         解像度設定が変更された時に呼び出される
@@ -378,9 +378,7 @@ class VideoCaptureFrame(AISFrame, TkinterDnD.DnDWrapper):
         self._aspect_ratio = aspect_ratio
         self._resolution = resolution
         with VideoModelEditSession(self._model.video) as edit:
-            edit.set_size(
-                ImageLayer.NIME, ResizeDesc.from_pattern(aspect_ratio, resolution)
-            )
+            edit.set_size(ImageLayer.NIME, ResizeDesc(aspect_ratio, resolution))
 
     def _on_save_frame_rate_slider_changed(self, value: DFREntry):
         """

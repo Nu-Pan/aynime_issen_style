@@ -5,7 +5,7 @@ import customtkinter as ctk
 # utils
 from utils.constants import DEFAULT_FONT_FAMILY
 from utils.ctk import configure_presence
-from utils.image import AISImage
+from utils.image import AISImage, ResolutionPattern, Resolution
 
 # gui
 from gui.model.contents_cache import (
@@ -77,7 +77,7 @@ class SentinelItem(ctk.CTkFrame):
         with VideoModelEditSession(self._model.video) as edit:
             edit.set_size(
                 ImageLayer.THUMBNAIL,
-                ResizeDesc(aspect_ratio, None, actual_height),
+                ResizeDesc(aspect_ratio, Resolution(None, actual_height)),
             )
 
 
@@ -207,7 +207,7 @@ class ThumbnailBar(ctk.CTkScrollableFrame):
         with VideoModelEditSession(self._model.video) as edit:
             edit.set_size(
                 ImageLayer.THUMBNAIL,
-                ResizeDesc(AspectRatioPattern.E_RAW, None, None),
+                ResizeDesc(AspectRatioPattern.E_RAW, ResolutionPattern.E_RAW),
             )
 
         # 番兵アイテムを追加

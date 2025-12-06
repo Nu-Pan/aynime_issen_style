@@ -3,7 +3,7 @@ import customtkinter as ctk
 
 # utils
 from utils.ctk import configure_presence
-from utils.image import ResizeDesc, AspectRatioPattern, AISImage
+from utils.image import ResizeDesc, AspectRatioPattern, Resolution, AISImage
 
 # gui
 from gui.model.aynime_issen_style import AynimeIssenStyleModel
@@ -130,5 +130,7 @@ class VideoLabel(ctk.CTkLabel):
         with VideoModelEditSession(self._model.video) as edit:
             edit.set_size(
                 ImageLayer.PREVIEW,
-                ResizeDesc(AspectRatioPattern.E_RAW, actual_width, actual_height),
+                ResizeDesc(
+                    AspectRatioPattern.E_RAW, Resolution(actual_width, actual_height)
+                ),
             )

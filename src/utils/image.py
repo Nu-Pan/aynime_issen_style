@@ -20,10 +20,10 @@ class AspectRatioPattern(Enum):
     典型的なアスペクト比の列挙値
     """
 
-    E_RAW = "RAW"  # オリジナルのアスペクト比をそのまま使う
     E_16_9 = "16:9"
     E_4_3 = "4:3"
     E_1_1 = "1:1"
+    E_RAW = "RAW"  # オリジナルのアスペクト比をそのまま使う
 
 
 class AspectRatio:
@@ -58,16 +58,16 @@ class AspectRatio:
         """
         パターン列挙値からインスタンスを生成する
         """
-        if pattern == AspectRatioPattern.E_RAW:
-            return AspectRatio(None, None)
-        elif pattern == AspectRatioPattern.E_16_9:
+        if pattern == AspectRatioPattern.E_16_9:
             return AspectRatio(16, 9)
         elif pattern == AspectRatioPattern.E_4_3:
             return AspectRatio(4, 3)
         elif pattern == AspectRatioPattern.E_1_1:
             return AspectRatio(1, 1)
+        elif pattern == AspectRatioPattern.E_RAW:
+            return AspectRatio(None, None)
         else:
-            raise ValueError()
+            raise TypeError(f"Invalid AspectRatioPattern(pattern={pattern})")
 
     @property
     def name(self) -> str:
@@ -107,7 +107,102 @@ class AspectRatio:
         if isinstance(other, AspectRatio):
             return self.width == other.width and self.height == other.height
         else:
-            raise TypeError()
+            raise TypeError(f"other is not AspectRatio(other={other})")
+
+
+class ResolutionPattern(Enum):
+    """
+    典型的な解像度を定義する列挙型
+    横幅だけを定義する
+    """
+
+    E_DISCORD_EMOJI = "128"  # Dsicord 絵文字の上限
+    E_DISCORD_STAMP = "320"  # 320
+    E_VGA = "640"  # 640
+    E_QHD = "960"  # 960
+    E_HD = "1280"  # 1280
+    E_FHD = "1920"  # 1920
+    E_3K = "2880"  # 2880
+    E_4K = "3840"  # 3840
+    E_RAW = "RAW"  # オリジナルの解像度をそのまま使う
+
+
+class Resolution:
+    """
+    解像度を表すクラス
+    """
+
+    def __init__(self, width: int | None, height: int | None, name: str | None = None):
+        """
+        コンストラクタ
+        """
+        self._width = width
+        self._height = height
+        if name is None:
+            if width is None and height is None:
+                self._name = "RAW"
+            elif width is not None:
+                self._name = str(width)
+            elif height is not None:
+                self._name = str(height)
+        else:
+            self._name = name
+
+    @classmethod
+    def from_pattern(cls, pattern: ResolutionPattern) -> "Resolution":
+        """
+        パターン列挙値からインスタンスを生成する
+        """
+        if pattern == ResolutionPattern.E_DISCORD_EMOJI:
+            return Resolution(128, None, "EMOJI")
+        elif pattern == ResolutionPattern.E_DISCORD_STAMP:
+            return Resolution(320, None, "STAMP")
+        elif pattern == ResolutionPattern.E_VGA:
+            return Resolution(640, None, "640")
+        elif pattern == ResolutionPattern.E_QHD:
+            return Resolution(960, None, "960")
+        elif pattern == ResolutionPattern.E_HD:
+            return Resolution(1280, None, "1280")
+        elif pattern == ResolutionPattern.E_FHD:
+            return Resolution(1920, None, "1920")
+        elif pattern == ResolutionPattern.E_3K:
+            return Resolution(2880, None, "2880")
+        elif pattern == ResolutionPattern.E_4K:
+            return Resolution(3840, None, "3840")
+        elif pattern == ResolutionPattern.E_RAW:
+            return Resolution(None, None, "RAW")
+        else:
+            raise TypeError(f"Invalid ResolutionPattern(pattern={pattern})")
+
+    @property
+    def name(self) -> str:
+        """
+        人間用の名前を返す
+        """
+        return self._name
+
+    @property
+    def width(self) -> int | None:
+        """
+        水平方向解像度
+        """
+        return self._width
+
+    @property
+    def height(self) -> int | None:
+        """
+        垂直方向解像度
+        """
+        return self._height
+
+    def __eq__(self, other: Any) -> bool:
+        """
+        比較演算子
+        """
+        if isinstance(other, Resolution):
+            return self.width == other.width and self.height == other.height
+        else:
+            raise TypeError(f"other is not Resolution(other={other})")
 
 
 class ResizeMode(Enum):
@@ -127,26 +222,10 @@ class ResizeDesc:
     リサイズの挙動を記述するクラス。
     """
 
-    class Pattern(Enum):
-        """
-        典型的な解像度を定義する列挙型
-        横幅だけを定義する
-        """
-
-        E_RAW = "RAW"  # オリジナルの解像度をそのまま使う
-        E_HVGA = "320"  # 320
-        E_VGA = "640"  # 640
-        E_QHD = "960"  # 960
-        E_HD = "1280"  # 1280
-        E_FHD = "1920"  # 1920
-        E_3K = "2880"  # 2880
-        E_4K = "3840"  # 3840
-
     def __init__(
         self,
-        aspect_ratio: AspectRatioPattern | AspectRatio,
-        width: int | None,
-        height: int | None,
+        aspect_ratio: AspectRatio | AspectRatioPattern,
+        resolution: Resolution | ResolutionPattern,
     ):
         """
         コンストラクタ
@@ -155,51 +234,27 @@ class ResizeDesc:
         if isinstance(aspect_ratio, AspectRatioPattern):
             aspect_ratio = AspectRatio.from_pattern(aspect_ratio)
 
+        # 解像度をインスタンスで統一
+        if isinstance(resolution, ResolutionPattern):
+            resolution = Resolution.from_pattern(resolution)
+
         # メンバー保存
         self._aspect_ratio = aspect_ratio
-        self._width = width
-        self._height = height
-
-    @classmethod
-    def from_pattern(
-        cls,
-        aspect_ratio: AspectRatioPattern | AspectRatio,
-        pattern: "ResizeDesc.Pattern",
-    ) -> "ResizeDesc":
-        """
-        パターン列挙値からインスタンスを生成する。
-        記述を簡略化するためのヘルパー関数。
-        """
-        # アス比をインスタンスで統一
-        if isinstance(aspect_ratio, AspectRatioPattern):
-            aspect_ratio = AspectRatio.from_pattern(aspect_ratio)
-
-        # ResizeDesc のインスタンスを生成
-        if pattern == ResizeDesc.Pattern.E_RAW:
-            return ResizeDesc(aspect_ratio, None, None)
-        else:
-            return ResizeDesc(aspect_ratio, int(pattern.value), None)
+        self._resolution = resolution
 
     @property
     def aspect_ratio(self) -> AspectRatio:
         """
-        アスペクト比を取得する
+        要求アスペクト比を取得する
         """
         return self._aspect_ratio
 
     @property
-    def width(self) -> int | None:
+    def resolution(self) -> Resolution:
         """
-        目標横幅を取得する
+        要求解像度を取得する
         """
-        return self._width
-
-    @property
-    def height(self) -> int | None:
-        """
-        目標高さを取得する
-        """
-        return self._height
+        return self._resolution
 
     def resolve(
         self, source_width: int, source_height: int, mode: ResizeMode
@@ -213,8 +268,8 @@ class ResizeDesc:
         """
         # エイリアス
         desc_ar = self._aspect_ratio.size
-        desc_width = self._width
-        desc_height = self._height
+        desc_width = self._resolution.width
+        desc_height = self._resolution.height
 
         # 実際のアスペクト比を解決する
         if desc_ar is not None:
@@ -280,8 +335,7 @@ class ResizeDesc:
         if isinstance(other, ResizeDesc):
             return (
                 self._aspect_ratio == other._aspect_ratio
-                and self._width == other._width
-                and self._height == other._height
+                and self._resolution == other._resolution
             )
         else:
             return NotImplemented
@@ -514,11 +568,15 @@ def calc_ssim(image_A: AISImage, image_B: AISImage) -> float:
         actual_width = min(image_A.width, image_B.width)
         actual_height = min(image_A.height, image_B.height)
         image_A = image_A.resize(
-            ResizeDesc(AspectRatioPattern.E_RAW, actual_width, actual_height),
+            ResizeDesc(
+                AspectRatioPattern.E_RAW, Resolution(actual_width, actual_height)
+            ),
             ResizeMode.COVER,
         )
         image_B = image_B.resize(
-            ResizeDesc(AspectRatioPattern.E_RAW, actual_width, actual_height),
+            ResizeDesc(
+                AspectRatioPattern.E_RAW, Resolution(actual_width, actual_height)
+            ),
             ResizeMode.COVER,
         )
 

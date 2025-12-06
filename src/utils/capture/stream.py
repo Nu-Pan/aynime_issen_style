@@ -3,7 +3,7 @@ from time import sleep
 
 # utils
 from utils.constants import CAPTURE_FRAME_BUFFER_DURATION_IN_SEC
-from utils.image import AISImage, AspectRatio, AspectRatioPattern, ResizeDesc
+from utils.image import AISImage, AspectRatio, AspectRatioPattern, ResolutionPattern
 from utils.capture.target import WindowHandle, get_nime_window_text
 
 # ayc
@@ -96,14 +96,14 @@ class CaptureStream:
         self,
         key: str,
         aspect_ratio_pattern: AspectRatioPattern,
-        resize_desc_patetrn: ResizeDesc.Pattern,
+        resize_desc_patetrn: ResolutionPattern,
     ) -> None:
         """
         キャプチャの最大サイズを変更する
         パターン指定版
         """
-        # ResizeDesc.Pattern
-        if resize_desc_patetrn == ResizeDesc.Pattern.E_RAW:
+        # ResizeDescPattern
+        if resize_desc_patetrn == ResolutionPattern.E_RAW:
             max_width = None
         else:
             max_width = int(resize_desc_patetrn.value)
