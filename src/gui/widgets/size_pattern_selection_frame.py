@@ -6,7 +6,7 @@ import customtkinter as ctk
 
 # utils
 from utils.constants import WIDGET_MIN_WIDTH, DEFAULT_FONT_FAMILY
-from utils.image import AspectRatioPattern, ResizeDesc
+from utils.image import AspectRatioPattern, AspectRatio, ResolutionPattern, Resolution
 
 # gui
 from gui.widgets.ais_frame import AISFrame
@@ -77,9 +77,9 @@ class ResolutionSelectionFrame(AISFrame):
         self,
         master: ctk.CTkBaseClass,
         on_radio_change: Callable[[], None],
-        initial_resolution: ResizeDesc.Pattern = ResizeDesc.Pattern.E_RAW,
-        shown_resolutions: Sequence[ResizeDesc.Pattern] = [
-            res for res in ResizeDesc.Pattern
+        initial_resolution: ResolutionPattern = ResolutionPattern.E_RAW,
+        shown_resolutions: Sequence[ResolutionPattern] = [
+            res for res in ResolutionPattern
         ],
         **kwargs,
     ):
@@ -102,7 +102,7 @@ class ResolutionSelectionFrame(AISFrame):
         for i, resolution in enumerate(shown_resolutions):
             resolution_radio = ctk.CTkRadioButton(
                 self,
-                text=resolution.value,
+                text=Resolution.from_pattern(resolution).name,
                 variable=self._resolution_var,
                 value=resolution.value,
                 command=on_radio_change,
@@ -114,11 +114,11 @@ class ResolutionSelectionFrame(AISFrame):
             self._resolution_radios.append(resolution_radio)
 
     @property
-    def value(self) -> ResizeDesc.Pattern:
+    def value(self) -> ResolutionPattern:
         """
         選択中の値を取得
         """
-        return ResizeDesc.Pattern(self._resolution_var.get())
+        return ResolutionPattern(self._resolution_var.get())
 
 
 class SizePatternSlectionFrame(AISFrame):
@@ -130,14 +130,14 @@ class SizePatternSlectionFrame(AISFrame):
         self,
         master: ctk.CTkBaseClass,
         model: AynimeIssenStyleModel,
-        aux_on_radio_change: Callable[[AspectRatioPattern, ResizeDesc.Pattern], None],
+        aux_on_radio_change: Callable[[AspectRatioPattern, ResolutionPattern], None],
         initial_aspect_ratio: AspectRatioPattern = AspectRatioPattern.E_RAW,
-        initial_resolution: ResizeDesc.Pattern = ResizeDesc.Pattern.E_RAW,
+        initial_resolution: ResolutionPattern = ResolutionPattern.E_RAW,
         shown_aspect_ratios: Sequence[AspectRatioPattern] = [
             ar for ar in AspectRatioPattern
         ],
-        shown_resolutions: Sequence[ResizeDesc.Pattern] = [
-            res for res in ResizeDesc.Pattern
+        shown_resolutions: Sequence[ResolutionPattern] = [
+            res for res in ResolutionPattern
         ],
         **kwargs,
     ):
@@ -203,7 +203,7 @@ class SizePatternSlectionFrame(AISFrame):
         return self._aspect_ratio_frame.value
 
     @property
-    def resolution(self) -> ResizeDesc.Pattern:
+    def resolution(self) -> ResolutionPattern:
         """
         現在 UI 上で選択されている解像度を返す
 

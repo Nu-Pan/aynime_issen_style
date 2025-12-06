@@ -4,7 +4,7 @@ import customtkinter as ctk
 # utils
 from utils.constants import DEFAULT_FONT_FAMILY
 from utils.ctk import silent_configure, configure_presence
-from utils.image import ResizeDesc, AspectRatioPattern, AISImage
+from utils.image import ResizeDesc, AspectRatioPattern, Resolution, AISImage
 
 # model
 from gui.model.contents_cache import ImageModel, ImageLayer, ImageModelEditSession
@@ -75,5 +75,7 @@ class StillLabel(ctk.CTkLabel):
         with ImageModelEditSession(self._image_model) as edit:
             edit.set_size(
                 ImageLayer.PREVIEW,
-                ResizeDesc(AspectRatioPattern.E_RAW, actual_width, actual_height),
+                ResizeDesc(
+                    AspectRatioPattern.E_RAW, Resolution(actual_width, actual_height)
+                ),
             )

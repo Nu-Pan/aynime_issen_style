@@ -9,7 +9,7 @@ from tkinterdnd2.TkinterDnD import DnDEvent
 from tkinter import Event
 
 # utils
-from utils.image import AspectRatioPattern, ResizeDesc
+from utils.image import AspectRatioPattern, ResolutionPattern, ResizeDesc
 from gui.model.contents_cache import (
     ImageModel,
     VideoModel,
@@ -85,14 +85,20 @@ class StillCaptureFrame(AISFrame, TkinterDnD.DnDWrapper):
             model,
             self.on_resolution_changes,
             AspectRatioPattern.E_RAW,
-            ResizeDesc.Pattern.E_HD,
-            [ar for ar in AspectRatioPattern],
+            ResolutionPattern.E_HD,
             [
-                ResizeDesc.Pattern.E_RAW,
-                ResizeDesc.Pattern.E_VGA,
-                ResizeDesc.Pattern.E_HD,
-                ResizeDesc.Pattern.E_FHD,
-                ResizeDesc.Pattern.E_4K,
+                AspectRatioPattern.E_16_9,
+                AspectRatioPattern.E_4_3,
+                AspectRatioPattern.E_1_1,
+                AspectRatioPattern.E_RAW,
+            ],
+            [
+                ResolutionPattern.E_DISCORD_EMOJI,
+                ResolutionPattern.E_DISCORD_STAMP,
+                ResolutionPattern.E_VGA,
+                ResolutionPattern.E_HD,
+                ResolutionPattern.E_FHD,
+                ResolutionPattern.E_RAW,
             ],
         )
         self.ais.grid_child(self._size_pattern_selection_frame, 2, 0)
@@ -175,7 +181,7 @@ class StillCaptureFrame(AISFrame, TkinterDnD.DnDWrapper):
                 edit.set_nime_name(self._model.stream.nime_window_text)
 
     def on_resolution_changes(
-        self, aspect_ratio: AspectRatioPattern, resolution: ResizeDesc.Pattern
+        self, aspect_ratio: AspectRatioPattern, resolution: ResolutionPattern
     ):
         """
         解像度が変更された時に呼び出される
@@ -188,9 +194,7 @@ class StillCaptureFrame(AISFrame, TkinterDnD.DnDWrapper):
         # NOTE
         #   リサイズさえすればコールバック経由でエクスポートまで走るはず
         with ImageModelEditSession(self._model.still) as edit:
-            edit.set_size(
-                ImageLayer.NIME, ResizeDesc.from_pattern(aspect_ratio, resolution)
-            )
+            edit.set_size(ImageLayer.NIME, ResizeDesc(aspect_ratio, resolution))
 
     def on_nime_changed(self):
         """

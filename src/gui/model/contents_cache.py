@@ -14,7 +14,6 @@ from io import BytesIO
 import re
 from abc import ABC, abstractmethod
 from enum import Enum
-import logging
 
 # numpy
 import numpy as np
@@ -32,6 +31,7 @@ from PIL import (
 # utils
 from utils.image import (
     AspectRatioPattern,
+    ResolutionPattern,
     ResizeDesc,
     ResizeMode,
     AISImage,
@@ -239,9 +239,7 @@ class CachedScalableImage(CachedContent):
         self._aux_process = aux_process
 
         # 遅延変数
-        self._size = ResizeDesc.from_pattern(
-            AspectRatioPattern.E_RAW, ResizeDesc.Pattern.E_RAW
-        )
+        self._size = ResizeDesc(AspectRatioPattern.E_RAW, ResolutionPattern.E_RAW)
         self._output = None
 
     def set_size(self, size: ResizeDesc) -> Self:
