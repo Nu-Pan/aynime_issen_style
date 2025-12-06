@@ -9,7 +9,6 @@ from tkinterdnd2.TkinterDnD import DnDEvent
 from tkinter import Event
 
 # utils
-from utils.constants import WIDGET_PADDING
 from utils.image import AspectRatioPattern, ResizeDesc
 from gui.model.contents_cache import (
     ImageModel,
@@ -28,13 +27,14 @@ from gui.widgets.still_label import StillLabel
 from gui.widgets.size_pattern_selection_frame import (
     SizePatternSlectionFrame,
 )
+from gui.widgets.ais_frame import AISFrame
 from gui.widgets.ais_entry import AISEntry
 from gui.widgets.ais_slider import AISSlider
 from gui.model.contents_cache import ImageLayer
 from gui.model.aynime_issen_style import AynimeIssenStyleModel
 
 
-class StillCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
+class StillCaptureFrame(AISFrame, TkinterDnD.DnDWrapper):
     """
     スチル画像のキャプチャ操作を行う CTk フレーム
     """
@@ -56,30 +56,28 @@ class StillCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
         self._model.still.register_notify_handler(ImageLayer.NIME, self.on_nime_changed)
 
         # レイアウト設定
-        self.columnconfigure(0, weight=1)
+        self.ais.columnconfigure(0, weight=1)
 
         # プレビューラベル兼キャプチャボタン
-        self.preview_label = StillLabel(self, model.still, "Click Here or Ctrl+Alt+P")
-        self.rowconfigure(0, weight=1)
-        self.preview_label.grid(
-            row=0, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
-        )
-        self.preview_label.bind("<Button-1>", self.on_preview_label_click)
+        self._preview_label = StillLabel(self, model.still, "Click Here or Ctrl+Alt+P")
+        self.ais.grid_child(self._preview_label, 0, 0)
+        self.ais.rowconfigure(0, weight=1)
+        self._preview_label.bind("<Button-1>", self.on_preview_label_click)
 
         # グローバルホットキーを登録
         # NOTE
-        #   I は一閃流の頭文字
+        #   I は「一閃」の頭文字
         self._model.global_hotkey.register(
             "I", lambda: self.on_preview_label_click(None)
         )
 
         # アニメ名テキストボックス
-        self.nime_name_entry = AISEntry(self, placeholder_text="Override NIME name ...")
-        self.rowconfigure(2, weight=0)
-        self.nime_name_entry.grid(
-            row=1, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
+        self._nime_name_entry = AISEntry(
+            self, placeholder_text="Override NIME name ..."
         )
-        self.nime_name_entry.register_handler(self.on_nime_name_entry_changed)
+        self.ais.grid_child(self._nime_name_entry, 1, 0)
+        self.ais.rowconfigure(1, weight=0)
+        self._nime_name_entry.register_handler(self.on_nime_name_entry_changed)
 
         # 解像度選択フレーム
         self._size_pattern_selection_frame = SizePatternSlectionFrame(
@@ -97,10 +95,8 @@ class StillCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
                 ResizeDesc.Pattern.E_4K,
             ],
         )
-        self.rowconfigure(3, weight=0)
-        self._size_pattern_selection_frame.grid(
-            row=2, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
-        )
+        self.ais.grid_child(self._size_pattern_selection_frame, 2, 0)
+        self.ais.rowconfigure(2, weight=0)
 
         # キャプチャタイミングスライダー
         CAPTURE_TIMING_STEP_IN_SEC = 0.05
@@ -124,9 +120,8 @@ class StillCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
             lambda x: f"{x:4.2f}",
             "SEC",
         )
-        self._capture_timing_slider.grid(
-            row=3, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
-        )
+        self.ais.grid_child(self._capture_timing_slider, 3, 0)
+        self.ais.rowconfigure(3, weight=0)
         self._capture_timing_slider.set_value(0.35)
 
         # ファイルドロップ関係
@@ -156,8 +151,8 @@ class StillCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
             return
 
         # アニメ名を解決
-        if self.nime_name_entry.text != "":
-            actual_nime_name = self.nime_name_entry.text
+        if self._nime_name_entry.text != "":
+            actual_nime_name = self._nime_name_entry.text
         else:
             actual_nime_name = self._model.stream.nime_window_text
 
@@ -271,8 +266,8 @@ class StillCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
             return
 
         # NIEM 名を解決
-        if self.nime_name_entry.text != "":
-            actual_nime_name = self.nime_name_entry.text
+        if self._nime_name_entry.text != "":
+            actual_nime_name = self._nime_name_entry.text
         else:
             actual_nime_name = nime_name
 

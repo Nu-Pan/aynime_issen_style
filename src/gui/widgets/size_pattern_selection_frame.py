@@ -5,14 +5,123 @@ from typing import Callable, Sequence
 import customtkinter as ctk
 
 # utils
-from utils.constants import WIDGET_PADDING, WIDGET_MIN_WIDTH, DEFAULT_FONT_FAMILY
+from utils.constants import WIDGET_MIN_WIDTH, DEFAULT_FONT_FAMILY
 from utils.image import AspectRatioPattern, ResizeDesc
 
 # gui
+from gui.widgets.ais_frame import AISFrame
 from gui.model.aynime_issen_style import AynimeIssenStyleModel
 
 
-class SizePatternSlectionFrame(ctk.CTkFrame):
+class AspectRatioSelectionFrame(AISFrame):
+    """
+    アスペクト比パターン選択フレーム
+    SizePatternSlectionFrame の構成パーツ
+    """
+
+    def __init__(
+        self,
+        master: ctk.CTkBaseClass,
+        on_radio_change: Callable[[], None],
+        initial_aspect_ratio: AspectRatioPattern = AspectRatioPattern.E_RAW,
+        shown_aspect_raios: Sequence[AspectRatioPattern] = [
+            ar for ar in AspectRatioPattern
+        ],
+        **kwargs,
+    ):
+        """
+        コンストラクタ
+        """
+        super().__init__(master, **kwargs)
+
+        # フォントを生成
+        default_font = ctk.CTkFont(DEFAULT_FONT_FAMILY)
+
+        # レイアウト
+        self.ais.rowconfigure(0, weight=1)
+
+        # アス比選択ラジオボタン変数
+        self._aspect_ratio_var = ctk.StringVar(value=initial_aspect_ratio.value)
+
+        # アス比選択ラジオボタン
+        self._aspect_ratio_radios: list[ctk.CTkRadioButton] = []
+        for i, aspect_ratio in enumerate(shown_aspect_raios):
+            aspect_ratio_radio = ctk.CTkRadioButton(
+                self,
+                text=aspect_ratio.value,
+                variable=self._aspect_ratio_var,
+                value=aspect_ratio.value,
+                command=on_radio_change,
+                width=WIDGET_MIN_WIDTH,
+                font=default_font,
+            )
+            self.ais.grid_child(aspect_ratio_radio, 0, i, sticky="ns")
+            self.ais.columnconfigure(i, weight=1)
+            self._aspect_ratio_radios.append(aspect_ratio_radio)
+
+    @property
+    def value(self) -> AspectRatioPattern:
+        """
+        選択中の値を取得
+        """
+        return AspectRatioPattern(self._aspect_ratio_var.get())
+
+
+class ResolutionSelectionFrame(AISFrame):
+    """
+    解像度パターン選択フレーム
+    SizePatternSlectionFrame の構成パーツ
+    """
+
+    def __init__(
+        self,
+        master: ctk.CTkBaseClass,
+        on_radio_change: Callable[[], None],
+        initial_resolution: ResizeDesc.Pattern = ResizeDesc.Pattern.E_RAW,
+        shown_resolutions: Sequence[ResizeDesc.Pattern] = [
+            res for res in ResizeDesc.Pattern
+        ],
+        **kwargs,
+    ):
+        """
+        コンストラクタ
+        """
+        super().__init__(master, **kwargs)
+
+        # フォントを生成
+        default_font = ctk.CTkFont(DEFAULT_FONT_FAMILY)
+
+        # レイアウト
+        self.ais.rowconfigure(0, weight=1)
+
+        # 解像度選択ラジオボタン変数
+        self._resolution_var = ctk.StringVar(value=initial_resolution.value)
+
+        # 解像度選択ラジオボタン
+        self._resolution_radios: list[ctk.CTkRadioButton] = []
+        for i, resolution in enumerate(shown_resolutions):
+            resolution_radio = ctk.CTkRadioButton(
+                self,
+                text=resolution.value,
+                variable=self._resolution_var,
+                value=resolution.value,
+                command=on_radio_change,
+                width=WIDGET_MIN_WIDTH,
+                font=default_font,
+            )
+            self.ais.grid_child(resolution_radio, 0, i, sticky="ns")
+            self.ais.columnconfigure(i, weight=1)
+            self._resolution_radios.append(resolution_radio)
+
+    @property
+    def value(self) -> ResizeDesc.Pattern:
+        """
+        選択中の値を取得
+        """
+        return ResizeDesc.Pattern(self._resolution_var.get())
+
+
+class SizePatternSlectionFrame(AISFrame):
     """
     画像解像度選択フレーム
     """
@@ -24,7 +133,7 @@ class SizePatternSlectionFrame(ctk.CTkFrame):
         aux_on_radio_change: Callable[[AspectRatioPattern, ResizeDesc.Pattern], None],
         initial_aspect_ratio: AspectRatioPattern = AspectRatioPattern.E_RAW,
         initial_resolution: ResizeDesc.Pattern = ResizeDesc.Pattern.E_RAW,
-        shown_aspect_raios: Sequence[AspectRatioPattern] = [
+        shown_aspect_ratios: Sequence[AspectRatioPattern] = [
             ar for ar in AspectRatioPattern
         ],
         shown_resolutions: Sequence[ResizeDesc.Pattern] = [
@@ -44,71 +153,25 @@ class SizePatternSlectionFrame(ctk.CTkFrame):
         # モデル
         self._model = model
 
-        # フォントを生成
-        default_font = ctk.CTkFont(DEFAULT_FONT_FAMILY)
-
         # ハンドラを保存
         self._aux_on_radio_change = aux_on_radio_change
 
         # フレームのレイアウト
-        self.columnconfigure(0, weight=1)
-        self.columnconfigure(1, weight=1)
+        self.ais.rowconfigure(0, weight=1)
 
-        # アス比選択フレーム
-        self.aspect_ratio_frame = ctk.CTkFrame(self)
-        self.aspect_ratio_frame.grid(
-            row=0, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="ns"
+        # アスペクト比選択フレーム
+        self._aspect_ratio_frame = AspectRatioSelectionFrame(
+            self, self._on_radio_change, initial_aspect_ratio, shown_aspect_ratios
         )
-
-        # アス比選択ラジオボタン変数
-        self.aspect_ratio_var = ctk.StringVar(value=initial_aspect_ratio.value)
-
-        # アス比選択ラジオボタン
-        self.aspect_ratio_frame.rowconfigure(0, weight=1)
-        self.aspect_ratio_radios: list[ctk.CTkRadioButton] = []
-        for i, aspect_ratio in enumerate(shown_aspect_raios):
-            aspect_ratio_radio = ctk.CTkRadioButton(
-                self.aspect_ratio_frame,
-                text=aspect_ratio.value,
-                variable=self.aspect_ratio_var,
-                value=aspect_ratio.value,
-                command=self._on_radio_change,
-                width=WIDGET_MIN_WIDTH,
-                font=default_font,
-            )
-            aspect_ratio_radio.grid(
-                row=0, column=i, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="ns"
-            )
-            self.aspect_ratio_frame.columnconfigure(i, weight=1)
-            self.aspect_ratio_radios.append(aspect_ratio_radio)
+        self.ais.grid_child(self._aspect_ratio_frame, 0, 0, sticky="ns")
+        self.ais.columnconfigure(0, weight=1)
 
         # 解像度選択フレーム
-        self.resolution_frame = ctk.CTkFrame(self)
-        self.resolution_frame.grid(
-            row=0, column=1, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="ns"
+        self._resolution_frame = ResolutionSelectionFrame(
+            self, self._on_radio_change, initial_resolution, shown_resolutions
         )
-
-        # 解像度選択ラジオボタン変数
-        self.resolution_var = ctk.StringVar(value=initial_resolution.value)
-
-        # 解像度選択ラジオボタン
-        self.resolution_frame.rowconfigure(0, weight=1)
-        self.resolution_radios: list[ctk.CTkRadioButton] = []
-        for i, resolution in enumerate(shown_resolutions):
-            resolution_radio = ctk.CTkRadioButton(
-                self.resolution_frame,
-                text=resolution.value,
-                variable=self.resolution_var,
-                value=resolution.value,
-                command=self._on_radio_change,
-                width=WIDGET_MIN_WIDTH,
-                font=default_font,
-            )
-            resolution_radio.grid(
-                row=0, column=i, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="ns"
-            )
-            self.resolution_frame.columnconfigure(i, weight=1)
-            self.resolution_radios.append(resolution_radio)
+        self.ais.grid_child(self._resolution_frame, 0, 1, sticky="ns")
+        self.ais.columnconfigure(1, weight=1)
 
         # 初期状態を通知
         self.after("idle", self._on_radio_change)
@@ -118,8 +181,8 @@ class SizePatternSlectionFrame(ctk.CTkFrame):
         ラジオボタンに変化が合った時に呼び出されるハンドラ
         """
         # 状態を取得
-        aspect_raio_pat = AspectRatioPattern(self.aspect_ratio_var.get())
-        resize_desc_pat = ResizeDesc.Pattern(self.resolution_var.get())
+        aspect_raio_pat = self._aspect_ratio_frame.value
+        resize_desc_pat = self._resolution_frame.value
 
         # モデルに反映
         self._model.stream.set_max_size_pattern(
@@ -137,7 +200,7 @@ class SizePatternSlectionFrame(ctk.CTkFrame):
         Returns:
             AspectRatio: アスペクト比
         """
-        return AspectRatioPattern(self.aspect_ratio_var.get())
+        return self._aspect_ratio_frame.value
 
     @property
     def resolution(self) -> ResizeDesc.Pattern:
@@ -147,4 +210,4 @@ class SizePatternSlectionFrame(ctk.CTkFrame):
         Returns:
             Resolution: 解像度
         """
-        return ResizeDesc.Pattern(self.resolution_var.get())
+        return self._resolution_frame.value

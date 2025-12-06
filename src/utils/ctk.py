@@ -11,7 +11,7 @@ from tkinter import Event
 import tkinter.messagebox as mb
 
 # utils
-from utils.constants import DEFAULT_FONT_FAMILY, WIDGET_PADDING, APP_NAME_JP
+from utils.constants import DEFAULT_FONT_FAMILY, APP_NAME_JP
 from utils.std import traceback_str
 
 
@@ -80,7 +80,6 @@ def show_notify_label(
         font=default_font,
     )
     status_label.place(relx=0.5, rely=0.5, anchor="center")
-    status_label.configure(padx=WIDGET_PADDING, pady=WIDGET_PADDING)
     if on_click_handler is not None:
         status_label.bind("<Button-1>", on_click_handler)
 

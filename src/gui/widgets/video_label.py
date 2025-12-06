@@ -10,7 +10,7 @@ from gui.model.aynime_issen_style import AynimeIssenStyleModel
 from gui.model.contents_cache import ImageLayer, PlaybackMode, VideoModelEditSession
 
 
-class Videoabel(ctk.CTkLabel):
+class VideoLabel(ctk.CTkLabel):
     """
     動画（連番静止画）を再生する用のラベル
     """

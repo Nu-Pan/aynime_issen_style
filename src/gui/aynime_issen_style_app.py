@@ -60,7 +60,7 @@ class AynimeIssenStyleApp(ctk.CTk, TkinterDnD.DnDWrapper):
         self.model = AynimeIssenStyleModel(self)
 
         # タブビューを追加
-        self.tabview = ctk.CTkTabview(self)
+        self.tabview = ctk.CTkTabview(self, corner_radius=0, border_width=0)
         self.tabview.pack(fill="both", expand=True)
 
         # ウィンドウ選択タブを追加

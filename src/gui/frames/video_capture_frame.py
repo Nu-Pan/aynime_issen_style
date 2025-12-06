@@ -8,7 +8,7 @@ from tkinterdnd2 import TkinterDnD, DND_FILES
 from tkinterdnd2.TkinterDnD import DnDEvent
 
 # utils
-from utils.constants import WIDGET_PADDING, WIDGET_MIN_WIDTH, DEFAULT_FONT_FAMILY
+from utils.constants import WIDGET_MIN_WIDTH, DEFAULT_FONT_FAMILY
 from utils.image import (
     AspectRatioPattern,
     ResizeDesc,
@@ -28,8 +28,9 @@ from utils.std import MultiscaleSequence
 
 # gui
 from gui.widgets.thumbnail_bar import ThumbnailBar
-from gui.widgets.video_label import Videoabel
+from gui.widgets.video_label import VideoLabel
 from gui.widgets.size_pattern_selection_frame import SizePatternSlectionFrame
+from gui.widgets.ais_frame import AISFrame
 from gui.widgets.ais_entry import AISEntry
 from gui.widgets.ais_slider import AISSlider
 from gui.model.contents_cache import (
@@ -45,7 +46,55 @@ from gui.model.contents_cache import (
 from gui.model.aynime_issen_style import AynimeIssenStyleModel
 
 
-class VideoCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
+class PlaybackModeSelectionFrame(AISFrame):
+    """
+    再生モード選択フレーム
+    ラジオボタンを１つにまとめるためだけに存在
+    """
+
+    def __init__(
+        self, master: ctk.CTkBaseClass, model: AynimeIssenStyleModel, **kwargs
+    ):
+        """
+        コンストラクタ
+        """
+        super().__init__(master, **kwargs)
+
+        # メンバー保存
+        self._model = model
+
+        # フォントを生成
+        default_font = ctk.CTkFont(DEFAULT_FONT_FAMILY)
+
+        # レイアウト設定
+        self.ais.rowconfigure(0, weight=1)
+
+        # 再生モード変数
+        self._playback_mode_var = ctk.StringVar(value=self._model.playback_mode.value)
+
+        # 再生モードラジオボタン
+        self._radio_buttons: list[ctk.CTkRadioButton] = []
+        for i, playback_mode in enumerate(PlaybackMode):
+            radio_button = ctk.CTkRadioButton(
+                self,
+                text=playback_mode.value,
+                variable=self._playback_mode_var,
+                value=playback_mode.value,
+                command=self._on_radio_button_change,
+                font=default_font,
+            )
+            self.ais.grid_child(radio_button, 0, i, sticky="ns")
+            self.ais.columnconfigure(i, weight=1)
+            self._radio_buttons.append(radio_button)
+
+    def _on_radio_button_change(self):
+        """
+        再生モードラジオボタンに変化があった時に呼び出されるハンドラ
+        """
+        self._model.playback_mode = PlaybackMode(self._playback_mode_var.get())
+
+
+class VideoCaptureFrame(AISFrame, TkinterDnD.DnDWrapper):
     """
     スチル画像のキャプチャ操作を行う CTk フレーム
     """
@@ -67,49 +116,32 @@ class VideoCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
         # メンバー保存
         self._model = model
 
-        # フォントを生成
-        default_font = ctk.CTkFont(DEFAULT_FONT_FAMILY)
-
         # レイアウト設定
-        self.rowconfigure(0, weight=1)
-        self.columnconfigure(0, weight=1)
+        self.ais.columnconfigure(0, weight=1)
 
         # 出力関係フレーム
         # NOTE
         #   使用する画像は与えられるものとして、それをどう gif 化するか？　これを担う
-        self._output_kind_frame = ctk.CTkFrame(self, width=WIDGET_MIN_WIDTH, height=0)
-        self._output_kind_frame.grid(
-            row=0, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
-        )
-        self._output_kind_frame.rowconfigure(0, weight=1)
-        self._output_kind_frame.columnconfigure(0, weight=1)
+        self._output_kind_frame = AISFrame(self)
+        self.ais.grid_child(self._output_kind_frame, 0, 0)
+        self.ais.rowconfigure(0, weight=1)
+
+        # 出力関係フレームのレイアウト設定
+        self._output_kind_frame.ais.columnconfigure(0, weight=1)
 
         # 動画プレビュー
-        self._video_preview_label = Videoabel(self._output_kind_frame, self._model)
-        self._video_preview_label.grid(
-            row=0,
-            column=0,
-            columnspan=2,
-            padx=WIDGET_PADDING,
-            pady=WIDGET_PADDING,
-            sticky="nswe",
-        )
+        self._video_preview_label = VideoLabel(self._output_kind_frame, self._model)
+        self._output_kind_frame.ais.grid_child(self._video_preview_label, 0, 0, 1, 2)
+        self._output_kind_frame.ais.rowconfigure(0, weight=1)
 
         # アニメ名テキストボックス
-        self.nime_name_entry = AISEntry(
+        self._nime_name_entry = AISEntry(
             self._output_kind_frame,
             width=WIDGET_MIN_WIDTH,
             placeholder_text="Override NIME name ...",
         )
-        self.nime_name_entry.grid(
-            row=1,
-            column=0,
-            columnspan=2,
-            padx=WIDGET_PADDING,
-            pady=WIDGET_PADDING,
-            sticky="nswe",
-        )
-        self.nime_name_entry.register_handler(self.on_nime_name_entry_changed)
+        self._output_kind_frame.ais.grid_child(self._nime_name_entry, 1, 0, 1, 2)
+        self._nime_name_entry.register_handler(self.on_nime_name_entry_changed)
 
         # 解像度選択フレーム
         self._size_pattern_selection_frame = SizePatternSlectionFrame(
@@ -132,13 +164,8 @@ class VideoCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
                 ResizeDesc.Pattern.E_HD,
             ],
         )
-        self._size_pattern_selection_frame.grid(
-            row=2,
-            column=0,
-            columnspan=2,
-            padx=WIDGET_PADDING,
-            pady=WIDGET_PADDING,
-            sticky="nswe",
+        self._output_kind_frame.ais.grid_child(
+            self._size_pattern_selection_frame, 2, 0, 1, 2
         )
 
         # UI とモデルの解像度を揃える
@@ -151,35 +178,11 @@ class VideoCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
                 ),
             )
 
-        # 再生モード関係フレーム
-        self._playback_mode_frame = ctk.CTkFrame(
-            self._output_kind_frame, width=WIDGET_MIN_WIDTH, height=0
-        )
-        self._playback_mode_frame.grid(
-            row=3, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
-        )
-        self._playback_mode_frame.rowconfigure(0, weight=1)
-
-        # 再生モード変数
-        self._playback_mode_var = ctk.StringVar(value=self._model.playback_mode.value)
-
         # 再生モードラジオボタン
-        self._playback_mode_radios: list[ctk.CTkRadioButton] = []
-        for i, playback_mode in enumerate(PlaybackMode):
-            playback_mode_radio = ctk.CTkRadioButton(
-                self._playback_mode_frame,
-                text=playback_mode.value,
-                variable=self._playback_mode_var,
-                value=playback_mode.value,
-                command=self._on_playback_mode_radio_change,
-                width=WIDGET_MIN_WIDTH,
-                font=default_font,
-            )
-            playback_mode_radio.grid(
-                row=0, column=i, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="ns"
-            )
-            self._playback_mode_frame.columnconfigure(i, weight=1)
-            self._playback_mode_radios.append(playback_mode_radio)
+        self._playback_mode_frame = PlaybackModeSelectionFrame(
+            self._output_kind_frame, model
+        )
+        self._output_kind_frame.ais.grid_child(self._playback_mode_frame, 3, 0)
 
         # セーブフレームレートスライダー
         # NOTE
@@ -192,9 +195,7 @@ class VideoCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
             lambda x: f"{x.frame_rate:6.3f}",
             "FPS",
         )
-        self._save_frame_rate_slider.grid(
-            row=4, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
-        )
+        self._output_kind_frame.ais.grid_child(self._save_frame_rate_slider, 4, 0)
         self._save_frame_rate_slider.register_handler(
             self._on_save_frame_rate_slider_changed
         )
@@ -210,37 +211,23 @@ class VideoCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
             width=2 * WIDGET_MIN_WIDTH,
             command=self._on_save_button_clicked,
         )
-        self._save_button.grid(
-            row=3,
-            rowspan=2,
-            column=1,
-            columnspan=1,
-            padx=WIDGET_PADDING,
-            pady=WIDGET_PADDING,
-            sticky="nswe",
-        )
+        self._output_kind_frame.ais.grid_child(self._save_button, 3, 1, 2, 1)
 
         # 入力関係フレーム
         # NOTE
         #   gif にする画像の入力・削除・選定を行う
-        self._input_kind_frame = ctk.CTkFrame(self, width=WIDGET_MIN_WIDTH, height=0)
-        self._input_kind_frame.grid(
-            row=1, column=0, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
-        )
-        self._input_kind_frame.columnconfigure(0, weight=1)
+        self._input_kind_frame = AISFrame(self)
+        self.ais.grid_child(self._input_kind_frame, 1, 0)
+        self.ais.rowconfigure(1, weight=0)
+
+        # 入力関係フレームのレイアウト設定
+        self._input_kind_frame.ais.columnconfigure(0, weight=1)
 
         # フレームリスト
         self._frame_list_bar = ThumbnailBar(
             self._input_kind_frame, self._model, THUMBNAIL_HEIGHT
         )
-        self._frame_list_bar.grid(
-            row=0,
-            column=0,
-            columnspan=5,
-            padx=WIDGET_PADDING,
-            pady=WIDGET_PADDING,
-            sticky="nswe",
-        )
+        self._input_kind_frame.ais.grid_child(self._frame_list_bar, 0, 0, 1, 5)
 
         # 全削除ボタン
         self._wipe_button = ctk.CTkButton(
@@ -249,9 +236,7 @@ class VideoCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
             width=2 * WIDGET_MIN_WIDTH,
             command=self._on_remove_all_button_clicked,
         )
-        self._wipe_button.grid(
-            row=1, column=1, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="ns"
-        )
+        self._input_kind_frame.ais.grid_child(self._wipe_button, 1, 1, sticky="ns")
 
         # 無効化画像削除ボタン
         self._remove_disable_button = ctk.CTkButton(
@@ -260,19 +245,19 @@ class VideoCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
             width=2 * WIDGET_MIN_WIDTH,
             command=self._on_remove_disable_button_clicked,
         )
-        self._remove_disable_button.grid(
-            row=1, column=2, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="ns"
+        self._input_kind_frame.ais.grid_child(
+            self._remove_disable_button, 1, 2, sticky="ns"
         )
 
         # 全有効化ボタン
-        self._disable_all_button = ctk.CTkButton(
+        self._enable_all_button = ctk.CTkButton(
             self._input_kind_frame,
             text="ENABLE ALL",
             width=2 * WIDGET_MIN_WIDTH,
             command=self._on_enable_all_button_clicked,
         )
-        self._disable_all_button.grid(
-            row=1, column=3, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="ns"
+        self._input_kind_frame.ais.grid_child(
+            self._enable_all_button, 1, 3, sticky="ns"
         )
 
         # 全無効化ボタン
@@ -282,8 +267,8 @@ class VideoCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
             width=2 * WIDGET_MIN_WIDTH,
             command=self._on_disable_all_button_clicked,
         )
-        self._disable_all_button.grid(
-            row=1, column=4, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="ns"
+        self._input_kind_frame.ais.grid_child(
+            self._disable_all_button, 1, 4, sticky="ns"
         )
 
         # 重複無効化しきい値スライダー
@@ -299,14 +284,7 @@ class VideoCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
             lambda x: self._disable_dupe_values.to_pct_str(x),
             "%",
         )
-        self._disable_dupe_slider.grid(
-            row=2,
-            column=0,
-            columnspan=4,
-            padx=WIDGET_PADDING,
-            pady=WIDGET_PADDING,
-            sticky="nswe",
-        )
+        self._input_kind_frame.ais.grid_child(self._disable_dupe_slider, 2, 0, 1, 4)
         self._disable_dupe_slider.set_value(99900)
 
         # 重複無効化ボタン
@@ -316,9 +294,7 @@ class VideoCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
             width=2 * WIDGET_MIN_WIDTH,
             command=self._on_disable_dupe_button_clicked,
         )
-        self._disable_dupe_button.grid(
-            row=2, column=4, padx=WIDGET_PADDING, pady=WIDGET_PADDING, sticky="nswe"
-        )
+        self._input_kind_frame.ais.grid_child(self._disable_dupe_button, 2, 4)
 
         # レコードフレームレートスライダー
         # NOTE
@@ -331,13 +307,8 @@ class VideoCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
             lambda x: f"{x:6.3f}",
             "FPS",
         )
-        self._record_frame_rate_slider.grid(
-            row=3,
-            column=0,
-            columnspan=4,
-            padx=WIDGET_PADDING,
-            pady=WIDGET_PADDING,
-            sticky="nswe",
+        self._input_kind_frame.ais.grid_child(
+            self._record_frame_rate_slider, 3, 0, 1, 4
         )
         self._record_frame_rate_slider.set_value(FILM_TIMELINE_IN_FPS)
 
@@ -359,14 +330,7 @@ class VideoCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
             lambda x: f"{x:3.1f}",
             "SEC",
         )
-        self._record_length_slider.grid(
-            row=4,
-            column=0,
-            columnspan=4,
-            padx=WIDGET_PADDING,
-            pady=WIDGET_PADDING,
-            sticky="nswe",
-        )
+        self._input_kind_frame.ais.grid_child(self._record_length_slider, 4, 0, 1, 4)
         self._record_length_slider.set_value(
             min(3, CAPTURE_FRAME_BUFFER_DURATION_IN_SEC)
         )
@@ -378,14 +342,7 @@ class VideoCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
             width=2 * WIDGET_MIN_WIDTH,
             command=self._on_record_button_clicked,
         )
-        self._record_button.grid(
-            row=3,
-            rowspan=2,
-            column=4,
-            padx=WIDGET_PADDING,
-            pady=WIDGET_PADDING,
-            sticky="nswe",
-        )
+        self._input_kind_frame.ais.grid_child(self._record_button, 3, 4, 2, 1)
 
         # グローバルホットキーを登録
         # NOTE
@@ -425,12 +382,6 @@ class VideoCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
                 ImageLayer.NIME, ResizeDesc.from_pattern(aspect_ratio, resolution)
             )
 
-    def _on_playback_mode_radio_change(self):
-        """
-        再生モードラジオボタンに変化があった時に呼び出されるハンドラ
-        """
-        self._model.playback_mode = PlaybackMode(self._playback_mode_var.get())
-
     def _on_save_frame_rate_slider_changed(self, value: DFREntry):
         """
         フレームレートスライダーハンドラ
@@ -460,7 +411,7 @@ class VideoCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
             return
 
         # gif ファイルとして保存
-        playback_mode = PlaybackMode(self._playback_mode_var.get())
+        playback_mode = self._model.playback_mode
         try:
             gif_file_path = save_content_model(video, playback_mode)
         except Exception as e:
@@ -566,8 +517,8 @@ class VideoCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
         )
 
         # アニメ名を解決
-        if self.nime_name_entry.text != "":
-            nime_name = self.nime_name_entry.text
+        if self._nime_name_entry.text != "":
+            nime_name = self._nime_name_entry.text
         else:
             nime_name = self._model.stream.nime_window_text
 
@@ -620,8 +571,8 @@ class VideoCaptureFrame(ctk.CTkFrame, TkinterDnD.DnDWrapper):
             return
 
         # アニメ名を解決
-        if self.nime_name_entry.text != "":
-            actual_nime_name = self.nime_name_entry.text
+        if self._nime_name_entry.text != "":
+            actual_nime_name = self._nime_name_entry.text
         else:
             actual_nime_name = load_result.nime_name
 

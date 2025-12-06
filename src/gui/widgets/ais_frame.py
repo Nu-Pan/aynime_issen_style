@@ -1,37 +1,31 @@
+# std
+from typing import Protocol
+
 # Tk/CTk
 import customtkinter as ctk
 
+# utils
+from utils.constants import WIDGET_PADDING
 
-class AISFrame:
+
+class HasGrid(Protocol):
+    def grid(self, *args, **kwargs) -> None: ...
+
+
+class AISFrameInterface:
     """
-    フレーム
-    grid 上に不可視の要素を差し込んでパディングを実現する。
+    AISFrame の拡張操作インターフェースクラス
     """
 
-    def __init__(self, master, pad: int, **kwargs):
+    def __init__(self, parent: "AISFrame"):
         """
         コンストラクタ
         """
-        # 本体
-        self._impl = ctk.CTkFrame(master, **kwargs)
-
-        # パラメータ保存
-        self._pad = pad
-
-        # grid の「予約」済みのサイズ
-        self._reserved_row_stop = 0
-        self._reserved_column_stop = 0
-
-    @property
-    def ctk_impl(self) -> ctk.CTkFrame:
-        """
-        内部実装の CTk オブジェクトを取得する
-        """
-        return self._impl
+        self._parent = parent
 
     def grid_child(
         self,
-        widget: ctk.CTkBaseClass,
+        widget: HasGrid,
         row: int,
         column: int,
         row_span: int = 1,
@@ -39,7 +33,8 @@ class AISFrame:
         sticky: str = "nswe",
     ) -> None:
         """
-        child_widget を自分自身の直下に grid で配置する
+        widget を自分自身の直下に grid で配置する
+        通常の grid とは逆の関係なので注意
         """
         # グリッドを予約
         row_stop = row + row_span
@@ -55,23 +50,53 @@ class AISFrame:
             sticky=sticky,
         )
 
-    def set_row_weights(self, weight: int, row: int, row_span: int = 1):
+    def rowconfigure(
+        self,
+        row: int,
+        row_span: int = 1,
+        *,
+        weight: int | None = None,
+        minsize: int | None = None,
+    ):
         """
         行方向のウェイトを設定する
         """
+        # パラメータを構築
+        kwargs = dict()
+        if weight is not None:
+            kwargs["weight"] = weight
+        if minsize is not None:
+            kwargs["minsize"] = minsize
+
+        # 各行に設定
         row_stop = row + row_span
         self._reserve_grid(row_stop, 0)
         for r in range(row, row_stop):
-            self._impl.rowconfigure(2 * r + 1, weight=weight)
+            self._parent.rowconfigure(2 * r + 1, **kwargs)
 
-    def set_column_weights(self, weight: int, column: int, colunm_span: int = 1):
+    def columnconfigure(
+        self,
+        column: int,
+        colunm_span: int = 1,
+        *,
+        weight: int | None = None,
+        minsize: int | None = None,
+    ):
         """
         列方向のウェイトを設定する
         """
+        # パラメータを構築
+        kwargs = dict()
+        if weight is not None:
+            kwargs["weight"] = weight
+        if minsize is not None:
+            kwargs["minsize"] = minsize
+
+        # 各列に設定
         column_stop = column + colunm_span
         self._reserve_grid(0, column_stop)
         for c in range(column, column_stop):
-            self._impl.columnconfigure(2 * c + 1, weight=weight)
+            self._parent.columnconfigure(2 * c + 1, **kwargs)
 
     def _reserve_grid(self, row_stop: int, column_stop: int):
         """
@@ -80,15 +105,39 @@ class AISFrame:
             grid に対して必要なパディング設定を行うことを「予約」と呼んでいる。
         """
         # 行方向に予約
-        if row_stop > self._reserved_row_stop:
-            self._reserved_row_stop = row_stop
-            self._impl.rowconfigure(0, minsize=self._pad)
+        if row_stop > self._parent._reserved_row_stop:
+            self._parent._reserved_row_stop = row_stop
+            self._parent.rowconfigure(0, minsize=WIDGET_PADDING)
             for i in range(row_stop):
-                self._impl.rowconfigure(2 * (i + 1), minsize=self._pad)
+                self._parent.rowconfigure(2 * (i + 1), minsize=WIDGET_PADDING)
 
         # 列方向に予約
-        if column_stop > self._reserved_column_stop:
-            self._reserved_column_stop = column_stop
-            self._impl.columnconfigure(0, minsize=self._pad)
+        if column_stop > self._parent._reserved_column_stop:
+            self._parent._reserved_column_stop = column_stop
+            self._parent.columnconfigure(0, minsize=WIDGET_PADDING)
             for i in range(column_stop):
-                self._impl.columnconfigure(2 * (i + 1), minsize=self._pad)
+                self._parent.columnconfigure(2 * (i + 1), minsize=WIDGET_PADDING)
+
+
+class AISFrame(ctk.CTkFrame):
+    """
+    一閃流フレーム
+    grid 上に不可視の要素を差し込んでパディングを実現している。
+    """
+
+    def __init__(self, master, **kwargs):
+        """
+        コンストラクタ
+        """
+        super().__init__(master, **kwargs)
+
+        # grid の「予約」済みのサイズ
+        self._reserved_row_stop = 0
+        self._reserved_column_stop = 0
+
+    @property
+    def ais(self) -> AISFrameInterface:
+        """
+        AIS 拡張操作インターフェースを取得
+        """
+        return AISFrameInterface(self)
