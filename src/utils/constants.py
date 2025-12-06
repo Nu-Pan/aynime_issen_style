@@ -7,7 +7,7 @@ APP_NAME_EN = "aynime_issen_style"
 APP_NAME_JP = "えぃにめ一閃流奥義「一閃」"
 
 # ウィジェットのパディングサイズ
-WIDGET_PADDING = 8
+WIDGET_PADDING = 6
 
 # ウィジェットの最小幅
 WIDGET_MIN_WIDTH = 60
