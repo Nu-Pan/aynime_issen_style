@@ -1,6 +1,7 @@
 # std
 import sys
 import logging
+import threading
 
 # Tk/CTk
 import customtkinter as ctk
@@ -9,14 +10,27 @@ import customtkinter as ctk
 from utils.windows import SystemWideMutex
 from utils.constants import APP_NAME_EN
 from utils.ctk import show_error_dialog
-from utils.logging import setup_logging
+from utils.logging import setup_logging, setup_logging_ctk
 from utils.version_constants import COMMIT_HASH, BUILD_DATE
 
 # gui
 from gui.aynime_issen_style_app import AynimeIssenStyleApp
+from gui.splash_app import SplashWindow
 from gui.model.contents_cache import standardize_nime_raw_dile
 
-if __name__ == "__main__":
+
+def _startup_job():
+    """
+    アプリ起動前に実行される処理
+    """
+    # nime, raw を整理
+    standardize_nime_raw_dile()
+
+
+def main():
+    """
+    メイン関数
+    """
     # カラーテーマを設定
     ctk.set_appearance_mode("Dark")
     ctk.set_default_color_theme("blue")
@@ -29,21 +43,29 @@ if __name__ == "__main__":
         show_error_dialog("アプリはすでに起動しています")
         sys.exit(-1)
 
-    # 不要な RAW ファイルを削除
-    standardize_nime_raw_dile()
-
-    # CTk アプリを生成
-    app = AynimeIssenStyleApp()
-
     # ロギング挙動を設定
-    setup_logging(app)
+    setup_logging()
 
     # バージョン情報をログにダンプ
     logging.info(f"COMMIT_HASH = {COMMIT_HASH}")
     logging.info(f"BUILD_DATE = {BUILD_DATE}")
 
-    # メインループ
-    app.mainloop()
+    # 本体の CTk アプリを生成
+    ais_app = AynimeIssenStyleApp()
+    setup_logging_ctk(ais_app)
+    ais_app.withdraw()
 
-    # 正常終了
+    # バックグラウンドジョブ実行とスプラッシュ表示
+    startup_thread = threading.Thread(
+        target=_startup_job, name="_startup_job", daemon=True
+    )
+    startup_thread.start()
+    _splash = SplashWindow(ais_app, lambda: not startup_thread.is_alive())
+
+    # CTk アプリの mainloop を開始
+    ais_app.mainloop()
+
+
+if __name__ == "__main__":
+    main()
     sys.exit(0)

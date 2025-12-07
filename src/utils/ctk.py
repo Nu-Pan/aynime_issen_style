@@ -114,3 +114,22 @@ def show_error_dialog(
         APP_NAME_JP,
         f"{message}\n{tb_str}",
     )
+
+
+def place_window_to_display_center(
+    window: ctk.CTk | ctk.CTkToplevel, window_width: int, window_height: int
+):
+    """
+    window をディスプレイの中央に配置する
+    """
+    window.update_idletasks()
+    window_scale = window._get_window_scaling()
+    raw_screen_width = round(window.winfo_screenwidth() * window_scale)
+    raw_screen_height = round(window.winfo_screenheight() * window_scale)
+    raw_window_width = round(window_width * window_scale)
+    raw_window_height = round(window_height * window_scale)
+    splash_window_x = (raw_screen_width - raw_window_width) // 2
+    splash_window_y = (raw_screen_height - raw_window_height) // 2
+    window.geometry(
+        f"{window_width}x{window_height}+{splash_window_x}+{splash_window_y}"
+    )

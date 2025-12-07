@@ -37,8 +37,9 @@ from utils.image import (
     AISImage,
 )
 from utils.duration_and_frame_rate import DFR_MAP
-from utils.constants import NIME_DIR_PATH, RAW_DIR_PATH, OVERLAY_FONT_PATH
+from utils.constants import *
 from utils.windows import sanitize_text
+from utils.std import PerfLogger
 
 
 class FontCache:
@@ -1314,7 +1315,9 @@ def save_content_model(
         # NOTE
         #   スチル画像の場合は raw 画像に後から変更が入ることはありえない。
         #   よって、ローカルにファイルが無い場合だけ保存する。
-        png_file_path = RAW_DIR_PATH / f"{model.nime_name}__{model.time_stamp}.png"
+        png_file_path = (
+            RAW_DIR_PATH / f"{model.nime_name}__{model.time_stamp}{RAW_STILL_SUFFIX}"
+        )
         save_png = not png_file_path.exists()
 
         # raw ディレクトリに png 画像を保存
@@ -1330,7 +1333,9 @@ def save_content_model(
         # nime ディレクトリに jpeg 画像を保存
         # NOTE
         #   NIME 画像はサイズ変更がかかっている可能性があるので、必ず保存処理を通す。
-        jpeg_file_path = NIME_DIR_PATH / f"{model.nime_name}__{model.time_stamp}.jpg"
+        jpeg_file_path = (
+            NIME_DIR_PATH / f"{model.nime_name}__{model.time_stamp}{NIME_STILL_SUFFIX}"
+        )
         nime_image.pil_image.convert("RGB").save(
             str(jpeg_file_path),
             format="JPEG",
@@ -1355,7 +1360,9 @@ def save_content_model(
         #   ここがかなり重たいので最適化を入れている
         #   特に zip 圧縮が重いので ZIP_STORED にするのが大事
         #   png 圧縮率は大した影響はない
-        zip_file_path = RAW_DIR_PATH / f"{model.nime_name}__{model.time_stamp}.zip"
+        zip_file_path = (
+            RAW_DIR_PATH / f"{model.nime_name}__{model.time_stamp}{RAW_VIDEO_SUFFIX}"
+        )
         with ZipFile(zip_file_path, "w", compression=ZIP_STORED) as zip_file:
             for idx, img in enumerate(model.iter_frames(ImageLayer.RAW, False)):
                 # 無効なフレームはスキップ
@@ -1366,7 +1373,9 @@ def save_content_model(
                 img.pil_image.save(buf, format="PNG", optimize=False, compress_level=6)
                 # png メモリイメージを zip ファイルに書き出し
                 enable_suffix = "e" if model.get_enable(idx) else "d"
-                png_file_name = f"{model.time_stamp}_{idx:03d}_{enable_suffix}.png"
+                png_file_name = (
+                    f"{model.time_stamp}_{idx:03d}_{enable_suffix}{RAW_STILL_SUFFIX}"
+                )
                 zip_file.writestr(png_file_name, buf.getvalue())
 
         # NIME フレームを展開
@@ -1437,7 +1446,9 @@ def save_content_model(
                 raise RuntimeError()
 
         # nime ディレクトリに gif ファイルを保存
-        gif_file_path = NIME_DIR_PATH / f"{model.nime_name}__{model.time_stamp}.gif"
+        gif_file_path = (
+            NIME_DIR_PATH / f"{model.nime_name}__{model.time_stamp}{NIME_VIDEO_SUFFIX}"
+        )
         nime_frames[0].save(
             str(gif_file_path),
             save_all=True,
@@ -1475,11 +1486,10 @@ def load_content_model(
         AISImage: 読み込んだ画像
     """
     # 実際に読み込むべきファイルパスを解決する
-    IMAGE_EXTENSIONS = (".png", ".jpg", ".jpeg", ".bmp")
-    MOVIE_EXTENSIONS = (".gif",)
-    RAW_ZIP_EXTENSIONS = (".zip",)
-    if file_path.suffix.lower() in IMAGE_EXTENSIONS:
-        raw_png_file_path_cand = list(RAW_DIR_PATH.glob(f"**/{file_path.stem}.*"))
+    if file_path.suffix.lower() in ALL_STILL_SUFFIXES:
+        raw_png_file_path_cand = list(
+            RAW_DIR_PATH.glob(f"**/{file_path.stem}{RAW_STILL_SUFFIX}")
+        )
         if len(raw_png_file_path_cand) == 1:
             actual_file_path = raw_png_file_path_cand[0]
             gif_file_path = None
@@ -1490,10 +1500,12 @@ def load_content_model(
             raise ValueError(f"Multiple {file_path.name} hits in {RAW_DIR_PATH}")
         else:
             raise FileNotFoundError(
-                f"{RAW_DIR_PATH}/**/{file_path.stem}.* or {file_path}"
+                f"{RAW_DIR_PATH}/**/{file_path.stem}{RAW_STILL_SUFFIX} or {file_path}"
             )
-    elif file_path.suffix.lower() in MOVIE_EXTENSIONS:
-        raw_zip_file_path_cand = list(RAW_DIR_PATH.glob(f"**/{file_path.stem}.*"))
+    elif file_path.suffix.lower() == NIME_VIDEO_SUFFIX:
+        raw_zip_file_path_cand = list(
+            RAW_DIR_PATH.glob(f"**/{file_path.stem}{RAW_VIDEO_SUFFIX}")
+        )
         if len(raw_zip_file_path_cand) == 1:
             actual_file_path = raw_zip_file_path_cand[0]
             gif_file_path = file_path
@@ -1504,9 +1516,9 @@ def load_content_model(
             raise ValueError(f"Multiple {file_path.name} hits in {RAW_DIR_PATH}")
         else:
             raise FileNotFoundError(
-                f"{RAW_DIR_PATH}/**/{file_path.stem}.* or {file_path}"
+                f"{RAW_DIR_PATH}/**/{file_path.stem}{RAW_VIDEO_SUFFIX} or {file_path}"
             )
-    elif file_path.suffix.lower() in RAW_ZIP_EXTENSIONS:
+    elif file_path.suffix.lower() == RAW_VIDEO_SUFFIX:
         if file_path.exists():
             actual_file_path = file_path
             gif_file_path = None
@@ -1514,7 +1526,7 @@ def load_content_model(
             raise FileNotFoundError(f"{file_path}")
     else:
         raise ValueError(
-            f"Unsuported file type. Only extensions {IMAGE_EXTENSIONS + MOVIE_EXTENSIONS} are supported."
+            f"Unsuported file type. Only extensions {ALL_CONTENT_SUFFIXES} are supported."
         )
 
     # 使用する NIEM 名・タイムスタンプを解決
@@ -1523,12 +1535,12 @@ def load_content_model(
         time_stamp = current_time_stamp()
 
     # 画像・動画を読み込む
-    if actual_file_path.suffix.lower() in IMAGE_EXTENSIONS:
+    if actual_file_path.suffix.lower() in ALL_STILL_SUFFIXES:
         # 画像ファイルの場合はそのまま読み込む
         pil_image = Image.open(actual_file_path).convert("RGB")
         image_model = ImageModel(AISImage(pil_image), nime_name, time_stamp)
         return image_model
-    elif actual_file_path.suffix.lower() in MOVIE_EXTENSIONS:
+    elif actual_file_path.suffix.lower() == NIME_VIDEO_SUFFIX:
         # 動画ファイルの場合はフレームを全て読み込む
         video_model = VideoModel()
         with VideoModelEditSession(video_model) as edit:
@@ -1551,11 +1563,11 @@ def load_content_model(
             avg_delay = round(sum(delays) / len(delays))
             edit.set_duration_in_msec(avg_delay)
         return video_model
-    elif actual_file_path.suffix.lower() in RAW_ZIP_EXTENSIONS:
+    elif actual_file_path.suffix.lower() == RAW_VIDEO_SUFFIX:
         # ZIP ファイルの場合、中身を連番静止画として読み込む
         # NOTE
         #   ZIP ファイルはこのアプリによって出力されたものであることを前提としている
-        #   その中身は .png であることを前提としている
+        #   その中身は RAW_STILL_SUFFIX であることを前提としている
 
         # 対応する gif ファイルからフレームレートをロード
         if gif_file_path is None:
@@ -1584,11 +1596,19 @@ def load_content_model(
             with ZipFile(actual_file_path, "r") as zip_file:
                 file_list = zip_file.namelist()
                 for file_name in file_list:
+                    # ステムを抽出
+                    # NOTE
+                    #   拡張子が想定通りじゃない場合はスキップ
+                    if not file_name.endswith(RAW_STILL_SUFFIX):
+                        continue
+                    else:
+                        file_stem = file_name.replace(RAW_STILL_SUFFIX, "")
+
                     # フレームの有効・無効を解決する
                     # NOTE
                     #   ファイル名から解決する
                     #   なんかおかしい時は何も言わずに有効扱いする
-                    enable_match = re.search(r"_([de])\.png$", file_name)
+                    enable_match = re.search(r"_([de])$", file_stem)
                     if enable_match is None:
                         enable = True
                     else:
@@ -1621,79 +1641,90 @@ def _remove_unmatched_nime_raw_file():
     nime に無いけど raw にあるファイルを削除する。
     """
     # NIME 側を列挙
-    nime_stems = [p.stem for p in NIME_DIR_PATH.glob("**/*.jpg")]
+    nime_file_names = {
+        p.name
+        for p in NIME_DIR_PATH.glob("**/*.*")
+        if p.suffix.lower() in NIME_CONTENT_SUFFIXES
+    }
 
-    # RAW 側の削除対象を列挙
-    raw_unmatched_paths = [
-        p
-        for p in RAW_DIR_PATH.glob("**/**.*")
-        if p.is_file()
-        and p.suffix.lower() in [".png", ".zip"]
-        and p.stem not in nime_stems
-    ]
+    # RAW 側
+    for raw_file_path in RAW_DIR_PATH.glob("**/**.*"):
+        # 非ファイルはスキップ
+        if not raw_file_path.is_file():
+            continue
 
-    # 削除
-    for p in raw_unmatched_paths:
-        p.unlink(True)
+        # NIME 側の対応ファイル名を生成、想定外ならスキップ
+        raw_suffix = raw_file_path.suffix.lower()
+        if raw_suffix == RAW_STILL_SUFFIX:
+            expected_nime_file_name = raw_file_path.with_suffix(NIME_STILL_SUFFIX).name
+        elif raw_suffix == RAW_VIDEO_SUFFIX:
+            expected_nime_file_name = raw_file_path.with_suffix(NIME_VIDEO_SUFFIX).name
+        else:
+            continue
+
+        # NIME 側に対応するファイルが居るならスキップ
+        if expected_nime_file_name in nime_file_names:
+            continue
+
+        # 対応する NIME ファイルなしってことなので、 RAW ファイルを削除
+        raw_file_path.unlink(True)
 
 
 def _archive_old_nime_files():
     """
-    先月よりも古い（先月を含まない） nime ファイルを `nime/older/YYYY_MM` に退避する。
+    ある程度以上古い nime ファイルを `nime/older/YYYY_MM` に退避する。
     NOTE
         退避の対象は nime ファイルだけなので、 nime, raw 間で相対パスがズレるが、
         これは `_sync_nime_raw_relative_path` でまとめて修正されることを前提している。
     """
-    # 現在の年月文字列
-    YEAR_MONTH_PATTERN = r"^(\d{4}-\d{2})"
-    m = re.search(YEAR_MONTH_PATTERN, current_time_stamp())
-    if m is None:
-        raise ValueError("Invalid timestamp format.")
-    else:
-        current_year_month = m.group(1)
+    # ファイルの stem から年月日を抽出する用の正規表現
+    nime_stem_pattern = re.compile(r".+__(\d{4})-(\d{2})-(\d{2})_.+")
 
-    # １ヶ月前の年月文字列
-    current_year_int = int(current_year_month[0:4])
-    current_month_int = int(current_year_month[5:7])
-    prev_month_int = current_month_int - 1
-    if prev_month_int <= 0:
-        prev_year_int = current_year_int - 1
-    else:
-        prev_year_int = current_year_int
-    prev_year_month = f"{prev_year_int:04d}-{prev_month_int:02d}"
-
-    # すべての直下 NIME 画像に対して処理
-    # NOTE
-    #   ユーザーが手動でフォルダ分けしてる可能性もあるので、対象は直下だけに絞る。
-    for nime_path in NIME_DIR_PATH.glob("*.*"):
-        # ファイルのみが対象
-        if not nime_path.is_file():
-            continue
-
-        # jpg, gif が対象
-        if nime_path.suffix not in [".jpg", ".gif"]:
-            continue
-
-        # タイムスタンプ文字列を解決
-        _, time_stamp = parse_nime_file_stem(nime_path.stem)
-        if time_stamp is None:
-            continue
-
-        # タイムスタンプから年月をパース
-        m = re.search(YEAR_MONTH_PATTERN, time_stamp)
+    # ファイルの stem から年月日を抽出する関数
+    def make_year_month_date(nime_file_stem: str) -> int | None:
+        m = nime_stem_pattern.match(nime_file_stem)
         if m is None:
-            continue
+            return None
         else:
-            nime_year_month = m.group(1)
+            year = int(m.group(1)) * (10**4)
+            month = int(m.group(2)) * (10**2)
+            day = int(m.group(3))
+            return year + month + day
 
-        # 今月・先月の NIME 画像ならそのままにする
-        if nime_year_month in [current_year_month, prev_year_month]:
+    # 「パス --> タイムスタンプ」テーブル
+    # NOTE
+    #   NIME ディレクトリ直下のファイルが対象
+    nime_file_path_to_time_stamp = {
+        p: ts
+        for p, ts in {
+            p: make_year_month_date(p.stem)
+            for p in NIME_DIR_PATH.glob("*.*")
+            if p.is_file() and p.suffix.lower() in NIME_CONTENT_SUFFIXES
+        }.items()
+        if ts is not None
+    }
+
+    # 残す対象のタイムスタンプを列挙
+    # NOTE
+    #   最新 1000 枚と「年月日」が一致するファイルを残す
+    remainting_time_stamps = set(
+        sorted(ts for ts in nime_file_path_to_time_stamp.values())[-1000:]
+    )
+
+    # すべての NIME ファイルに対して
+    for nime_file_path, year_month_date in nime_file_path_to_time_stamp.items():
+        # 残す対象ならスキップ
+        if year_month_date in remainting_time_stamps:
             continue
+
+        # 移動先パスを生成
+        year_month_date_str = str(year_month_date)
+        year_month_str = f"{year_month_date_str[0:4]}-{year_month_date_str[4:6]}"
+        older_file_path = NIME_DIR_PATH / "older" / year_month_str / nime_file_path.name
 
         # older に移動
-        older_file_path = NIME_DIR_PATH / "older" / nime_year_month / nime_path.name
         older_file_path.parent.mkdir(parents=True, exist_ok=True)
-        nime_path.rename(older_file_path)
+        nime_file_path.rename(older_file_path)
 
 
 def _sync_nime_raw_relative_path():
@@ -1705,42 +1736,40 @@ def _sync_nime_raw_relative_path():
     """
     # RAW 側を事前に列挙
     # NOTE
-    #   ファイルシステムへのアクセスを最小化したい
-    raw_abs_paths = [
-        p
+    #   同名ファイルが複数階層に存在するパターンなぞ知らん
+    raw_file_name_to_path = {
+        p.name: p
         for p in RAW_DIR_PATH.glob("**/*.*")
-        if p.is_file() and p.suffix.lower() in [".png", ".zip"]
-    ]
+        if p.is_file() and p.suffix.lower() in RAW_CONTENT_SUFFIXES
+    }
+
     # すべての NIME 画像に対して処理
     for nime_path in NIME_DIR_PATH.glob("**/*.*"):
-        # ファイルのみが対象
+        # 非ファイルはスキップ
         if not nime_path.is_file():
             continue
 
-        # gif, jpg が対象
-        if nime_path.suffix not in [".jpg", ".gif"]:
-            continue
-
-        # NIME ファイルのパスを解決
-        nime_abs_path = nime_path.absolute()
-        nime_rel_path = nime_abs_path.relative_to(NIME_DIR_PATH)
-
-        # RAW ファイルのパスを解決
-        raw_abs_path_cand = [p for p in raw_abs_paths if p.stem == nime_path.stem]
-        if len(raw_abs_path_cand) == 1:
-            raw_abs_path = raw_abs_path_cand[0]
+        # RAW 側の対応拡張子を解決、想定外の拡張子はスキップ
+        if nime_path.suffix == NIME_STILL_SUFFIX:
+            raw_suffix = RAW_STILL_SUFFIX
+        elif nime_path.suffix == NIME_VIDEO_SUFFIX:
+            raw_suffix = RAW_VIDEO_SUFFIX
         else:
             continue
 
+        # 期待する RAW ファイルパスを解決、想定 RAW ファイルがなければスキップ
+        raw_file_name = nime_path.stem + raw_suffix
+        actual_raw_file_path = raw_file_name_to_path.get(raw_file_name)
+        if actual_raw_file_path is None:
+            continue
+
         # RAW ファイルをあるべき場所に移動する
-        # NOTE
-        #   NIME ファイルの相対パスを元に「あるべき RAW ファイルパス」を解決する
-        expected_raw_abs_path = RAW_DIR_PATH / nime_rel_path.with_suffix(
-            raw_abs_path.suffix
-        )
-        if expected_raw_abs_path != raw_abs_path:
-            expected_raw_abs_path.parent.mkdir(parents=True, exist_ok=True)
-            raw_abs_path.rename(expected_raw_abs_path)
+        nime_rel_path = nime_path.relative_to(NIME_DIR_PATH)
+        raw_rel_path = nime_rel_path.with_suffix(raw_suffix)
+        expected_raw_file_abs_path = RAW_DIR_PATH / raw_rel_path
+        if actual_raw_file_path != expected_raw_file_abs_path:
+            expected_raw_file_abs_path.parent.mkdir(parents=True, exist_ok=True)
+            actual_raw_file_path.rename(expected_raw_file_abs_path)
 
 
 def standardize_nime_raw_dile():
@@ -1751,6 +1780,9 @@ def standardize_nime_raw_dile():
     - nime, raw からの相対パスを一致させる
     - nime, raw 直下の古いファイルを `<nime or raw>/older/YYYY_MM` に退避する
     """
-    _remove_unmatched_nime_raw_file()
-    _archive_old_nime_files()
-    _sync_nime_raw_relative_path()
+    with PerfLogger("_remove_unmatched_nime_raw_file"):
+        _remove_unmatched_nime_raw_file()
+    with PerfLogger("_archive_old_nime_files"):
+        _archive_old_nime_files()
+    with PerfLogger("_sync_nime_raw_relative_path"):
+        _sync_nime_raw_relative_path()
