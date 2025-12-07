@@ -179,7 +179,7 @@ class TkInterExceptionHandler:
             pass
 
 
-def setup_logging(ctk_app: ctk.CTk):
+def setup_logging():
     """
     ログ周りのセットアップを行う
     エントリーポイントで真っ先に呼び出すこと
@@ -248,10 +248,18 @@ def setup_logging(ctk_app: ctk.CTk):
         asyncio.get_event_loop().set_exception_handler(_asyncio_exception_handler)
     except Exception:
         pass
-    ctk_app.report_callback_exception = TkInterExceptionHandler(LOG_DIR_PATH)
 
     # ロギング開始をログ
     logging.getLogger(__name__).info("Logging initialized. file=%s", LOG_DIR_PATH)
 
     # 正常終了
     return
+
+
+def setup_logging_ctk(ctk_app: ctk.CTk):
+    """
+    ログ周りのセットアップを行う
+    エントリーポイントで真っ先に呼び出すこと
+    CTk 関係だけやる
+    """
+    ctk_app.report_callback_exception = TkInterExceptionHandler(LOG_DIR_PATH)

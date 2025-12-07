@@ -13,6 +13,7 @@ from utils.constants import (
 )
 from utils.pyinstaller import resource_path
 from utils.capture import *
+from utils.ctk import place_window_to_display_center
 
 # gui
 from gui.frames.window_selection_frame import WindowSelectionFrame
@@ -51,7 +52,7 @@ class AynimeIssenStyleApp(ctk.CTk, TkinterDnD.DnDWrapper):
         self.iconbitmap(resource_path("app.ico"))
 
         # 初期サイズを設定
-        self.geometry(f"{WINDOW_INIT_WIDTH}x{WINDOW_INIT_HEIGHT}")
+        place_window_to_display_center(self, WINDOW_INIT_WIDTH, WINDOW_INIT_HEIGHT)
 
         # 最小サイズを設定
         self.minsize(WINDOW_MIN_WIDTH, WINDOW_MIN_HEIGHT)
@@ -93,7 +94,6 @@ class AynimeIssenStyleApp(ctk.CTk, TkinterDnD.DnDWrapper):
         # 初期選択
         self.tabview.configure(command=self.on_tab_change)
         self.tabview.set(WindowSelectionFrame.UI_TAB_NAME)
-        self.window_select_frame.update_list()
 
         # グローバルホットキーを設定
         self.model.global_hotkey.register(

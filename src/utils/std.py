@@ -1,7 +1,9 @@
 # std
-from typing import Any, Iterable
+from typing import Any, Iterable, Self, Callable
 import traceback
 import copy
+from time import perf_counter
+import logging
 
 
 def flatten(source: Any) -> Any:
@@ -129,3 +131,31 @@ class MultiscaleSequence:
             lower_str = lower_str + "0"
 
         return f"{upper_str}.{lower_str}"
+
+
+class PerfLogger:
+    """
+    with 区間の経過時間をダンプする用のロガー
+    """
+
+    def __init__(
+        self, label: str, formatter: Callable[[float], str] = lambda x: f"{x:.2f} sec"
+    ):
+        self._label = label
+        self._formatter = formatter
+        self._start = None
+
+    def __enter__(self) -> Self:
+        """
+        with 句開始
+        """
+        self._start = perf_counter()
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """
+        with 句終了
+        """
+        if exc_type is None and self._start is not None:
+            elapsed_str = self._formatter(perf_counter() - self._start)
+            logging.info(f"{self._label}: {elapsed_str}")

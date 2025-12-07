@@ -92,8 +92,6 @@ class WindowSelectionFrame(AISFrame):
 
         # 初回キャプチャターゲットリスト更新
         self.update_list()
-        with ImageModelEditSession(self.model.window_selection_image) as edit:
-            edit.set_raw_image(None)
 
     def on_capture_target_select(self, event: Event) -> None:
         """
