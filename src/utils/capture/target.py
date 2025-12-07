@@ -144,6 +144,12 @@ def get_nime_window_text(window_handle: WindowHandle) -> tuple[str, bool]:
         # NOTE
         #   Amazon Prime Video の場合、前後に余計な文字が付くので、それらをカット。
         text = replace_multi(text, ["Amazon.co.jp ", "を観る Prime Video"], "")
+    elif text.endswith("ABEMA"):
+        # NOTE
+        #   ABEMA の場合、シンプルにカットしていくだけで良い
+        text = replace_multi(
+            text, ["(アニメ)", "無料動画・見逃し配信を見るなら", "ABEMA"], ""
+        )
     else:
         return text, False
 
