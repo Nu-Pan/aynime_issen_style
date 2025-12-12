@@ -79,11 +79,15 @@ class VideoLabel(ctk.CTkLabel):
                 match self._model.playback_mode:
                     case PlaybackMode.FORWARD:
                         self._frame_index += 1
-                        if self._frame_index >= self._model.video.num_total_frames:
+                        if self._frame_index < 0:
+                            self._frame_index = 0
+                        elif self._frame_index >= self._model.video.num_total_frames:
                             self._frame_index = 0
                     case PlaybackMode.BACKWARD:
                         self._frame_index -= 1
                         if self._frame_index < 0:
+                            self._frame_index = self._model.video.num_total_frames - 1
+                        elif self._frame_index >= self._model.video.num_total_frames:
                             self._frame_index = self._model.video.num_total_frames - 1
                     case PlaybackMode.REFLECT:
                         self._frame_index += self._reflect_seek_direction
@@ -93,8 +97,6 @@ class VideoLabel(ctk.CTkLabel):
                         elif self._frame_index >= self._model.video.num_total_frames:
                             self._frame_index = self._model.video.num_total_frames - 2
                             self._reflect_seek_direction = -1
-                        else:
-                            pass
 
                 # 有効フレームなら、ここで決定
                 if self._model.video.get_enable(self._frame_index):
