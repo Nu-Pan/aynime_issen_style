@@ -24,7 +24,6 @@ from PIL import (
     ImageDraw,
     ImageFont,
     ImageEnhance,
-    ImageOps,
     ImageFilter,
 )
 
@@ -1311,165 +1310,140 @@ def save_content_model(
         if not isinstance(nime_image, AISImage):
             raise ValueError("Invalid NIME Image")
 
-        # raw png ファイルの保存が必要か判定
+        # raw ディレクトリに png 画像を保存
         # NOTE
         #   スチル画像の場合は raw 画像に後から変更が入ることはありえない。
         #   よって、ローカルにファイルが無い場合だけ保存する。
-        png_file_path = (
-            RAW_DIR_PATH / f"{model.nime_name}__{model.time_stamp}{RAW_STILL_SUFFIX}"
+        raw_file_path = (
+            RAW_DIR_PATH
+            / f"{model.nime_name}__{model.time_stamp}{RAW_STILL_OUT_SUFFIX}"
         )
-        save_png = not png_file_path.exists()
-
-        # raw ディレクトリに png 画像を保存
-        if save_png:
+        if not raw_file_path.exists():
             raw_image.pil_image.convert("RGB").save(
-                str(png_file_path),
-                format="PNG",
+                str(raw_file_path),
+                format=RAW_STILL_OUT_PIL_FORMAT,
                 optimize=True,
                 compress_levvel=9,
                 transparency=(0, 0, 0),
             )
 
-        # nime ディレクトリに jpeg 画像を保存
+        # nime ディレクトリにスチル画像を保存
         # NOTE
         #   NIME 画像はサイズ変更がかかっている可能性があるので、必ず保存処理を通す。
-        jpeg_file_path = (
-            NIME_DIR_PATH / f"{model.nime_name}__{model.time_stamp}{NIME_STILL_SUFFIX}"
+        still_file_path = (
+            NIME_DIR_PATH
+            / f"{model.nime_name}__{model.time_stamp}{NIME_STILL_OUT_SUFFIX}"
         )
         nime_image.pil_image.convert("RGB").save(
-            str(jpeg_file_path),
-            format="JPEG",
+            str(still_file_path),
+            format=NIME_STILL_OUT_PIL_FORMAT,
+            lossless=False,
             quality=92,
-            optimize=True,
-            progressive=True,
+            alpha_quality=92,
+            method=6,
+            exact=False,  # 透明画素の RGB 値は保持しない
         )
 
         # 正常終了
-        return jpeg_file_path
+        return still_file_path
 
     elif isinstance(model, VideoModel):
         # VideoModel
 
-        # raw ディレクトリに zip ファイルを保存
-        # NOTE
-        #   raw zip ファイルの差分確認は処理的にも対応コスト的に重い。
-        #   なので、妥協して毎回保存する。
-        # NOTE
-        #   raw フレームは enable かどうかを問わずに保存する。
-        # NOTE
-        #   ここがかなり重たいので最適化を入れている
-        #   特に zip 圧縮が重いので ZIP_STORED にするのが大事
-        #   png 圧縮率は大した影響はない
-        zip_file_path = (
-            RAW_DIR_PATH / f"{model.nime_name}__{model.time_stamp}{RAW_VIDEO_SUFFIX}"
-        )
-        with ZipFile(zip_file_path, "w", compression=ZIP_STORED) as zip_file:
-            for idx, img in enumerate(model.iter_frames(ImageLayer.RAW, False)):
-                # 無効なフレームはスキップ
-                if not isinstance(img, AISImage):
-                    continue
-                # png ファイルメモリに書き出し
-                buf = BytesIO()
-                img.pil_image.save(buf, format="PNG", optimize=False, compress_level=6)
-                # png メモリイメージを zip ファイルに書き出し
-                enable_suffix = "e" if model.get_enable(idx) else "d"
-                png_file_name = (
-                    f"{model.time_stamp}_{idx:03d}_{enable_suffix}{RAW_STILL_SUFFIX}"
-                )
-                zip_file.writestr(png_file_name, buf.getvalue())
-
-        # NIME フレームを展開
-        nime_frames = [
-            f.pil_image
-            for f in model.iter_frames(ImageLayer.NIME)
-            if isinstance(f, AISImage)
-        ]
-
-        # フレームの横幅を解決
-        frame_width = {f.width for f in nime_frames}
-        if len(frame_width) == 1:
-            frame_width = frame_width.pop()
-        else:
-            raise ValueError("Multiple frame width contaminated.")
-
-        # フレームの高さを解決
-        frame_height = {f.height for f in nime_frames}
-        if len(frame_height) == 1:
-            frame_height = frame_height.pop()
-        else:
-            raise ValueError("Multiple frame height contaminated.")
-
-        # すべての NIME フレームを１つの atlas 画像に結合
-        nime_atlas = Image.new(
-            "RGB", (frame_width, frame_height * len(nime_frames)), color=None
-        )
-        for frame_index, nime_frame in enumerate(nime_frames):
-            nime_atlas.paste(nime_frame, (0, frame_index * frame_height))
-
-        # atlas 画像を 256 色パレット化
-        # NOTE
-        #   ちらつき対策として 6bit 量子化を先にやる
-        #   メディアンフィルタは輪郭線がちらつく原因になるので却下
-        #   FASTOCTREE はフリッカーが出やすい傾向があったので却下
-        #   kmeans は品質と速度の兼ね合いで 2 にした
-        nime_atlas = ImageOps.posterize(nime_atlas, bits=6)
-        nime_atlas = nime_atlas.quantize(
-            colors=256, method=Image.Quantize.MEDIANCUT, kmeans=2
-        )
-        nime_atlas = nime_atlas.convert("P", dither=Image.Dither.NONE, colors=256)
-        atlas_palette = nime_atlas.getpalette()
-        if atlas_palette is None:
-            raise TypeError("Failed to getpalette")
-
-        # atlas から 256 色パレット化された NIME 画像を切り出す
-        for frame_index in range(len(nime_frames)):
-            nime_frames[frame_index] = nime_atlas.crop(
-                (
-                    0,
-                    frame_index * frame_height,
-                    frame_width,
-                    (frame_index + 1) * frame_height,
-                )
+        # RAW ディレクトリに保存
+        with PerfLogger("Save RAW Video"):
+            raw_file_path = (
+                RAW_DIR_PATH
+                / f"{model.nime_name}__{model.time_stamp}{RAW_VIDEO_OUT_SUFFIX}"
             )
-            nime_frames[frame_index].putpalette(atlas_palette)
+            if not raw_file_path.exists():
+                # RAW フレームを展開
+                raw_frames = [
+                    f.pil_image
+                    for f in model.iter_frames(ImageLayer.RAW)
+                    if isinstance(f, AISImage)
+                ]
 
-        # 再生モードを反映
-        match playback_mode:
-            case PlaybackMode.FORWARD:
-                pass
-            case PlaybackMode.BACKWARD:
-                nime_frames.reverse()
-            case PlaybackMode.REFLECT:
-                if len(nime_frames) >= 3:
-                    nime_frames = nime_frames + [f for f in reversed(nime_frames)][1:-1]
-            case _:
-                raise RuntimeError()
+                # 再生モードを反映
+                match playback_mode:
+                    case PlaybackMode.FORWARD:
+                        pass
+                    case PlaybackMode.BACKWARD:
+                        raw_frames.reverse()
+                    case PlaybackMode.REFLECT:
+                        if len(raw_frames) >= 3:
+                            raw_frames = (
+                                raw_frames + [f for f in reversed(raw_frames)][1:-1]
+                            )
+                    case _:
+                        raise RuntimeError()
 
-        # nime ディレクトリに gif ファイルを保存
-        gif_file_path = (
-            NIME_DIR_PATH / f"{model.nime_name}__{model.time_stamp}{NIME_VIDEO_SUFFIX}"
-        )
-        nime_frames[0].save(
-            str(gif_file_path),
-            save_all=True,
-            append_images=nime_frames[1:],
-            duration=model.duration_in_msec,
-            loop=0,
-            disposal=2,
-            optimize=False,
-        )
+                # ファイル保存
+                # NOTE
+                #   - 無圧縮で保存（これはマスト）
+                #   - 保存にかかる時間の短縮を最優先
+                #   - 完全な無圧縮は避けたい
+                #   という観点から WebP(lossless) を選択した。
+                #   エンコード時間を短縮したいので、圧縮率は最大限妥協している。
+                raw_frames[0].save(
+                    str(raw_file_path),
+                    save_all=True,
+                    append_images=raw_frames[1:],
+                    duration=model.duration_in_msec,
+                    loop=0,  # 無限ループ
+                    lossless=True,  # 可逆圧縮
+                    quality=0,  # エンコード時間を最優先
+                    method=0,  # エンコード時間を最優先
+                )
 
-        # 正常終了
-        return gif_file_path
+        # NIME ディレクトリに保存
+        with PerfLogger("Save NIME Video"):
+            # NIME フレームを展開
+            nime_frames = [
+                f.pil_image
+                for f in model.iter_frames(ImageLayer.NIME)
+                if isinstance(f, AISImage)
+            ]
+
+            # 再生モードを反映
+            match playback_mode:
+                case PlaybackMode.FORWARD:
+                    pass
+                case PlaybackMode.BACKWARD:
+                    nime_frames.reverse()
+                case PlaybackMode.REFLECT:
+                    if len(nime_frames) >= 3:
+                        nime_frames = (
+                            nime_frames + [f for f in reversed(nime_frames)][1:-1]
+                        )
+                case _:
+                    raise RuntimeError()
+
+            # nime ディレクトリに動画ファイルを保存
+            nime_file_path = (
+                NIME_DIR_PATH
+                / f"{model.nime_name}__{model.time_stamp}{NIME_VIDEO_OUT_SUFFIX}"
+            )
+            nime_frames[0].save(
+                str(nime_file_path),
+                save_all=True,
+                append_images=nime_frames[1:],
+                duration=model.duration_in_msec,
+                quality=65,
+                subsampling="4:2:0",
+                speed=7,
+                range="full",
+                codec="auto",
+            )
+
+            # 正常終了
+            return nime_file_path
 
     else:
         raise TypeError(type(model))
 
 
-def load_content_model(
-    file_path: Path,
-    default_duration_in_msec: int = DFR_MAP.default_entry.duration_in_msec,
-) -> ImageModel | VideoModel:
+def load_content_model(file_path: Path) -> ImageModel | VideoModel:
     """
     file_path から画像を読み込む。
     画像・動画の両方に対応している。
@@ -1485,130 +1459,101 @@ def load_content_model(
     Returns:
         AISImage: 読み込んだ画像
     """
-    # 実際に読み込むべきファイルパスを解決する
-    if file_path.suffix.lower() in ALL_STILL_SUFFIXES:
-        raw_png_file_path_cand = list(
-            RAW_DIR_PATH.glob(f"**/{file_path.stem}{RAW_STILL_SUFFIX}")
-        )
-        if len(raw_png_file_path_cand) == 1:
-            actual_file_path = raw_png_file_path_cand[0]
-            gif_file_path = None
-        elif len(raw_png_file_path_cand) == 0 and file_path.exists():
-            actual_file_path = file_path
-            gif_file_path = None
-        elif len(raw_png_file_path_cand) > 1:
-            raise ValueError(f"Multiple {file_path.name} hits in {RAW_DIR_PATH}")
-        else:
-            raise FileNotFoundError(
-                f"{RAW_DIR_PATH}/**/{file_path.stem}{RAW_STILL_SUFFIX} or {file_path}"
-            )
-    elif file_path.suffix.lower() == NIME_VIDEO_SUFFIX:
-        raw_zip_file_path_cand = list(
-            RAW_DIR_PATH.glob(f"**/{file_path.stem}{RAW_VIDEO_SUFFIX}")
-        )
-        if len(raw_zip_file_path_cand) == 1:
-            actual_file_path = raw_zip_file_path_cand[0]
-            gif_file_path = file_path
-        elif len(raw_zip_file_path_cand) == 0 and file_path.exists():
-            actual_file_path = file_path
-            gif_file_path = file_path
-        elif len(raw_zip_file_path_cand) > 1:
-            raise ValueError(f"Multiple {file_path.name} hits in {RAW_DIR_PATH}")
-        else:
-            raise FileNotFoundError(
-                f"{RAW_DIR_PATH}/**/{file_path.stem}{RAW_VIDEO_SUFFIX} or {file_path}"
-            )
-    elif file_path.suffix.lower() == RAW_VIDEO_SUFFIX:
-        if file_path.exists():
-            actual_file_path = file_path
-            gif_file_path = None
-        else:
-            raise FileNotFoundError(f"{file_path}")
+    # 先に静画・動画を判定
+    # NOTE
+    #   webp はどっちもありえるので、ヘッダで判断する。
+    #   それ以外は拡張子で判断する。
+    if file_path.suffix == ".webp":
+        with Image.open(file_path) as im:
+            if getattr(im, "is_animated", False) and getattr(im, "n_frames", 1) > 1:
+                is_video = True
+            else:
+                is_video = False
+    elif file_path.suffix.lower() in ALL_STILL_INOUT_SUFFIXES:
+        is_video = False
+    elif file_path.suffix.lower() in ALL_VIDEO_INOUT_SUFFIXES:
+        is_video = True
     else:
         raise ValueError(
-            f"Unsuported file type. Only extensions {ALL_CONTENT_SUFFIXES} are supported."
+            f"Unsupported file type. Only extensions {ALL_CONTENT_INOUT_SUFFIXES} are supported."
         )
+
+    # 対応する RAW ファイル候補を列挙
+    if is_video:
+        raw_file_path_cands = [
+            p
+            for p in RAW_DIR_PATH.glob(f"**/{file_path.stem}.*")
+            if p.suffix.lower() in RAW_STILL_INOUT_SUFFIXES
+        ]
+    else:
+        raw_file_path_cands = [
+            p
+            for p in RAW_DIR_PATH.glob(f"**/{file_path.stem}.*")
+            if p.suffix.lower() in RAW_VIDEO_INOUT_SUFFIXES
+        ]
+
+    # 対応する RAW ファイルを確定させる
+    if len(raw_file_path_cands) >= 1:
+        raw_file_path = sorted(raw_file_path_cands)[0]
+    else:
+        raw_file_path = None
+
+    # 実際に読み込むべきファイルパスを解決する
+    if raw_file_path is not None:
+        actual_file_path = raw_file_path
+    else:
+        actual_file_path = file_path
 
     # 使用する NIEM 名・タイムスタンプを解決
     nime_name, time_stamp = parse_nime_file_stem(actual_file_path.stem)
     if time_stamp is None:
         time_stamp = current_time_stamp()
 
-    # 画像・動画を読み込む
-    if actual_file_path.suffix.lower() in ALL_STILL_SUFFIXES:
-        # 画像ファイルの場合はそのまま読み込む
-        pil_image = Image.open(actual_file_path).convert("RGB")
-        image_model = ImageModel(AISImage(pil_image), nime_name, time_stamp)
-        return image_model
-    elif actual_file_path.suffix.lower() == NIME_VIDEO_SUFFIX:
-        # 動画ファイルの場合はフレームを全て読み込む
-        video_model = VideoModel()
-        with VideoModelEditSession(video_model) as edit:
-            edit.set_nime_name(nime_name)
-            edit.set_time_stamp(time_stamp)
-            delays = []
-            with Image.open(actual_file_path) as img:
-                try:
-                    while True:
-                        pil_image = img.copy().convert("RGB")
-                        edit.append_frames(
-                            [ImageModel(AISImage(pil_image), nime_name, time_stamp)]
-                        )
-                        delays.append(
-                            img.info.get("duration", default_duration_in_msec)
-                        )
-                        img.seek(img.tell() + 1)
-                except EOFError:
-                    pass
-            avg_delay = round(sum(delays) / len(delays))
-            edit.set_duration_in_msec(avg_delay)
-        return video_model
-    elif actual_file_path.suffix.lower() == RAW_VIDEO_SUFFIX:
+    # コンテンツをロード
+    if is_video and actual_file_path.suffix.lower() == ".zip":
         # ZIP ファイルの場合、中身を連番静止画として読み込む
         # NOTE
         #   ZIP ファイルはこのアプリによって出力されたものであることを前提としている
         #   その中身は RAW_STILL_SUFFIX であることを前提としている
 
-        # 対応する gif ファイルからフレームレートをロード
-        if gif_file_path is None:
-            avg_delay = default_duration_in_msec
-        elif isinstance(gif_file_path, Path):
+        # 動画ファイルからフレームレートをロード
+        try:
             delays = []
-            with Image.open(gif_file_path) as img:
-                try:
-                    while True:
-                        delays.append(
-                            img.info.get("duration", default_duration_in_msec)
-                        )
+            with Image.open(file_path) as img:
+                while True:
+                    delays.append(
+                        img.info.get("duration", DFR_MAP.default_entry.duration_in_msec)
+                    )
+                    try:
                         img.seek(img.tell() + 1)
-                except EOFError:
-                    pass
+                    except EOFError:
+                        break
             avg_delay = round(sum(delays) / len(delays))
-        else:
-            raise TypeError(f"Invalid type {type(gif_file_path)}")
+        except Exception:
+            avg_delay = None
 
         # ビデオモデルを構築
-        video_model = VideoModel()
-        with VideoModelEditSession(video_model) as edit:
+        content_model = VideoModel()
+        with VideoModelEditSession(content_model) as edit:
             edit.set_nime_name(nime_name)
             edit.set_time_stamp(time_stamp)
-            edit.set_duration_in_msec(avg_delay)
+            if avg_delay is not None:
+                edit.set_duration_in_msec(avg_delay)
             with ZipFile(actual_file_path, "r") as zip_file:
                 file_list = zip_file.namelist()
                 for file_name in file_list:
                     # ステムを抽出
                     # NOTE
                     #   拡張子が想定通りじゃない場合はスキップ
-                    if not file_name.endswith(RAW_STILL_SUFFIX):
+                    file_name = Path(file_name)
+                    if file_name.suffix not in RAW_STILL_INOUT_SUFFIXES:
                         continue
-                    else:
-                        file_stem = file_name.replace(RAW_STILL_SUFFIX, "")
 
                     # フレームの有効・無効を解決する
                     # NOTE
                     #   ファイル名から解決する
                     #   なんかおかしい時は何も言わずに有効扱いする
-                    enable_match = re.search(r"_([de])$", file_stem)
+                    enable_match = re.search(r"_([de])$", file_name.stem)
                     if enable_match is None:
                         enable = True
                     else:
@@ -1622,18 +1567,44 @@ def load_content_model(
                     edit.append_frames(
                         ImageModel(
                             AISImage(
-                                Image.open(zip_file.open(file_name)).convert("RGB")
+                                Image.open(zip_file.open(file_name.name)).convert("RGB")
                             ),
                             nime_name,
                             time_stamp,
                             enable,
                         )
                     )
-
-        # 正常終了
-        return video_model
+    elif is_video:
+        # 動画ファイルの場合はそのまま読み込む
+        content_model = VideoModel()
+        with VideoModelEditSession(content_model) as edit:
+            edit.set_nime_name(nime_name)
+            edit.set_time_stamp(time_stamp)
+            delays = []
+            with Image.open(actual_file_path) as img:
+                try:
+                    while True:
+                        pil_image = img.copy().convert("RGB")
+                        edit.append_frames(
+                            [ImageModel(AISImage(pil_image), nime_name, time_stamp)]
+                        )
+                        delays.append(
+                            img.info.get(
+                                "duration", DFR_MAP.default_entry.duration_in_msec
+                            )
+                        )
+                        img.seek(img.tell() + 1)
+                except EOFError:
+                    pass
+            avg_delay = round(sum(delays) / len(delays))
+            edit.set_duration_in_msec(avg_delay)
     else:
-        raise ValueError("Logic Error")
+        # 画像ファイルの場合はそのまま読み込む
+        pil_image = Image.open(actual_file_path).convert("RGB")
+        content_model = ImageModel(AISImage(pil_image), nime_name, time_stamp)
+
+    # 正常終了
+    return content_model
 
 
 def _remove_unmatched_nime_raw_file():
@@ -1644,7 +1615,7 @@ def _remove_unmatched_nime_raw_file():
     nime_file_names = {
         p.name
         for p in NIME_DIR_PATH.glob("**/*.*")
-        if p.suffix.lower() in NIME_CONTENT_SUFFIXES
+        if p.suffix.lower() in NIME_CONTENT_INOUT_SUFFIXES
     }
 
     # RAW 側
@@ -1653,17 +1624,22 @@ def _remove_unmatched_nime_raw_file():
         if not raw_file_path.is_file():
             continue
 
-        # NIME 側の対応ファイル名を生成、想定外ならスキップ
-        raw_suffix = raw_file_path.suffix.lower()
-        if raw_suffix == RAW_STILL_SUFFIX:
-            expected_nime_file_name = raw_file_path.with_suffix(NIME_STILL_SUFFIX).name
-        elif raw_suffix == RAW_VIDEO_SUFFIX:
-            expected_nime_file_name = raw_file_path.with_suffix(NIME_VIDEO_SUFFIX).name
+        # NIME 側の想定拡張子を解決
+        # NOTE
+        #   RAW として想定してない拡張子ならスキップ
+        if raw_file_path.suffix.lower() in RAW_STILL_INOUT_SUFFIXES:
+            nime_suffixes = NIME_STILL_INOUT_SUFFIXES
+        elif raw_file_path.suffix.lower() in RAW_VIDEO_INOUT_SUFFIXES:
+            nime_suffixes = NIME_VIDEO_INOUT_SUFFIXES
         else:
             continue
 
         # NIME 側に対応するファイルが居るならスキップ
-        if expected_nime_file_name in nime_file_names:
+        expected_nime_file_names = {
+            raw_file_path.stem + expected_nime_suffix
+            for expected_nime_suffix in nime_suffixes
+        }
+        if not nime_file_names.isdisjoint(expected_nime_file_names):
             continue
 
         # 対応する NIME ファイルなしってことなので、 RAW ファイルを削除
@@ -1699,7 +1675,7 @@ def _archive_old_nime_files():
         for p, ts in {
             p: make_year_month_date(p.stem)
             for p in NIME_DIR_PATH.glob("*.*")
-            if p.is_file() and p.suffix.lower() in NIME_CONTENT_SUFFIXES
+            if p.is_file() and p.suffix.lower() in NIME_CONTENT_INOUT_SUFFIXES
         }.items()
         if ts is not None
     }
@@ -1734,13 +1710,13 @@ def _sync_nime_raw_relative_path():
     この２つを一致させる。
     不一致があった場合は raw 側を移動する。
     """
-    # RAW 側を事前に列挙
+    # RAW ファイル名 --> ファイルパス
     # NOTE
     #   同名ファイルが複数階層に存在するパターンなぞ知らん
     raw_file_name_to_path = {
         p.name: p
         for p in RAW_DIR_PATH.glob("**/*.*")
-        if p.is_file() and p.suffix.lower() in RAW_CONTENT_SUFFIXES
+        if p.is_file() and p.suffix.lower() in RAW_CONTENT_INOUT_SUFFIXES
     }
 
     # すべての NIME 画像に対して処理
@@ -1750,22 +1726,28 @@ def _sync_nime_raw_relative_path():
             continue
 
         # RAW 側の対応拡張子を解決、想定外の拡張子はスキップ
-        if nime_path.suffix == NIME_STILL_SUFFIX:
-            raw_suffix = RAW_STILL_SUFFIX
-        elif nime_path.suffix == NIME_VIDEO_SUFFIX:
-            raw_suffix = RAW_VIDEO_SUFFIX
+        if nime_path.suffix.lower() in NIME_STILL_INOUT_SUFFIXES:
+            raw_suffixes = RAW_STILL_INOUT_SUFFIXES
+        elif nime_path.suffix.lower() in NIME_VIDEO_INOUT_SUFFIXES:
+            raw_suffixes = RAW_VIDEO_INOUT_SUFFIXES
         else:
             continue
 
-        # 期待する RAW ファイルパスを解決、想定 RAW ファイルがなければスキップ
-        raw_file_name = nime_path.stem + raw_suffix
-        actual_raw_file_path = raw_file_name_to_path.get(raw_file_name)
+        # 対応する RAW ファイルパスを解決
+        actual_raw_file_path = None
+        for raw_suffix in raw_suffixes:
+            raw_file_name = nime_path.stem + raw_suffix
+            actual_raw_file_path = raw_file_name_to_path.get(raw_file_name)
+            if actual_raw_file_path is not None:
+                break
+
+        # 対応する RAW ファイルがなければスキップ
         if actual_raw_file_path is None:
             continue
 
         # RAW ファイルをあるべき場所に移動する
         nime_rel_path = nime_path.relative_to(NIME_DIR_PATH)
-        raw_rel_path = nime_rel_path.with_suffix(raw_suffix)
+        raw_rel_path = nime_rel_path.with_suffix(actual_raw_file_path.suffix)
         expected_raw_file_abs_path = RAW_DIR_PATH / raw_rel_path
         if actual_raw_file_path != expected_raw_file_abs_path:
             expected_raw_file_abs_path.parent.mkdir(parents=True, exist_ok=True)

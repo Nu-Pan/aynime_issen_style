@@ -122,7 +122,7 @@ class VideoCaptureFrame(AISFrame, TkinterDnD.DnDWrapper):
 
         # 出力関係フレーム
         # NOTE
-        #   使用する画像は与えられるものとして、それをどう gif 化するか？　これを担う
+        #   使用する画像は与えられるものとして、それをどう動画化するか？　これを担う
         self._output_kind_frame = AISFrame(self)
         self.ais.grid_child(self._output_kind_frame, 0, 0)
         self.ais.rowconfigure(0, weight=1)
@@ -215,7 +215,7 @@ class VideoCaptureFrame(AISFrame, TkinterDnD.DnDWrapper):
 
         # 入力関係フレーム
         # NOTE
-        #   gif にする画像の入力・削除・選定を行う
+        #   動画にする画像の入力・削除・選定を行う
         self._input_kind_frame = AISFrame(self)
         self.ais.grid_child(self._input_kind_frame, 1, 0)
         self.ais.rowconfigure(1, weight=0)
@@ -405,19 +405,19 @@ class VideoCaptureFrame(AISFrame, TkinterDnD.DnDWrapper):
         # 最低２フレーム必要
         video = self._model.video
         if video.num_enable_frames < 2:
-            show_error_dialog("gif の保存には最低でも 2 フレーム必要だよ")
+            show_error_dialog("動画の保存には最低でも 2 フレーム必要だよ")
             return
 
-        # gif ファイルとして保存
+        # 動画ファイルとして保存
         playback_mode = self._model.playback_mode
         try:
-            gif_file_path = save_content_model(video, playback_mode)
+            video_file_path = save_content_model(video, playback_mode)
         except Exception as e:
-            show_error_dialog("gif ファイルの保存に失敗", e)
+            show_error_dialog("動画ファイルの保存に失敗", e)
             return
 
         # クリップボードに転送
-        file_to_clipboard(gif_file_path)
+        file_to_clipboard(video_file_path)
 
         # クリップボード転送完了通知
         show_notify_label(self, "info", "「一閃」\nクリップボード転送完了")
