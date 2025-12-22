@@ -1338,8 +1338,8 @@ def save_content_model(
             str(still_file_path),
             format=NIME_STILL_OUT_PIL_FORMAT,
             lossless=False,
-            quality=92,
-            alpha_quality=92,
+            quality=88,
+            alpha_quality=88,
             method=6,
             exact=False,  # 透明画素の RGB 値は保持しない
         )
