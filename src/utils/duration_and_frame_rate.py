@@ -7,7 +7,7 @@ FILM_TIMELINE_IN_FPS = 24 * 1000 / 1001
 
 # 世の中的に標準的なフレームレートのリスト
 # NOTE
-#   60 fps はツールのメモリフットプリント的にも gif 的にも過剰なので除外
+#   60 fps は Discord, X(Twitter) の
 STANDARD_FRAME_RATES = sorted(
     [
         # 映画・えぃにめ向け
@@ -17,14 +17,6 @@ STANDARD_FRAME_RATES = sorted(
         FILM_TIMELINE_IN_FPS / 2.0,
         FILM_TIMELINE_IN_FPS / 3.0,
         FILM_TIMELINE_IN_FPS / 4.0,
-        # Youtube とかの動画・ライブ向け
-        # 60 FPS ベース
-        # 10 ~ 30 FPS の程よい範囲が対象
-        60.0 / 2.0,
-        60.0 / 3.0,
-        60.0 / 4.0,
-        60.0 / 5.0,
-        60.0 / 6.0,
     ]
 )
 
@@ -59,12 +51,13 @@ class DFREntry:
 class DFRMap:
     """
     Duration and Frame Rate Map
+    PIL でフレームレート指定が
     gif の更新周期の分解能が 10msec であることに端を発するマップ
     合法で意味のある周期・フレームレートを提供する
     モジュール外からのアクセスは GIF_DURATION_MAP の方を使うこと
     """
 
-    def __init__(self):
+    def __init__(self, duration_step_in_msec: int):
         """
         コンストラクタ
         """
@@ -74,11 +67,20 @@ class DFRMap:
         #   かつ gif 的に合法なフレームレートが対象
         min_frame_rate = min(STANDARD_FRAME_RATES)
         max_frame_rate = max(STANDARD_FRAME_RATES)
-        max_duration_in_sec = 10 * math.ceil(100 / min_frame_rate)
-        min_duration_in_sec = 10 * math.floor(100 / max_frame_rate)
+        num_steps_in_one_sec = 1000 / duration_step_in_msec
+        max_duration_in_sec = duration_step_in_msec * math.ceil(
+            num_steps_in_one_sec / min_frame_rate
+        )
+        min_duration_in_sec = duration_step_in_msec * math.floor(
+            num_steps_in_one_sec / max_frame_rate
+        )
         cands = [
             DFREntry(gd)
-            for gd in range(min_duration_in_sec, max_duration_in_sec + 10, 10)
+            for gd in range(
+                min_duration_in_sec,
+                max_duration_in_sec + duration_step_in_msec,
+                duration_step_in_msec,
+            )
         ]
 
         # 各標準フレームレートから、最も近い候補を選択
@@ -131,4 +133,6 @@ class DFRMap:
 
 
 # 合法で意味のある周期・フレームレートのマップ
-DFR_MAP = DFRMap()
+# NOTE
+#   PIL + .avif 想定で 1 msec 分解能を設定
+DFR_MAP = DFRMap(1)

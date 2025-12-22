@@ -186,7 +186,7 @@ def setup_logging():
     すべてのメッセージ出力 logging に集約したうえで、コンソール・ファイルに tee する。
     """
     # 定数
-    LOGGING_LEVEL = logging.DEBUG
+    LOGGING_LEVEL = logging.INFO
 
     # ログディレクトリを生成
     LOG_DIR_PATH.mkdir(parents=True, exist_ok=True)
