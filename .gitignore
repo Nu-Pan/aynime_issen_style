@@ -9,3 +9,4 @@ __pycache__
 /log/
 /memo.md
 *.egg-info
+/proposal/*
