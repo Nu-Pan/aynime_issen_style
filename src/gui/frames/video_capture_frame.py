@@ -71,7 +71,9 @@ class PlaybackModeSelectionFrame(AISFrame):
         self.ais.rowconfigure(0, weight=1)
 
         # 再生モード変数
-        self._playback_mode_var = ctk.StringVar(value=self._model.playback_mode.value)
+        self._playback_mode_var = ctk.StringVar(
+            value=self._model.video.playback_mode.value
+        )
 
         # 再生モードラジオボタン
         self._radio_buttons: list[ctk.CTkRadioButton] = []
@@ -92,7 +94,8 @@ class PlaybackModeSelectionFrame(AISFrame):
         """
         再生モードラジオボタンに変化があった時に呼び出されるハンドラ
         """
-        self._model.playback_mode = PlaybackMode(self._playback_mode_var.get())
+        with VideoModelEditSession(self._model.video) as edit:
+            edit.set_playback_mode(PlaybackMode(self._playback_mode_var.get()))
 
 
 class VideoCaptureFrame(AISFrame, TkinterDnD.DnDWrapper):
@@ -131,7 +134,9 @@ class VideoCaptureFrame(AISFrame, TkinterDnD.DnDWrapper):
         self._output_kind_frame.ais.columnconfigure(0, weight=1)
 
         # 動画プレビュー
-        self._video_preview_label = VideoLabel(self._output_kind_frame, self._model)
+        self._video_preview_label = VideoLabel(
+            self._output_kind_frame, self._model.video
+        )
         self._output_kind_frame.ais.grid_child(self._video_preview_label, 0, 0, 1, 2)
         self._output_kind_frame.ais.rowconfigure(0, weight=1)
 
@@ -403,15 +408,14 @@ class VideoCaptureFrame(AISFrame, TkinterDnD.DnDWrapper):
         セーブボタンクリックハンドラ
         """
         # 最低２フレーム必要
-        video = self._model.video
-        if video.num_enable_frames < 2:
+        video_model = self._model.video
+        if video_model.num_enable_frames < 2:
             show_error_dialog("動画の保存には最低でも 2 フレーム必要だよ")
             return
 
         # 動画ファイルとして保存
-        playback_mode = self._model.playback_mode
         try:
-            video_file_path = save_content_model(video, playback_mode)
+            video_file_path = save_content_model(video_model)
         except Exception as e:
             show_error_dialog("動画ファイルの保存に失敗", e)
             return

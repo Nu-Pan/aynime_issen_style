@@ -23,4 +23,4 @@ class AynimeIssenStyleModel:
         self.window_selection_image = ImageModel()
         self.still = ImageModel()
         self.video = VideoModel()
-        self.playback_mode = PlaybackMode.FORWARD
+        self.foreign = VideoModel()

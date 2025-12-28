@@ -19,6 +19,7 @@ from utils.ctk import place_window_to_display_center
 from gui.frames.window_selection_frame import WindowSelectionFrame
 from gui.frames.still_capture_frame import StillCaptureFrame
 from gui.frames.video_capture_frame import VideoCaptureFrame
+from gui.frames.foreign_export_frame import ForeignExportFrame
 from gui.frames.version_frame import VersionFrame
 
 # local
@@ -85,6 +86,14 @@ class AynimeIssenStyleApp(ctk.CTk, TkinterDnD.DnDWrapper):
             self.model,
         )
         self.video_capture_frame.pack(fill="both", expand=True)
+
+        # 外部サービスエクスポートタブを追加
+        self.tabview.add(ForeignExportFrame.UI_TAB_NAME)
+        self.foregin_export_frame = ForeignExportFrame(
+            self.tabview.tab(ForeignExportFrame.UI_TAB_NAME),
+            self.model,
+        )
+        self.foregin_export_frame.pack(fill="both", expand=True)
 
         # バージョン情報タブを追加
         self.tabview.add(VersionFrame.UI_TAB_NAME)

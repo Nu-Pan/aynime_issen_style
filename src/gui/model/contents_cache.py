@@ -215,6 +215,90 @@ class CachedSourceImage(CachedContent):
         return self._source
 
 
+class CachedCropSquareImage(CachedContent):
+    """
+    正方形領域の切り出しとそのキャッシュ機能を持つ画像クラス
+    """
+
+    type Output = AISImage
+
+    def __init__(self, parent: CachedContent):
+        """
+        コンストラクタ
+        """
+        super().__init__(parent)
+        self._size_ratio = None
+        self._x_ratio = None
+        self._y_ratio = None
+        self._output: AISImage | None = None
+
+    def set_crop_param(
+        self, size_ratio: float | None, x_ratio: float | None, y_ratio: float | None
+    ) -> Self:
+        """
+        切り出しパラメータを設定する
+        元画像上のどこを切り出すか？　これを決める
+        位置・サイズ共に元画像に対する比率で指定する
+        """
+        if (
+            self._size_ratio != size_ratio
+            or self._x_ratio != x_ratio
+            or self._y_ratio != y_ratio
+        ):
+            self._size_ratio = size_ratio
+            self._x_ratio = x_ratio
+            self._y_ratio = y_ratio
+            self.mark_dirty()
+        return self
+
+    @property
+    def crop_param(self) -> tuple[float | None, float | None, float | None]:
+        """
+        切り出しパラメータを取得する
+        """
+        return self._size_ratio, self._x_ratio, self._y_ratio
+
+    @property
+    def output(self) -> AISImage | None:
+        """
+        出力を取得する
+        ダーティー状態は暗黙に解決される。
+        """
+        # ダーティ状態を解消
+        if self.is_dirty:
+            # 必要なものが…
+            parent_output = self.parent_output
+            if (
+                isinstance(parent_output, AISImage)
+                and self._size_ratio is not None
+                and self._x_ratio is not None
+                and self._y_ratio is not None
+            ):
+                # すべて揃っている場合、更新
+                square_size = min(parent_output.width, parent_output.height)
+                left = max(
+                    0, round(self._x_ratio * parent_output.width - square_size / 2)
+                )
+                top = max(
+                    0, round(self._y_ratio * parent_output.height - square_size / 2)
+                )
+                right = min(parent_output.width, left + square_size)
+                bottom = min(parent_output.width, top + square_size)
+                self._output = AISImage(
+                    parent_output.pil_image.crop((left, top, right, bottom))
+                )
+            elif isinstance(parent_output, AISImage):
+                # 元画像はあるけど切り出しパラメータが未指定なら、パススルー
+                self._output = parent_output
+            else:
+                # 画像すらない場合、単にクリア
+                self._output = None
+            self.mark_resolved()
+
+        # 正常終了
+        return self._output
+
+
 class CachedScalableImage(CachedContent):
     """
     拡大縮小とそのキャッシュ機能を持つ画像クラス
@@ -645,8 +729,11 @@ class ImageModel:
         """
         # 各画像メンバ
         self._raw_image = CachedSourceImage()
+        self._crop_square_image = CachedCropSquareImage(self._raw_image)
         self._nime_image = CachedScalableImage(
-            self._raw_image, ResizeMode.COVER, aux_process=self._aux_process_nime
+            self._crop_square_image,
+            ResizeMode.COVER,
+            aux_process=self._aux_process_nime,
         )
         self._preview_pil_image = CachedScalableImage(
             self._nime_image, ResizeMode.CONTAIN
@@ -865,6 +952,29 @@ class ImageModelEditSession:
         # 正常終了
         return self
 
+    def set_crop_param(
+        self, size_ratio: float | None, x_ratio: float | None, y_ratio: float | None
+    ) -> Self:
+        """
+        正方形切り出しのパラメータを設定する。
+        パラメータに１つでも None が混じっている場合、切り出しを行わない。
+        初期値はすべて None になっている。
+
+        size_ratio:
+            正方形の大きさ
+            元画像の短辺側に対する比率で指定
+
+        x_ratio:
+            正方形の中心位置（水平）
+            元画像の横幅に対する比率で指定
+
+        y_ratio:
+            正方形の中心位置（垂直）
+            元画像の高さに対する比率で指定
+        """
+        self._model._crop_square_image.set_crop_param(size_ratio, x_ratio, y_ratio)
+        return self
+
     def set_enable(self, enable: bool) -> Self:
         """
         モデルの有効・無効を切り替える
@@ -898,6 +1008,12 @@ class ImageModelEditSession:
         return self
 
 
+class PlaybackMode(Enum):
+    FORWARD = "FORWARD"
+    BACKWARD = "BACKWARD"
+    REFLECT = "REFLECT"
+
+
 class VideoModel:
     """
     動画を表すクラス
@@ -908,15 +1024,22 @@ class VideoModel:
         """
         コンストラクタ
         """
-        # 各メンバを初期化
+        # モデル
         # NOTE
         #   サイズとかの全フレーム共通の情報は self._global_model をマスターとして管理する
         #   フレーム個別の情報は self._frame で管理する
         self._global_model = ImageModel()
         self._frames: list[ImageModel] = []
+
+        # 再生時の更新間隔
         self._duration_in_msec = DFR_MAP.default_entry.duration_in_msec
         self._duration_is_dirty = False
         self._duration_change_handlers: list[NotifyHandler] = []
+
+        # 再生モード
+        self._playback_mode = PlaybackMode.FORWARD
+        self._playback_mode_is_dirty = False
+        self._playback_mode_change_handlers: list[NotifyHandler] = []
 
     @property
     def nime_name(self) -> str | None:
@@ -984,9 +1107,16 @@ class VideoModel:
     @property
     def duration_in_msec(self) -> int:
         """
-        再生フレームレート
+        再生時の更新間隔
         """
         return self._duration_in_msec
+
+    @property
+    def playback_mode(self) -> PlaybackMode:
+        """
+        再生モード
+        """
+        return self._playback_mode
 
     def register_notify_handler(self, layer: ImageLayer, handler: NotifyHandler):
         """
@@ -997,9 +1127,15 @@ class VideoModel:
 
     def register_duration_change_handler(self, handler: NotifyHandler):
         """
-        フレームレート変更ハンドラーを登録する
+        再生時更新間隔の変更ハンドラーを登録する
         """
         self._duration_change_handlers.append(handler)
+
+    def register_playback_mode_change_handler(self, handler: NotifyHandler):
+        """
+        再生モードの変更ハンドラーを登録する
+        """
+        self._playback_mode_change_handlers.append(handler)
 
 
 class VideoModelEditSession:
@@ -1258,7 +1394,7 @@ class VideoModelEditSession:
 
     def set_duration_in_msec(self, duration_in_msec: int) -> Self:
         """
-        再生フレームレートを設定する
+        再生時更新間隔を設定する
         """
         model = self._model
         if model._duration_in_msec != duration_in_msec:
@@ -1266,24 +1402,21 @@ class VideoModelEditSession:
             model._duration_is_dirty |= True
         return self
 
+    def set_playback_mode(self, playback_mode: PlaybackMode) -> Self:
+        """
+        再生モードを設定する
+        """
+        model = self._model
+        if model._playback_mode != playback_mode:
+            model._playback_mode = playback_mode
+            model._playback_mode_is_dirty |= True
+        return self
 
-class PlaybackMode(Enum):
-    FORWARD = "FORWARD"
-    BACKWARD = "BACKWARD"
-    REFLECT = "REFLECT"
 
-
-def save_content_model(
-    model: ImageModel | VideoModel,
-    playback_mode: PlaybackMode = PlaybackMode.FORWARD,
-) -> Path:
+def save_content_model(model: ImageModel | VideoModel) -> Path:
     """
     model をファイル保存する。
     画像・動画の両方に対応している。
-
-    Args:
-        model: 保存したいモデル
-        palyback_mode:
 
     Return:
         Path: 保存先ファイルパス
@@ -1365,7 +1498,7 @@ def save_content_model(
                 ]
 
                 # 再生モードを反映
-                match playback_mode:
+                match model.playback_mode:
                     case PlaybackMode.FORWARD:
                         pass
                     case PlaybackMode.BACKWARD:
@@ -1406,7 +1539,7 @@ def save_content_model(
             ]
 
             # 再生モードを反映
-            match playback_mode:
+            match model.playback_mode:
                 case PlaybackMode.FORWARD:
                     pass
                 case PlaybackMode.BACKWARD:
@@ -1483,13 +1616,13 @@ def load_content_model(file_path: Path) -> ImageModel | VideoModel:
         raw_file_path_cands = [
             p
             for p in RAW_DIR_PATH.glob(f"**/{file_path.stem}.*")
-            if p.suffix.lower() in RAW_STILL_INOUT_SUFFIXES
+            if p.suffix.lower() in RAW_VIDEO_INOUT_SUFFIXES
         ]
     else:
         raw_file_path_cands = [
             p
             for p in RAW_DIR_PATH.glob(f"**/{file_path.stem}.*")
-            if p.suffix.lower() in RAW_VIDEO_INOUT_SUFFIXES
+            if p.suffix.lower() in RAW_STILL_INOUT_SUFFIXES
         ]
 
     # 対応する RAW ファイルを確定させる
