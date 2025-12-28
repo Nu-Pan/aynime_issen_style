@@ -232,7 +232,7 @@ class CachedCropSquareImage(CachedContent):
         self._y_ratio = None
         self._output: AISImage | None = None
 
-    def set_crop_param(
+    def set_crop_params(
         self, size_ratio: float | None, x_ratio: float | None, y_ratio: float | None
     ) -> Self:
         """
@@ -252,7 +252,7 @@ class CachedCropSquareImage(CachedContent):
         return self
 
     @property
-    def crop_param(self) -> tuple[float | None, float | None, float | None]:
+    def crop_params(self) -> tuple[float | None, float | None, float | None]:
         """
         切り出しパラメータを取得する
         """
@@ -275,17 +275,29 @@ class CachedCropSquareImage(CachedContent):
                 and self._y_ratio is not None
             ):
                 # すべて揃っている場合、更新
-                square_size = min(parent_output.width, parent_output.height)
-                left = max(
-                    0, round(self._x_ratio * parent_output.width - square_size / 2)
+                square_size = self._size_ratio * min(
+                    parent_output.width, parent_output.height
                 )
-                top = max(
-                    0, round(self._y_ratio * parent_output.height - square_size / 2)
-                )
-                right = min(parent_output.width, left + square_size)
-                bottom = min(parent_output.width, top + square_size)
+                left = self._x_ratio * parent_output.width - square_size / 2
+                right = self._x_ratio * parent_output.width + square_size / 2
+                if left < 0:
+                    left = 0
+                    right = square_size
+                elif right > parent_output.width:
+                    left = parent_output.width - square_size
+                    right = parent_output.width
+                top = self._y_ratio * parent_output.height - square_size / 2
+                bottom = self._y_ratio * parent_output.height + square_size / 2
+                if top < 0:
+                    top = 0
+                    bottom = square_size
+                elif bottom > parent_output.height:
+                    top = parent_output.height - square_size
+                    bottom = parent_output.height
                 self._output = AISImage(
-                    parent_output.pil_image.crop((left, top, right, bottom))
+                    parent_output.pil_image.crop(
+                        (round(left), round(top), round(right), round(bottom))
+                    )
                 )
             elif isinstance(parent_output, AISImage):
                 # 元画像はあるけど切り出しパラメータが未指定なら、パススルー
@@ -779,6 +791,13 @@ class ImageModel:
         """
         return self._enable
 
+    @property
+    def crop_params(self) -> tuple[float | None, float | None, float | None]:
+        """
+        切り出しパラメータを取得する
+        """
+        return self._crop_square_image.crop_params
+
     def get_size(self, layer: ImageLayer) -> ResizeDesc:
         """
         指定 layer のリサイズ挙動を取得する。
@@ -952,7 +971,18 @@ class ImageModelEditSession:
         # 正常終了
         return self
 
-    def set_crop_param(
+    def set_enable(self, enable: bool) -> Self:
+        """
+        モデルの有効・無効を切り替える
+        """
+        model = self._model
+        if model._enable != enable:
+            model._enable = enable
+            model._thumbnail_pil_image_enable.mark_dirty()
+            model._thumbnail_pil_image_disable.mark_dirty()
+        return self
+
+    def set_crop_params(
         self, size_ratio: float | None, x_ratio: float | None, y_ratio: float | None
     ) -> Self:
         """
@@ -972,18 +1002,7 @@ class ImageModelEditSession:
             正方形の中心位置（垂直）
             元画像の高さに対する比率で指定
         """
-        self._model._crop_square_image.set_crop_param(size_ratio, x_ratio, y_ratio)
-        return self
-
-    def set_enable(self, enable: bool) -> Self:
-        """
-        モデルの有効・無効を切り替える
-        """
-        model = self._model
-        if model._enable != enable:
-            model._enable = enable
-            model._thumbnail_pil_image_enable.mark_dirty()
-            model._thumbnail_pil_image_disable.mark_dirty()
+        self._model._crop_square_image.set_crop_params(size_ratio, x_ratio, y_ratio)
         return self
 
     def set_size(self, layer: ImageLayer, size: ResizeDesc) -> Self:
@@ -1060,6 +1079,13 @@ class VideoModel:
         指定フレームの有効・無効を取得する
         """
         return self._frames[frame_index].enable
+
+    @property
+    def crop_params(self) -> tuple[float | None, float | None, float | None]:
+        """
+        切り出しパラメータを取得する
+        """
+        return self._global_model.crop_params
 
     def get_size(self, layer: ImageLayer) -> ResizeDesc:
         """
@@ -1268,6 +1294,27 @@ class VideoModelEditSession:
         # 正常終了
         return self
 
+    def set_crop_params(
+        self, size_ratio: float | None, x_ratio: float | None, y_ratio: float | None
+    ) -> Self:
+        """
+        正方形切り出しのパラメータを設定する。
+        """
+        # エイリアス
+        model = self._model
+
+        # 各フレーム
+        for frame in model._frames:
+            with ImageModelEditSession(frame, _does_notify=False) as e:
+                e.set_crop_params(size_ratio, x_ratio, y_ratio)
+
+        # グローバル
+        with ImageModelEditSession(model._global_model, _does_notify=False) as e:
+            e.set_crop_params(size_ratio, x_ratio, y_ratio)
+
+        # 正常終了
+        return self
+
     def set_size(self, layer: ImageLayer, size: ResizeDesc) -> Self:
         """
         フレームサイズを設定する
@@ -1317,15 +1364,12 @@ class VideoModelEditSession:
             # ImageModel の場合、通常の追加フロー
 
             with ImageModelEditSession(new_obj, _does_notify=False) as e:
-                # サイズを統一
+                # いろいろ統一
+                e.set_crop_params(*model._global_model.crop_params)
                 for layer in ImageLayer:
                     if layer != ImageLayer.RAW:
                         e.set_size(layer, model._global_model.get_size(layer))
-
-                # タイムスタンプを統一
                 e.set_time_stamp(model._global_model.time_stamp)
-
-                # アニメ名を統一
                 e.set_nime_name(model._global_model.nime_name)
 
                 # フレームリストに挿入
