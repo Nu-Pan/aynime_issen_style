@@ -40,6 +40,7 @@ VERSION_FILE_PATH = Path("src\\utils\\version_constants.py")
 #   nime はリサイズなどの処理適用済みの最終結果画像の保存先
 #   raw は処理適用前のオリジナルのキャプチャ画像の保存先
 NIME_DIR_PATH = Path.cwd() / "nime"
+TENSEI_DIR_PATH = Path.cwd() / "tensei"
 RAW_DIR_PATH = Path.cwd() / "raw"
 LOG_DIR_PATH = Path.cwd() / "log"
 

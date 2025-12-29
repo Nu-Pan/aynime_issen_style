@@ -1,44 +1,109 @@
 # std
-from typing import cast
+from typing import cast, Callable
 from pathlib import Path
+from enum import Enum
+
 
 # Tk/CTk
 import customtkinter as ctk
 from tkinterdnd2 import TkinterDnD, DND_FILES
 from tkinterdnd2.TkinterDnD import DnDEvent
-from tkinter import Event
 
 # utils
-from utils.image import AspectRatioPattern, ResolutionPattern, ResizeDesc
-from gui.model.contents_cache import (
-    ImageModel,
-    VideoModel,
-    save_content_model,
-    load_content_model,
-    ImageModelEditSession,
-)
+from utils.image import AspectRatioPattern, Resolution, ResolutionPattern, ResizeDesc
 from utils.windows import file_to_clipboard
 from utils.ctk import show_notify_label, show_error_dialog
 from utils.capture import *
-from utils.constants import CAPTURE_FRAME_BUFFER_DURATION_IN_SEC
+from utils.constants import (
+    DEFAULT_FONT_FAMILY,
+    WIDGET_MIN_WIDTH,
+    TENSEI_DIR_PATH,
+)
 from utils.duration_and_frame_rate import (
-    FILM_TIMELINE_IN_FPS,
-    STANDARD_FRAME_RATES,
-    DFREntry,
     DFR_MAP,
 )
+from utils.image import apply_color_palette
 
 # gui
-from gui.widgets.still_label import StillLabel
-from gui.widgets.size_pattern_selection_frame import (
-    SizePatternSlectionFrame,
-)
 from gui.widgets.ais_frame import AISFrame
-from gui.widgets.ais_entry import AISEntry
 from gui.widgets.ais_slider import AISSlider
 from gui.widgets.video_label import VideoLabel, VideoModelEditSession
-from gui.model.contents_cache import ImageLayer
 from gui.model.aynime_issen_style import AynimeIssenStyleModel
+from gui.model.contents_cache import (
+    ImageLayer,
+    PlaybackMode,
+    ImageModel,
+    VideoModel,
+    load_content_model,
+)
+
+
+type NotifyHandler = Callable[[], None]
+
+
+class ExportTarget(Enum):
+    DISCORD_EMOJI = "Discord Emoji"
+    DISCORD_STAMP = "Discord Stamp"
+    X_TWITTER = "X(Twitter)"
+
+
+class ExportTargetRadioFrame(AISFrame):
+    """
+    エクスポート先を選択する用のラジオボタンを格納するフレーム
+    """
+
+    def __init__(self, master: ctk.CTkBaseClass, **kwargs):
+        """
+        コンストラクタ
+        """
+        super().__init__(master, **kwargs)
+
+        # フォントを生成
+        default_font = ctk.CTkFont(DEFAULT_FONT_FAMILY)
+
+        # レイアウト設定
+        self.ais.rowconfigure(0, weight=1)
+
+        # 再生モード変数
+        self._export_targe_var = ctk.StringVar(value=ExportTarget.X_TWITTER.value)
+
+        # 再生モードラジオボタン
+        self._radio_buttons: list[ctk.CTkRadioButton] = []
+        for i, export_target in enumerate(ExportTarget):
+            radio_button = ctk.CTkRadioButton(
+                self,
+                text=export_target.value,
+                variable=self._export_targe_var,
+                value=export_target.value,
+                command=self._on_radio_button_changed,
+                font=default_font,
+            )
+            self.ais.grid_child(radio_button, 0, i, sticky="ns")
+            self.ais.columnconfigure(i, weight=1)
+            self._radio_buttons.append(radio_button)
+
+        # ハンドラリスト
+        self._handlers: list[NotifyHandler] = []
+
+    @property
+    def value(self) -> ExportTarget:
+        """
+        現在選択されている値を取得
+        """
+        return ExportTarget(self._export_targe_var.get())
+
+    def register_on_radio_button_changed(self, handler: NotifyHandler):
+        """
+        再生モードラジオボタンに変化があった時に呼び出されるハンドラを登録する
+        """
+        self._handlers.append(handler)
+
+    def _on_radio_button_changed(self):
+        """
+        再生モードラジオボタンに変化があった時に呼び出されるハンドラ
+        """
+        for handler in self._handlers:
+            handler()
 
 
 class ForeignExportFrame(AISFrame, TkinterDnD.DnDWrapper):
@@ -66,8 +131,15 @@ class ForeignExportFrame(AISFrame, TkinterDnD.DnDWrapper):
 
         # 切り取り結果プレビュー
         self._preview_label = VideoLabel(self, model.foreign, "Drop NIME File HERE")
-        self.ais.grid_child(self._preview_label, 0, 0)
+        self.ais.grid_child(self._preview_label, 0, 0, 1, 2)
         self.ais.rowconfigure(0, weight=1)
+
+        # エクスポート先ラジオボタン
+        self._export_target_radio = ExportTargetRadioFrame(self)
+        self.ais.grid_child(self._export_target_radio, 1, 0)
+        self._export_target_radio.register_on_radio_button_changed(
+            self._on_widget_parameter_changed
+        )
 
         # 切り出し正方形サイズスライダー
         self._crop_square_size_slider = AISSlider(
@@ -78,10 +150,10 @@ class ForeignExportFrame(AISFrame, TkinterDnD.DnDWrapper):
             lambda x: f"{round(x * 100):3d}",
             "%",
         )
-        self.ais.grid_child(self._crop_square_size_slider, 1, 0)
+        self.ais.grid_child(self._crop_square_size_slider, 2, 0)
         self._crop_square_size_slider.set_value(1.0)
         self._crop_square_size_slider.register_handler(
-            self._on_crop_square_param_slider_changed
+            lambda _: self._on_widget_parameter_changed()
         )
 
         # 切り出し正方形 X 位置スライダー
@@ -93,10 +165,10 @@ class ForeignExportFrame(AISFrame, TkinterDnD.DnDWrapper):
             lambda x: f"{x * 100:5.1f}",
             "%",
         )
-        self.ais.grid_child(self._crop_square_x_slider, 2, 0)
+        self.ais.grid_child(self._crop_square_x_slider, 3, 0)
         self._crop_square_x_slider.set_value(0.5)
         self._crop_square_x_slider.register_handler(
-            self._on_crop_square_param_slider_changed
+            lambda _: self._on_widget_parameter_changed()
         )
 
         # 切り出し正方形 Y 位置スライダー
@@ -108,10 +180,10 @@ class ForeignExportFrame(AISFrame, TkinterDnD.DnDWrapper):
             lambda x: f"{x * 100:5.1f}",
             "%",
         )
-        self.ais.grid_child(self._crop_square_y_slider, 3, 0)
+        self.ais.grid_child(self._crop_square_y_slider, 4, 0)
         self._crop_square_y_slider.set_value(0.5)
         self._crop_square_y_slider.register_handler(
-            self._on_crop_square_param_slider_changed
+            lambda _: self._on_widget_parameter_changed()
         )
 
         # モデル側切り出しパラメータ変更ハンドラ
@@ -119,43 +191,227 @@ class ForeignExportFrame(AISFrame, TkinterDnD.DnDWrapper):
             self._on_crop_square_param_changed
         )
 
-        # 現在の GUI 表示をモデルに反映
-        self._on_crop_square_param_slider_changed(0.0)
+        # セーブボタン
+        self._save_button = ctk.CTkButton(
+            self,
+            text="SAVE",
+            width=2 * WIDGET_MIN_WIDTH,
+            command=self._on_save_button_clicked,
+        )
+        self.ais.grid_child(self._save_button, 1, 1, 4, 1)
 
         # ファイルドロップ関係
         self.drop_target_register(DND_FILES)
         self.dnd_bind("<<Drop>>", self._on_drop_file)
 
-    def _on_crop_square_param_slider_changed(self, _: float):
-        """
-        切り出し正方形サイズスライダーハンドラ
+        # UI 初期設定
+        # NOTE
+        #   シンプルにハンドラを直接呼び出す
+        self._on_widget_parameter_changed()
 
-        Args:
-            value (float): スライダー値
+    def _on_widget_parameter_changed(self):
         """
-        if (
-            self._crop_square_size_slider.value is not None
-            and self._crop_square_x_slider.value is not None
-            and self._crop_square_y_slider.value is not None
-        ):
-            with VideoModelEditSession(self._model.foreign) as edit:
-                edit.set_crop_params(
-                    self._crop_square_size_slider.value,
-                    self._crop_square_x_slider.value,
-                    self._crop_square_y_slider.value,
-                )
+        UI 上のパラメータが変更された時に呼び出されるハンドラ
+        """
+        # オーバーレイ有効・無効
+        if self._export_target_radio.value in [
+            ExportTarget.DISCORD_EMOJI,
+            ExportTarget.DISCORD_STAMP,
+        ]:
+            overlay_nime_name = False
+        else:
+            overlay_nime_name = True
+
+        # 適切な切り出しパラメータ
+        if self._export_target_radio.value in [
+            ExportTarget.DISCORD_EMOJI,
+            ExportTarget.DISCORD_STAMP,
+        ]:
+            crop_params = (
+                self._crop_square_size_slider.value,
+                self._crop_square_x_slider.value,
+                self._crop_square_y_slider.value,
+            )
+        else:
+            crop_params = (None, None, None)
+
+        # リサイズパラメータ
+        if self._export_target_radio.value == ExportTarget.DISCORD_EMOJI:
+            nime_resize_desc = ResizeDesc(
+                AspectRatioPattern.E_1_1, ResolutionPattern.E_DISCORD_EMOJI
+            )
+        elif self._export_target_radio.value == ExportTarget.DISCORD_STAMP:
+            nime_resize_desc = ResizeDesc(
+                AspectRatioPattern.E_1_1, ResolutionPattern.E_DISCORD_STAMP
+            )
+        elif self._export_target_radio.value == ExportTarget.X_TWITTER:
+            # NOTE
+            #   X(Twitter) の上限は長辺 4096px
+            nime_resize_desc = ResizeDesc(
+                AspectRatioPattern.E_RAW,
+                Resolution(4096, 4096, "X(Twitter) Limitation"),
+            )
+        else:
+            raise ValueError("Invalid ExportTarget")
+
+        # モデルに切り出し・リサイズを設定
+        with VideoModelEditSession(self._model.foreign) as edit:
+            edit.set_overlay_nime_name(overlay_nime_name)
+            edit.set_crop_params(*crop_params)
+            edit.set_size(ImageLayer.NIME, nime_resize_desc)
 
     def _on_crop_square_param_changed(self):
         """
-        ビデオモデルフレームレート変更ハンドラ
+        モデル側の切り出し正方形の変更ハンドラ
         """
         size_ratio, x_ratio, y_ratio = self._model.foreign.crop_params
-        if size_ratio is not None:
+        if size_ratio is not None and self._crop_square_size_slider.value != size_ratio:
             self._crop_square_size_slider.set_value(size_ratio)
-        if x_ratio is not None:
+        if x_ratio is not None and self._crop_square_x_slider.value != x_ratio:
             self._crop_square_x_slider.set_value(x_ratio)
-        if y_ratio is not None:
+        if y_ratio is not None and self._crop_square_y_slider.value != y_ratio:
             self._crop_square_y_slider.set_value(y_ratio)
+
+    def _on_save_button_clicked(self):
+        """
+        エクスポートボタンクリックハンドラ
+        """
+        # スチル・ビデオを解決、ロードされてなければなにもしない
+        model = self._model.foreign
+        if model.num_total_frames < 1:
+            return
+        elif model.num_total_frames == 1:
+            is_still = True
+        else:
+            is_still = False
+
+        # エクスポートファイルの仕様を決定
+        if self._export_target_radio.value == ExportTarget.DISCORD_EMOJI:
+            subdir_name = "discord_emoji"
+            if is_still:
+                file_suffix = ".png"
+            else:
+                file_suffix = ".avif"
+        elif self._export_target_radio.value == ExportTarget.DISCORD_STAMP:
+            subdir_name = "discord_stamp"
+            if is_still:
+                file_suffix = ".png"
+            else:
+                file_suffix = ".gif"
+        elif self._export_target_radio.value == ExportTarget.X_TWITTER:
+            subdir_name = "x_twitter"
+            if is_still:
+                file_suffix = ".jpg"
+            else:
+                file_suffix = ".gif"
+        else:
+            raise ValueError(self._export_target_radio.value)
+
+        # 出力ファイルパスを構築
+        save_file_path = (
+            TENSEI_DIR_PATH
+            / subdir_name
+            / f"{model.nime_name}__{model.time_stamp}{file_suffix}"
+        )
+
+        # エクスポート処理実行
+        # NOTE
+        #   エクスポートは NIME, RAW とは事情が異なるので、
+        #   save_content_model を使わず、
+        #   ここで直接ファイル出力を書く。
+        save_file_path.parent.mkdir(parents=True, exist_ok=True)
+        if is_still:
+            # スチルを解決
+            ais_image = model.get_frame(ImageLayer.NIME, 0)
+            if ais_image is None:
+                raise ValueError("Frame 0 is None")
+            else:
+                pil_image = ais_image.pil_image
+
+            # PIL でファイル出力
+            if file_suffix == ".png":
+                pil_image.save(
+                    str(save_file_path), format="PNG", optimize=True, compress_level=9
+                )
+            elif file_suffix == ".jpg":
+                ais_image.pil_image.save(
+                    str(save_file_path),
+                    format="JPEG",
+                    quality=92,
+                    subsampling=0,
+                    optimize=True,
+                    progressive=True,
+                )
+            else:
+                raise ValueError(f"Invalid still file_suffix ({file_suffix})")
+        else:
+            # 動画フレームを解決
+            pil_frames = [
+                f.pil_image for f in model.iter_frames(ImageLayer.NIME) if f is not None
+            ]
+
+            # gif なら 256 色カラーパレット化
+            if file_suffix == ".gif":
+                pil_frames = apply_color_palette(pil_frames)
+
+            # 再生モードを反映
+            match model.playback_mode:
+                case PlaybackMode.FORWARD:
+                    pass
+                case PlaybackMode.BACKWARD:
+                    pil_frames.reverse()
+                case PlaybackMode.REFLECT:
+                    if len(pil_frames) >= 3:
+                        pil_frames = (
+                            pil_frames + [f for f in reversed(pil_frames)][1:-1]
+                        )
+                case _:
+                    raise ValueError(f"Invalid PlaybaclMode ({model.playback_mode})")
+
+            # PIL でファイル出力
+            if file_suffix == ".avif":
+                pil_frames[0].save(
+                    str(save_file_path),
+                    save_all=True,
+                    append_images=pil_frames[1:],
+                    duration=model.duration_in_msec,
+                    quality=60,
+                    subsampling="4:2:0",
+                    speed=2,
+                    range="full",
+                    codec="auto",
+                )
+            elif file_suffix == ".gif":
+                duration_in_msec = max(1, 10 * round(model.duration_in_msec / 10))
+                pil_frames[0].save(
+                    str(save_file_path),
+                    save_all=True,
+                    append_images=pil_frames[1:],
+                    duration=duration_in_msec,  # 10 msec 分解能にスナップ
+                    loop=0,
+                    disposal=0,
+                    optimize=False,
+                )
+            elif file_suffix == ".apng":
+                pil_frames[0].save(
+                    str(save_file_path),
+                    save_all=True,
+                    append_images=pil_frames[1:],
+                    duration=model.duration_in_msec,
+                    loop=0,
+                    disposal=0,
+                    blend=0,
+                    optimize=True,
+                    compress_level=9,
+                )
+            else:
+                raise ValueError(f"Invalid video file_suffix ({file_suffix})")
+
+        # クリップボードに転送
+        file_to_clipboard(save_file_path)
+
+        # クリップボード転送完了通知
+        show_notify_label(self, "info", "転生\nクリップボード転送完了")
 
     def _on_drop_file(self, event: DnDEvent):
         """

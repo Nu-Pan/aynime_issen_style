@@ -6,7 +6,7 @@ from utils.capture import *
 from utils.windows import GlobalHotkey
 
 # model
-from gui.model.contents_cache import ImageModel, VideoModel, PlaybackMode
+from gui.model.contents_cache import ImageModel, VideoModel, ResizeMode
 
 
 class AynimeIssenStyleModel:
@@ -23,4 +23,4 @@ class AynimeIssenStyleModel:
         self.window_selection_image = ImageModel()
         self.still = ImageModel()
         self.video = VideoModel()
-        self.foreign = VideoModel()
+        self.foreign = VideoModel(nime_resize_mode=ResizeMode.CONTAIN)

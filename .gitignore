@@ -4,6 +4,7 @@ __pycache__
 /release/
 /raw/
 /nime/
+/tensei/
 /*.spec
 /src/utils/version_constants.py
 /log/

@@ -5,7 +5,7 @@ from enum import Enum, auto
 from math import gcd
 
 # PIL
-from PIL import Image
+from PIL import Image, ImageOps
 from PIL.ImageTk import PhotoImage
 
 # numpy
@@ -595,3 +595,62 @@ def calc_ssim(image_A: AISImage, image_B: AISImage) -> float:
 
     # 正常終了
     return score
+
+
+def apply_color_palette(pil_frames: list[Image.Image]) -> list[Image.Image]:
+    """
+    pil_frames にカラーパレットを適用する
+    カラーパレットは pil_frames 全体から計算され、これが全フレームに適用される。
+    """
+    # フレームの横幅を解決
+    frame_width = {f.width for f in pil_frames}
+    if len(frame_width) == 1:
+        frame_width = frame_width.pop()
+    else:
+        raise ValueError("Multiple frame width contaminated.")
+
+    # フレームの高さを解決
+    frame_height = {f.height for f in pil_frames}
+    if len(frame_height) == 1:
+        frame_height = frame_height.pop()
+    else:
+        raise ValueError("Multiple frame height contaminated.")
+
+    # すべての NIME フレームを１つの atlas 画像に結合
+    nime_atlas = Image.new(
+        "RGB", (frame_width, frame_height * len(pil_frames)), color=None
+    )
+    for frame_index, nime_frame in enumerate(pil_frames):
+        nime_atlas.paste(nime_frame, (0, frame_index * frame_height))
+
+    # atlas 画像を 256 色パレット化
+    # NOTE
+    #   ちらつき対策として 6bit 量子化を先にやる
+    #   メディアンフィルタは輪郭線がちらつく原因になるので却下
+    #   FASTOCTREE はフリッカーが出やすい傾向があったので却下
+    #   kmeans は品質と速度の兼ね合いで 2 にした
+    nime_atlas = ImageOps.posterize(nime_atlas, bits=6)
+    nime_atlas = nime_atlas.quantize(
+        colors=256, method=Image.Quantize.MEDIANCUT, kmeans=2
+    )
+    nime_atlas = nime_atlas.convert("P", dither=Image.Dither.NONE, colors=256)
+    atlas_palette = nime_atlas.getpalette()
+    if atlas_palette is None:
+        raise TypeError("Failed to getpalette")
+
+    # atlas から 256 色パレット化された NIME 画像を切り出す
+    out_pil_frames: list[Image.Image] = []
+    for frame_index in range(len(pil_frames)):
+        pil_cropped_frame = nime_atlas.crop(
+            (
+                0,
+                frame_index * frame_height,
+                frame_width,
+                (frame_index + 1) * frame_height,
+            )
+        )
+        pil_cropped_frame.putpalette(atlas_palette)
+        out_pil_frames.append(pil_cropped_frame)
+
+    # 正常終了
+    return out_pil_frames

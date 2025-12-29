@@ -41,6 +41,10 @@ from utils.windows import sanitize_text
 from utils.std import PerfLogger
 
 
+type AuxProcess = Callable[[AISImage], AISImage]
+type NotifyHandler = Callable[[], None]
+
+
 class FontCache:
     """
     フォントをキャッシュするクラス
@@ -109,10 +113,6 @@ def parse_nime_file_stem(stem: str) -> tuple[str | None, str | None]:
         else:
             time_stamp = None
     return nime_name, time_stamp
-
-
-type AuxProcess = Callable[[AISImage], AISImage]
-type NotifyHandler = Callable[[], None]
 
 
 class CachedContent(ABC):
@@ -321,7 +321,7 @@ class CachedScalableImage(CachedContent):
     def __init__(
         self,
         parent: CachedContent,
-        mode: ResizeMode,
+        resize_mode: ResizeMode,
         aux_process: AuxProcess | None = None,
     ):
         """
@@ -331,7 +331,7 @@ class CachedScalableImage(CachedContent):
         super().__init__(parent)
 
         # 定数
-        self._mode = mode
+        self._resize_mode = resize_mode
         self._aux_process = aux_process
 
         # 遅延変数
@@ -347,12 +347,28 @@ class CachedScalableImage(CachedContent):
             self._size = size
         return self
 
+    def set_resize_mode(self, resize_mode: ResizeMode) -> Self:
+        """
+        リサイズモードを設定
+        """
+        if self._resize_mode != resize_mode:
+            self.mark_dirty()
+            self._resize_mode = resize_mode
+        return self
+
     @property
     def size(self) -> ResizeDesc:
         """
         スケーリング後のサイズを取得
         """
         return self._size
+
+    @property
+    def resize_mode(self) -> ResizeMode:
+        """
+        リサイズモードを取得
+        """
+        return self._resize_mode
 
     @property
     def output(self) -> AISImage | None:
@@ -367,7 +383,7 @@ class CachedScalableImage(CachedContent):
             if parent_output is not None and self._size is not None:
                 # 揃っている場合、更新
                 if isinstance(parent_output, AISImage):
-                    self._output = parent_output.resize(self._size, self._mode)
+                    self._output = parent_output.resize(self._size, self._resize_mode)
                 else:
                     raise TypeError(type(parent_output))
                 if self._aux_process is not None:
@@ -732,6 +748,7 @@ class ImageModel:
         nime_name: str | None = None,
         time_stamp: str | None = None,
         enable: bool = True,
+        nime_resize_mode: ResizeMode | None = None,
     ):
         """
         コンストラクタ
@@ -744,17 +761,15 @@ class ImageModel:
         self._crop_square_image = CachedCropSquareImage(self._raw_image)
         self._nime_image = CachedScalableImage(
             self._crop_square_image,
-            ResizeMode.COVER,
+            ResizeMode.COVER if nime_resize_mode is None else nime_resize_mode,
             aux_process=self._aux_process_nime,
         )
-        self._preview_pil_image = CachedScalableImage(
-            self._nime_image, ResizeMode.CONTAIN
-        )
-        self._thumbnail_pil_image_enable = CachedScalableImage(
+        self._preview_image = CachedScalableImage(self._nime_image, ResizeMode.CONTAIN)
+        self._thumbnail_image_enable = CachedScalableImage(
             self._nime_image, ResizeMode.COVER
         )
-        self._thumbnail_pil_image_disable = CachedScalableImage(
-            self._thumbnail_pil_image_enable,
+        self._thumbnail_image_disable = CachedScalableImage(
+            self._thumbnail_image_enable,
             ResizeMode.COVER,
             aux_process=make_disabled_image,
         )
@@ -767,6 +782,7 @@ class ImageModel:
         # 初期設定
         self._raw_image.set_source(raw_image)
         self._nime_name = nime_name
+        self._overlay_nime_name = True
         self._time_stamp = time_stamp
         self._enable = enable
 
@@ -776,6 +792,13 @@ class ImageModel:
         アニメ名を取得する
         """
         return self._nime_name
+
+    @property
+    def overlay_nime_name(self) -> bool:
+        """
+        True なら、画像のアニメ名をオーバーレイする
+        """
+        return self._overlay_nime_name
 
     @property
     def time_stamp(self) -> str | None:
@@ -808,9 +831,31 @@ class ImageModel:
             case ImageLayer.NIME:
                 return self._nime_image.size
             case ImageLayer.PREVIEW:
-                return self._preview_pil_image.size
+                return self._preview_image.size
             case ImageLayer.THUMBNAIL:
-                return self._thumbnail_pil_image_enable.size
+                if self._enable:
+                    return self._thumbnail_image_enable.size
+                else:
+                    return self._thumbnail_image_disable.size
+            case _:
+                raise ValueError(layer)
+
+    def get_resize_mode(self, layer: ImageLayer) -> ResizeMode:
+        """
+        指定 layer のリサイズモードを取得する。
+        """
+        match layer:
+            case ImageLayer.RAW:
+                raise ValueError("RAW set_size NOT supported.")
+            case ImageLayer.NIME:
+                return self._nime_image.resize_mode
+            case ImageLayer.PREVIEW:
+                return self._preview_image.resize_mode
+            case ImageLayer.THUMBNAIL:
+                if self._enable:
+                    return self._thumbnail_image_enable.resize_mode
+                else:
+                    return self._thumbnail_image_disable.resize_mode
             case _:
                 raise ValueError(layer)
 
@@ -824,12 +869,12 @@ class ImageModel:
             case ImageLayer.NIME:
                 return self._nime_image.output
             case ImageLayer.PREVIEW:
-                return self._preview_pil_image.output
+                return self._preview_image.output
             case ImageLayer.THUMBNAIL:
                 if self._enable:
-                    return self._thumbnail_pil_image_enable.output
+                    return self._thumbnail_image_enable.output
                 else:
-                    return self._thumbnail_pil_image_disable.output
+                    return self._thumbnail_image_disable.output
             case _:
                 raise ValueError(layer)
 
@@ -847,7 +892,10 @@ class ImageModel:
         """
         NIME 用の外部プロセス
         """
-        return overlay_nime_name(source_image, self._nime_name)
+        if self._overlay_nime_name:
+            return overlay_nime_name(source_image, self._nime_name)
+        else:
+            return source_image
 
 
 class ImageModelEditSession:
@@ -891,11 +939,11 @@ class ImageModelEditSession:
             case ImageLayer.NIME:
                 is_dirty = model._nime_image.is_dirty
             case ImageLayer.PREVIEW:
-                is_dirty = model._preview_pil_image.is_dirty
+                is_dirty = model._preview_image.is_dirty
             case ImageLayer.THUMBNAIL:
                 is_dirty = (
-                    model._thumbnail_pil_image_enable.is_dirty
-                    or model._thumbnail_pil_image_disable
+                    model._thumbnail_image_enable.is_dirty
+                    or model._thumbnail_image_disable
                 )
             case _:
                 raise ValueError(f"Invalid ImageLayer(={layer})")
@@ -951,6 +999,20 @@ class ImageModelEditSession:
         # 正常終了
         return self
 
+    def set_overlay_nime_name(self, overlay_nime_name: bool) -> Self:
+        """
+        アニメ名オーバーレイの有効・無効を設定するする。
+        NIME 画像が影響を受ける。
+        """
+        # アニメ名更新・通知
+        model = self._model
+        if model._overlay_nime_name != overlay_nime_name:
+            model._overlay_nime_name = overlay_nime_name
+            model._nime_image.mark_dirty()
+
+        # 正常終了
+        return self
+
     def set_time_stamp(self, time_stamp: str | None) -> Self:
         """
         タイムスタンプを設定する
@@ -978,8 +1040,8 @@ class ImageModelEditSession:
         model = self._model
         if model._enable != enable:
             model._enable = enable
-            model._thumbnail_pil_image_enable.mark_dirty()
-            model._thumbnail_pil_image_disable.mark_dirty()
+            model._thumbnail_image_enable.mark_dirty()
+            model._thumbnail_image_disable.mark_dirty()
         return self
 
     def set_crop_params(
@@ -1017,9 +1079,32 @@ class ImageModelEditSession:
             case ImageLayer.NIME:
                 model._nime_image.set_size(size)
             case ImageLayer.PREVIEW:
-                model._preview_pil_image.set_size(size)
+                model._preview_image.set_size(size)
             case ImageLayer.THUMBNAIL:
-                model._thumbnail_pil_image_enable.set_size(size)
+                model._thumbnail_image_enable.set_size(size)
+                model._thumbnail_image_disable.set_size(size)
+            case _:
+                raise ValueError(layer)
+
+        # 正常終了
+        return self
+
+    def set_resize_mode(self, layer: ImageLayer, resize_mode: ResizeMode) -> Self:
+        """
+        指定 layer のリサイズモードを設定する。
+        """
+        # layer 分岐
+        model = self._model
+        match layer:
+            case ImageLayer.RAW:
+                raise ValueError("RAW set_size NOT supported.")
+            case ImageLayer.NIME:
+                model._nime_image.set_resize_mode(resize_mode)
+            case ImageLayer.PREVIEW:
+                model._preview_image.set_resize_mode(resize_mode)
+            case ImageLayer.THUMBNAIL:
+                model._thumbnail_image_enable.set_resize_mode(resize_mode)
+                model._thumbnail_image_disable.set_resize_mode(resize_mode)
             case _:
                 raise ValueError(layer)
 
@@ -1039,7 +1124,7 @@ class VideoModel:
     View-Model 的な意味でのモデル
     """
 
-    def __init__(self):
+    def __init__(self, nime_resize_mode: ResizeMode | None = None):
         """
         コンストラクタ
         """
@@ -1047,7 +1132,7 @@ class VideoModel:
         # NOTE
         #   サイズとかの全フレーム共通の情報は self._global_model をマスターとして管理する
         #   フレーム個別の情報は self._frame で管理する
-        self._global_model = ImageModel()
+        self._global_model = ImageModel(nime_resize_mode=nime_resize_mode)
         self._frames: list[ImageModel] = []
 
         # 再生時の更新間隔
@@ -1066,6 +1151,13 @@ class VideoModel:
         アニメ名
         """
         return self._global_model.nime_name
+
+    @property
+    def overlay_nime_name(self) -> bool:
+        """
+        アニメ名オーバーレイ有効・無効
+        """
+        return self._global_model.overlay_nime_name
 
     @property
     def time_stamp(self) -> str | None:
@@ -1092,6 +1184,12 @@ class VideoModel:
         フレームサイズを取得する
         """
         return self._global_model.get_size(layer)
+
+    def get_resize_mode(self, layer: ImageLayer) -> ResizeMode:
+        """
+        リサイズモードを取得する
+        """
+        return self._global_model.get_resize_mode(layer)
 
     @property
     def num_total_frames(self) -> int:
@@ -1228,6 +1326,25 @@ class VideoModelEditSession:
         # 正常終了
         return self
 
+    def set_overlay_nime_name(self, overlay_nime_name: bool) -> Self:
+        """
+        アニメ名を設定する。
+        """
+        # エイリアス
+        model = self._model
+
+        # 各フレーム
+        for frame in model._frames:
+            with ImageModelEditSession(frame, _does_notify=False) as e:
+                e.set_overlay_nime_name(overlay_nime_name)
+
+        # グローバル
+        with ImageModelEditSession(model._global_model, _does_notify=False) as e:
+            e.set_overlay_nime_name(overlay_nime_name)
+
+        # 正常終了
+        return self
+
     def set_time_stamp(self, time_stamp: str | None) -> Self:
         """
         動画のタイムスタンプを設定する。
@@ -1334,6 +1451,25 @@ class VideoModelEditSession:
         # 正常終了
         return self
 
+    def set_resize_mode(self, layer: ImageLayer, resize_mode: ResizeMode) -> Self:
+        """
+        リサイズモードを設定する
+        """
+        # エイリアス
+        model = self._model
+
+        # 各フレーム
+        for frame in model._frames:
+            with ImageModelEditSession(frame, _does_notify=False) as e:
+                e.set_resize_mode(layer, resize_mode)
+
+        # グローバル
+        with ImageModelEditSession(model._global_model, _does_notify=False) as e:
+            e.set_resize_mode(layer, resize_mode)
+
+        # 正常終了
+        return self
+
     def append_frames(
         self,
         new_obj: (
@@ -1369,6 +1505,9 @@ class VideoModelEditSession:
                 for layer in ImageLayer:
                     if layer != ImageLayer.RAW:
                         e.set_size(layer, model._global_model.get_size(layer))
+                        e.set_resize_mode(
+                            layer, model._global_model.get_resize_mode(layer)
+                        )
                 e.set_time_stamp(model._global_model.time_stamp)
                 e.set_nime_name(model._global_model.nime_name)
 
@@ -1500,8 +1639,7 @@ def save_content_model(model: ImageModel | VideoModel) -> Path:
                 str(raw_file_path),
                 format=RAW_STILL_OUT_PIL_FORMAT,
                 optimize=True,
-                compress_levvel=9,
-                transparency=(0, 0, 0),
+                compress_level=9,
             )
 
         # nime ディレクトリにスチル画像を保存

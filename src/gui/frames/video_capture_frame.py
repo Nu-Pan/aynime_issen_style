@@ -159,13 +159,12 @@ class VideoCaptureFrame(AISFrame, TkinterDnD.DnDWrapper):
             [
                 AspectRatioPattern.E_16_9,
                 AspectRatioPattern.E_4_3,
-                AspectRatioPattern.E_1_1,
                 AspectRatioPattern.E_RAW,
             ],
             [
-                ResolutionPattern.E_DISCORD_EMOJI,
-                ResolutionPattern.E_DISCORD_STAMP,
                 ResolutionPattern.E_VGA,
+                ResolutionPattern.E_HD,
+                ResolutionPattern.E_FHD,
                 ResolutionPattern.E_RAW,
             ],
         )
