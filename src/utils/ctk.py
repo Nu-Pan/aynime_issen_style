@@ -1,6 +1,7 @@
 # std
 import warnings
 from typing import Callable, Literal
+import logging
 
 # PIL
 from PIL.ImageTk import PhotoImage
@@ -114,6 +115,9 @@ def show_error_dialog(
         APP_NAME_JP,
         f"{message}\n{tb_str}",
     )
+
+    # ロガーにも流す
+    logging.error(f"{message}\n{tb_str}")
 
 
 def place_window_to_display_center(

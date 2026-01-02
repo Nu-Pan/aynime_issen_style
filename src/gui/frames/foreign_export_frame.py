@@ -1,7 +1,6 @@
 # std
 from typing import cast, Callable
 from pathlib import Path
-from enum import Enum
 
 
 # Tk/CTk
@@ -10,7 +9,16 @@ from tkinterdnd2 import TkinterDnD, DND_FILES
 from tkinterdnd2.TkinterDnD import DnDEvent
 
 # utils
-from utils.image import AspectRatioPattern, Resolution, ResolutionPattern, ResizeDesc
+from utils.image import (
+    AspectRatio,
+    AspectRatioPattern,
+    PlaybackMode,
+    Resolution,
+    ResolutionPattern,
+    ResizeDesc,
+    ResizeMode,
+)
+from utils.image import ExportTarget
 from utils.windows import file_to_clipboard
 from utils.ctk import show_notify_label, show_error_dialog
 from utils.capture import *
@@ -22,7 +30,13 @@ from utils.constants import (
 from utils.duration_and_frame_rate import (
     DFR_MAP,
 )
-from utils.image import apply_color_palette
+from utils.image import (
+    apply_color_palette,
+    ContentsMetadata,
+    smart_pil_save,
+    smart_pil_load,
+    AISImage,
+)
 
 # gui
 from gui.widgets.ais_frame import AISFrame
@@ -31,20 +45,15 @@ from gui.widgets.video_label import VideoLabel, VideoModelEditSession
 from gui.model.aynime_issen_style import AynimeIssenStyleModel
 from gui.model.contents_cache import (
     ImageLayer,
-    PlaybackMode,
     ImageModel,
+    ImageModelEditSession,
     VideoModel,
+    VideoModelEditSession,
     load_content_model,
 )
 
 
 type NotifyHandler = Callable[[], None]
-
-
-class ExportTarget(Enum):
-    DISCORD_EMOJI = "Discord Emoji"
-    DISCORD_STAMP = "Discord Stamp"
-    X_TWITTER = "X(Twitter)"
 
 
 class ExportTargetRadioFrame(AISFrame):
@@ -68,8 +77,13 @@ class ExportTargetRadioFrame(AISFrame):
         self._export_targe_var = ctk.StringVar(value=ExportTarget.X_TWITTER.value)
 
         # 再生モードラジオボタン
+        _EXPORT_TARGETS = [
+            ExportTarget.DISCORD_EMOJI,
+            ExportTarget.DISCORD_POST,
+            ExportTarget.X_TWITTER,
+        ]
         self._radio_buttons: list[ctk.CTkRadioButton] = []
-        for i, export_target in enumerate(ExportTarget):
+        for i, export_target in enumerate(_EXPORT_TARGETS):
             radio_button = ctk.CTkRadioButton(
                 self,
                 text=export_target.value,
@@ -213,8 +227,11 @@ class ForeignExportFrame(AISFrame, TkinterDnD.DnDWrapper):
         """
         UI 上のパラメータが変更された時に呼び出されるハンドラ
         """
+        # エイリアス
+        export_target = self._export_target_radio.value
+
         # オーバーレイ有効・無効
-        if self._export_target_radio.value in [
+        if export_target in [
             ExportTarget.DISCORD_EMOJI,
             ExportTarget.DISCORD_STAMP,
         ]:
@@ -223,7 +240,7 @@ class ForeignExportFrame(AISFrame, TkinterDnD.DnDWrapper):
             overlay_nime_name = True
 
         # 適切な切り出しパラメータ
-        if self._export_target_radio.value in [
+        if export_target in [
             ExportTarget.DISCORD_EMOJI,
             ExportTarget.DISCORD_STAMP,
         ]:
@@ -236,15 +253,15 @@ class ForeignExportFrame(AISFrame, TkinterDnD.DnDWrapper):
             crop_params = (None, None, None)
 
         # リサイズパラメータ
-        if self._export_target_radio.value == ExportTarget.DISCORD_EMOJI:
+        if export_target == ExportTarget.DISCORD_EMOJI:
             nime_resize_desc = ResizeDesc(
                 AspectRatioPattern.E_1_1, ResolutionPattern.E_DISCORD_EMOJI
             )
-        elif self._export_target_radio.value == ExportTarget.DISCORD_STAMP:
+        elif export_target == ExportTarget.DISCORD_STAMP:
             nime_resize_desc = ResizeDesc(
                 AspectRatioPattern.E_1_1, ResolutionPattern.E_DISCORD_STAMP
             )
-        elif self._export_target_radio.value == ExportTarget.X_TWITTER:
+        elif export_target == ExportTarget.X_TWITTER:
             # NOTE
             #   X(Twitter) の上限は長辺 4096px
             nime_resize_desc = ResizeDesc(
@@ -276,8 +293,11 @@ class ForeignExportFrame(AISFrame, TkinterDnD.DnDWrapper):
         """
         エクスポートボタンクリックハンドラ
         """
-        # スチル・ビデオを解決、ロードされてなければなにもしない
+        # エイリアス
+        export_target = self._export_target_radio.value
         model = self._model.foreign
+
+        # スチル・ビデオを解決、ロードされてなければなにもしない
         if model.num_total_frames < 1:
             return
         elif model.num_total_frames == 1:
@@ -286,26 +306,26 @@ class ForeignExportFrame(AISFrame, TkinterDnD.DnDWrapper):
             is_still = False
 
         # エクスポートファイルの仕様を決定
-        if self._export_target_radio.value == ExportTarget.DISCORD_EMOJI:
+        if export_target == ExportTarget.DISCORD_EMOJI:
             subdir_name = "discord_emoji"
             if is_still:
                 file_suffix = ".png"
             else:
                 file_suffix = ".avif"
-        elif self._export_target_radio.value == ExportTarget.DISCORD_STAMP:
+        elif export_target == ExportTarget.DISCORD_STAMP:
             subdir_name = "discord_stamp"
             if is_still:
                 file_suffix = ".png"
             else:
                 file_suffix = ".gif"
-        elif self._export_target_radio.value == ExportTarget.X_TWITTER:
+        elif export_target == ExportTarget.X_TWITTER:
             subdir_name = "x_twitter"
             if is_still:
                 file_suffix = ".jpg"
             else:
                 file_suffix = ".gif"
         else:
-            raise ValueError(self._export_target_radio.value)
+            raise ValueError(export_target)
 
         # 出力ファイルパスを構築
         save_file_path = (
@@ -328,31 +348,42 @@ class ForeignExportFrame(AISFrame, TkinterDnD.DnDWrapper):
             else:
                 pil_image = ais_image.pil_image
 
-            # PIL でファイル出力
+            # エンコード設定を解決
             if file_suffix == ".png":
-                pil_image.save(
-                    str(save_file_path), format="PNG", optimize=True, compress_level=9
-                )
+                lossless = True
+                quality_ratio = 1.0
+                encode_speed_ratio = 0.0
             elif file_suffix == ".jpg":
-                ais_image.pil_image.save(
-                    str(save_file_path),
-                    format="JPEG",
-                    quality=92,
-                    subsampling=0,
-                    optimize=True,
-                    progressive=True,
-                )
+                lossless = False
+                quality_ratio = 92 / 95
+                encode_speed_ratio = 0.0
             else:
                 raise ValueError(f"Invalid still file_suffix ({file_suffix})")
+
+            # メタデータを解決
+            # NOTE
+            #   スチルなので、ビデオ関係の情報は消去する
+            metadata = self._model.foreign.contents_metadata
+            metadata.set_playback_mode(None)
+            metadata.erase_frame_enable()
+
+            # PIL でファイル出力
+            smart_pil_save(
+                save_file_path,
+                pil_image,
+                duration_in_msec=None,
+                metadata=metadata,
+                lossless=lossless,
+                quality_ratio=quality_ratio,
+                encode_speed_ratio=encode_speed_ratio,
+            )
         else:
             # 動画フレームを解決
             pil_frames = [
-                f.pil_image for f in model.iter_frames(ImageLayer.NIME) if f is not None
+                f.pil_image
+                for f in model.iter_frames(ImageLayer.NIME, enable_only=True)
+                if f is not None
             ]
-
-            # gif なら 256 色カラーパレット化
-            if file_suffix == ".gif":
-                pil_frames = apply_color_palette(pil_frames)
 
             # 再生モードを反映
             match model.playback_mode:
@@ -368,44 +399,28 @@ class ForeignExportFrame(AISFrame, TkinterDnD.DnDWrapper):
                 case _:
                     raise ValueError(f"Invalid PlaybaclMode ({model.playback_mode})")
 
-            # PIL でファイル出力
-            if file_suffix == ".avif":
-                pil_frames[0].save(
-                    str(save_file_path),
-                    save_all=True,
-                    append_images=pil_frames[1:],
-                    duration=model.duration_in_msec,
-                    quality=60,
-                    subsampling="4:2:0",
-                    speed=2,
-                    range="full",
-                    codec="auto",
-                )
-            elif file_suffix == ".gif":
-                duration_in_msec = max(1, 10 * round(model.duration_in_msec / 10))
-                pil_frames[0].save(
-                    str(save_file_path),
-                    save_all=True,
-                    append_images=pil_frames[1:],
-                    duration=duration_in_msec,  # 10 msec 分解能にスナップ
-                    loop=0,
-                    disposal=0,
-                    optimize=False,
-                )
+            # エンコード設定を解決
+            if file_suffix in {".avif", ".gif"}:
+                lossless = False
+                quality_ratio = 0.6
+                encode_speed_ratio = 0.2
             elif file_suffix == ".apng":
-                pil_frames[0].save(
-                    str(save_file_path),
-                    save_all=True,
-                    append_images=pil_frames[1:],
-                    duration=model.duration_in_msec,
-                    loop=0,
-                    disposal=0,
-                    blend=0,
-                    optimize=True,
-                    compress_level=9,
-                )
+                lossless = True
+                quality_ratio = 1.0
+                encode_speed_ratio = 0.0
             else:
                 raise ValueError(f"Invalid video file_suffix ({file_suffix})")
+
+            # PIL でファイル出力
+            smart_pil_save(
+                save_file_path,
+                pil_frames,
+                duration_in_msec=model.duration_in_msec,
+                metadata=model.contents_metadata,
+                lossless=lossless,
+                quality_ratio=quality_ratio,
+                encode_speed_ratio=encode_speed_ratio,
+            )
 
         # クリップボードに転送
         file_to_clipboard(save_file_path)
@@ -435,29 +450,73 @@ class ForeignExportFrame(AISFrame, TkinterDnD.DnDWrapper):
 
         # モデルロード
         try:
-            load_result = load_content_model(Path(file_path))
+            new_model = load_content_model(Path(file_path))
         except Exception as e:
             show_error_dialog("ファイルロードに失敗。", e)
             return
 
-        # モデルに反映
+        # NIME のアス比指定を RAW に適用する（ベイクする）
         # NOTE
-        #   スチル画像の場合はフレーム数１の動画としてロードする。
-        #   スチル・ビデオで処理分けると実装がダルくなるので、それを避けるための措置。
+        #   foreign の NIME のリサイズ機構はサイズ上限に収める（CONTAIN）に使いたい。
+        #   ロードしたまんまだと、アス比をあわせるためのクロップ処理(COVER)になってるはず。
+        #   転生タブで出力するのは NIME だけなので RAW に破壊的変更を加えても悪い副作用は起きない。
+        #   よって、ちょっとお行儀が悪いけど、 RAW を編集してアスペクト比を適用(COVER)してしまう。
+        new_nime_aspect_ratio = new_model.get_size(ImageLayer.NIME).aspect_ratio
+        if new_nime_aspect_ratio != AspectRatio.from_pattern(AspectRatioPattern.E_RAW):
+            if isinstance(new_model, ImageModel):
+                # リサイズ済みの RAW 画像を生成
+                new_raw_image = new_model.get_image(ImageLayer.RAW)
+                if new_raw_image is not None:
+                    new_raw_image = new_raw_image.resize_cover(
+                        ResizeDesc(new_nime_aspect_ratio, ResolutionPattern.E_RAW)
+                    )
+                # モデルに反映
+                with ImageModelEditSession(new_model) as edit:
+                    edit.set_raw_image(new_raw_image)
+            elif isinstance(new_model, VideoModel):
+                # リサイズ済みの RAW フレーム列を生成
+                new_raw_images: list[AISImage | None] = []
+                for frame_index in range(new_model.num_total_frames):
+                    new_raw_image = new_model.get_frame(ImageLayer.RAW, frame_index)
+                    if new_raw_image is not None:
+                        new_raw_image = new_raw_image.resize_cover(
+                            ResizeDesc(new_nime_aspect_ratio, ResolutionPattern.E_RAW)
+                        )
+                    new_raw_images.append(new_raw_image)
+                # モデルに反映
+                with VideoModelEditSession(new_model) as edit:
+                    for frame_index, new_raw_image in enumerate(new_raw_images):
+                        edit.set_raw_image(
+                            frame_index,
+                            new_raw_image,
+                            _does_notify=frame_index + 1 == len(new_raw_images),
+                        )
+
+        # 維持されるべきパラメータ
+        preserved_overlay_nime_name = self._model.foreign.overlay_nime_name
+        preserved_crop_params = self._model.foreign.crop_params
+        preserved_size = self._model.foreign.get_size(ImageLayer.NIME)
+
+        # モデルに反映
         with VideoModelEditSession(self._model.foreign) as edit:
-            if isinstance(load_result, ImageModel):
-                (
-                    edit.clear_frames()
-                    .set_nime_name(load_result.nime_name)
-                    .set_time_stamp(load_result.time_stamp)
-                    .set_duration_in_msec(DFR_MAP.default_entry.duration_in_msec)
-                    .append_frames(load_result)
-                )
-            elif isinstance(load_result, VideoModel):
-                (
-                    edit.clear_frames()
-                    .set_nime_name(load_result.nime_name)
-                    .set_time_stamp(load_result.time_stamp)
-                    .set_duration_in_msec(load_result.duration_in_msec)
-                    .append_frames(load_result)
-                )
+            # 一度、全部設定
+            edit.set_model(new_model)
+            # 更新間隔を調整
+            # NOTE
+            #   スチル画像の場合はフレーム数１の動画になるので、
+            #   一番低いフレームレートにしておく。
+            if isinstance(new_model, ImageModel):
+                edit.set_duration_in_msec(DFR_MAP.slowest_entry.duration_in_msec)
+            # 一部パラメータを復元
+            # NOTE
+            #   転生タブの UI 由来で決まるパラメータは、関数呼び出し前から設定されていた値を維持する。
+            edit.set_overlay_nime_name(preserved_overlay_nime_name)
+            edit.set_crop_params(*preserved_crop_params)
+            edit.set_size(ImageLayer.NIME, preserved_size)
+            # リサイズ挙動は CONTAIN 固定
+            # NOTE
+            #   キャプチャタブでは NIME のリサイズ処理をアスペクト比適用（クロップ）のために使っていたが、
+            #   転生タブではエクスポート先サービスのサイズ上限に収めるために使う。
+            #   具体的には X(Twitter) の長辺 4096px 制限。
+            #   なので、転生タブでは CONTAIN が正しい。
+            edit.set_resize_mode(ImageLayer.NIME, ResizeMode.CONTAIN)

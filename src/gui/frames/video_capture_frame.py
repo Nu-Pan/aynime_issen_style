@@ -11,9 +11,11 @@ from tkinterdnd2.TkinterDnD import DnDEvent
 from utils.constants import WIDGET_MIN_WIDTH, DEFAULT_FONT_FAMILY
 from utils.image import (
     AspectRatioPattern,
+    PlaybackMode,
     ResolutionPattern,
     ResizeDesc,
     calc_ssim,
+    ExportTarget,
 )
 from utils.duration_and_frame_rate import (
     FILM_TIMELINE_IN_FPS,
@@ -37,7 +39,7 @@ from gui.widgets.ais_slider import AISSlider
 from gui.model.contents_cache import (
     ImageLayer,
     ImageModel,
-    PlaybackMode,
+    VideoModel,
     save_content_model,
     load_content_model,
     VideoModelEditSession,
@@ -53,9 +55,7 @@ class PlaybackModeSelectionFrame(AISFrame):
     ラジオボタンを１つにまとめるためだけに存在
     """
 
-    def __init__(
-        self, master: ctk.CTkBaseClass, model: AynimeIssenStyleModel, **kwargs
-    ):
+    def __init__(self, master: ctk.CTkBaseClass, model: VideoModel, **kwargs):
         """
         コンストラクタ
         """
@@ -71,9 +71,7 @@ class PlaybackModeSelectionFrame(AISFrame):
         self.ais.rowconfigure(0, weight=1)
 
         # 再生モード変数
-        self._playback_mode_var = ctk.StringVar(
-            value=self._model.video.playback_mode.value
-        )
+        self._playback_mode_var = ctk.StringVar(value=self._model.playback_mode.value)
 
         # 再生モードラジオボタン
         self._radio_buttons: list[ctk.CTkRadioButton] = []
@@ -90,17 +88,29 @@ class PlaybackModeSelectionFrame(AISFrame):
             self.ais.columnconfigure(i, weight=1)
             self._radio_buttons.append(radio_button)
 
+        # モデル変更ハンドラを登録
+        self._model.register_playback_mode_change_handler(
+            self._on_playback_mode_changed
+        )
+
     def _on_radio_button_change(self):
         """
         再生モードラジオボタンに変化があった時に呼び出されるハンドラ
         """
-        with VideoModelEditSession(self._model.video) as edit:
+        with VideoModelEditSession(self._model) as edit:
             edit.set_playback_mode(PlaybackMode(self._playback_mode_var.get()))
+
+    def _on_playback_mode_changed(self):
+        """
+        モデル側で再生モードに変更があった時に呼び出されるハンドラ
+        """
+        if self._playback_mode_var.get() != self._model.playback_mode.value:
+            self._playback_mode_var.set(self._model.playback_mode.value)
 
 
 class VideoCaptureFrame(AISFrame, TkinterDnD.DnDWrapper):
     """
-    スチル画像のキャプチャ操作を行う CTk フレーム
+    ビデオのキャプチャ操作を行う CTk フレーム
     """
 
     UI_TAB_NAME = "キンキンキンキンキンキンキンキンキンキンキンキンキンキンキンキン！"
@@ -184,7 +194,7 @@ class VideoCaptureFrame(AISFrame, TkinterDnD.DnDWrapper):
 
         # 再生モードラジオボタン
         self._playback_mode_frame = PlaybackModeSelectionFrame(
-            self._output_kind_frame, model
+            self._output_kind_frame, model.video
         )
         self._output_kind_frame.ais.grid_child(self._playback_mode_frame, 3, 0)
 
@@ -348,6 +358,11 @@ class VideoCaptureFrame(AISFrame, TkinterDnD.DnDWrapper):
         )
         self._input_kind_frame.ais.grid_child(self._record_button, 3, 4, 2, 1)
 
+        # モデル変更コールバック
+        self._model.video.register_layer_changed_handler(
+            ImageLayer.NIME, self._on_nime_changed
+        )
+
         # グローバルホットキーを登録
         # NOTE
         #   K はキンキン！　の頭文字
@@ -507,10 +522,31 @@ class VideoCaptureFrame(AISFrame, TkinterDnD.DnDWrapper):
                 ]
             )
 
+    def _on_nime_changed(self):
+        """
+        NIME 画像変更ハンドラ
+        """
+        # エイリアス
+        model = self._model.video
+
+        # 設定変更を各 UI に反映
+        resize_desc = model.get_size(ImageLayer.NIME)
+        if (
+            self._size_pattern_selection_frame.aspect_ratio != resize_desc.aspect_ratio
+            or self._size_pattern_selection_frame.resolution != resize_desc.resolution
+        ):
+            self._size_pattern_selection_frame.set_pattern(
+                aspect_ratio=resize_desc.aspect_ratio.pattern,
+                resolution=resize_desc.resolution.pattern,
+            )
+
     def _on_record_button_clicked(self):
         """
         レコードボタンクリックハンドラ
         """
+        # エイリアス
+        model = self._model.video
+
         # キャプチャ
         frames = self._model.stream.capture_video(
             fps=self._record_frame_rate_slider.value,
@@ -524,20 +560,11 @@ class VideoCaptureFrame(AISFrame, TkinterDnD.DnDWrapper):
             nime_name = self._model.stream.nime_window_text
 
         # モデルに設定
-        with VideoModelEditSession(self._model.video) as edit:
+        with VideoModelEditSession(model) as edit:
             edit.clear_frames()
             edit.set_nime_name(nime_name)
             edit.set_time_stamp(None)  # NOTE 現在時刻を適用
-            edit.append_frames(
-                [
-                    ImageModel(
-                        frame,
-                        self._model.video.nime_name,
-                        self._model.video.time_stamp,
-                    )
-                    for frame in frames
-                ]
-            )
+            edit.append_frames(frame for frame in frames)
 
     def _on_drop_file(self, event: DnDEvent):
         """
@@ -546,6 +573,9 @@ class VideoCaptureFrame(AISFrame, TkinterDnD.DnDWrapper):
         Args:
             event (Event): イベント
         """
+        # エイリアス
+        model = self._model.video
+
         # イベントからデータを取り出し
         event_data = vars(event)["data"]
         if not isinstance(event_data, str):
@@ -561,28 +591,28 @@ class VideoCaptureFrame(AISFrame, TkinterDnD.DnDWrapper):
 
         # モデルロード
         try:
-            load_result = load_content_model(Path(file_path))
+            new_model = load_content_model(Path(file_path))
         except Exception as e:
             show_error_dialog("ファイルロードに失敗。", e)
             return
 
-        # スチル画像はロード不可
-        if isinstance(load_result, ImageModel):
-            show_error_dialog("スチル画像はロード不可。")
-            return
+        # サムネイルのリサイズ設定を避けておく
+        preserved_thumbnail_resize_desc = model.get_size(ImageLayer.THUMBNAIL)
+        preserved_thumbnail_resize_mode = model.get_resize_mode(ImageLayer.THUMBNAIL)
 
-        # アニメ名を解決
-        if self._nime_name_entry.text != "":
-            actual_nime_name = self._nime_name_entry.text
-        else:
-            actual_nime_name = load_result.nime_name
-
-        # モデルに反映
-        with VideoModelEditSession(self._model.video) as edit:
-            (
-                edit.clear_frames()
-                .set_nime_name(actual_nime_name)
-                .set_time_stamp(load_result.time_stamp)
-                .set_duration_in_msec(load_result.duration_in_msec)
-                .append_frames(load_result)
-            )
+        # モデルに諸々を反映
+        with VideoModelEditSession(model) as edit:
+            # 普通にロード
+            if isinstance(new_model, VideoModel):
+                # 動画の場合、関連ロード
+                edit.set_model(new_model)
+                if self._nime_name_entry.text != "":
+                    edit.set_nime_name(self._nime_name_entry.text)
+            elif isinstance(new_model, ImageModel):
+                # 画像の場合、フレーム追加だけ
+                edit.append_frames(new_model)
+            else:
+                raise TypeError(f"Unexpected model type ({type(new_model)})")
+            # サムネイルのリサイズ設定を元に戻す
+            edit.set_size(ImageLayer.THUMBNAIL, preserved_thumbnail_resize_desc)
+            edit.set_resize_mode(ImageLayer.THUMBNAIL, preserved_thumbnail_resize_mode)

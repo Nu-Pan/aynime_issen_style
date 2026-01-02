@@ -36,7 +36,7 @@ class StillLabel(ctk.CTkLabel):
 
         # モデル関係
         self._image_model = image_model
-        self._image_model.register_notify_handler(
+        self._image_model.register_layer_changed_handler(
             ImageLayer.PREVIEW, self._on_preview_changed
         )
 

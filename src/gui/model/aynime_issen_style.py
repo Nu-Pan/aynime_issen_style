@@ -23,4 +23,4 @@ class AynimeIssenStyleModel:
         self.window_selection_image = ImageModel()
         self.still = ImageModel()
         self.video = VideoModel()
-        self.foreign = VideoModel(nime_resize_mode=ResizeMode.CONTAIN)
+        self.foreign = VideoModel()
