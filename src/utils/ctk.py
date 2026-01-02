@@ -12,7 +12,7 @@ import tkinter.messagebox as mb
 
 # utils
 from utils.constants import DEFAULT_FONT_FAMILY, APP_NAME_JP
-from utils.ais_logging import write_log
+from utils.ais_logging import LogLevel, write_log
 
 
 def silent_configure(widget: ctk.CTkBaseClass, **kwargs):
@@ -40,7 +40,7 @@ def configure_presence(widget: ctk.CTkBaseClass, content: PhotoImage | str):
 
 def show_notify_label(
     widget: ctk.CTkBaseClass,
-    level: Literal["info", "warning", "error"],
+    level: LogLevel,
     category: str,
     message: str,
     *,
