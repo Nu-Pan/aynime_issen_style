@@ -79,7 +79,7 @@ class ExportTargetRadioFrame(AISFrame):
         # 再生モードラジオボタン
         _EXPORT_TARGETS = [
             ExportTarget.DISCORD_EMOJI,
-            ExportTarget.DISCORD_POST,
+            ExportTarget.DISCORD_STAMP,
             ExportTarget.X_TWITTER,
         ]
         self._radio_buttons: list[ctk.CTkRadioButton] = []

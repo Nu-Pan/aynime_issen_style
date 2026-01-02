@@ -1873,20 +1873,6 @@ def save_content_model(model: ImageModel | VideoModel) -> Path:
                 if isinstance(f, AISImage)
             ]
 
-            # 再生モードを反映
-            match model.playback_mode:
-                case PlaybackMode.FORWARD:
-                    pass
-                case PlaybackMode.BACKWARD:
-                    raw_frames.reverse()
-                case PlaybackMode.REFLECT:
-                    if len(raw_frames) >= 3:
-                        raw_frames = (
-                            raw_frames + [f for f in reversed(raw_frames)][1:-1]
-                        )
-                case _:
-                    raise RuntimeError()
-
             # ファイル保存
             # NOTE
             #   - 無圧縮で保存（これはマスト）
