@@ -352,6 +352,4 @@ class PerfLogger:
         """
         if exc_type is None and self._start is not None:
             elapsed_str = self._formatter(perf_counter() - self._start)
-            write_log(
-                "info", str(__class__), f"PerfLogger {self._label}: {elapsed_str}"
-            )
+            write_log("info", str(__class__), f"{self._label}: {elapsed_str}")

@@ -581,6 +581,12 @@ class VideoCaptureFrame(AISFrame, TkinterDnD.DnDWrapper):
             edit.set_time_stamp(None)  # NOTE 現在時刻を適用
             edit.append_frames(frame for frame in frames)
 
+        # UI 上のフレームレートを同期
+        # NOTE キャプチャ側 --> セーブフレーム側
+        self._save_frame_rate_slider.set_value(
+            DFR_MAP.by_frame_rate(self._record_frame_rate_slider.value)
+        )
+
     def _on_drop_file(self, event: DnDEvent):
         """
         ファイルドロップハンドラ
