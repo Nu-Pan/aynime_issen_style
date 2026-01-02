@@ -1,7 +1,6 @@
 # std
 from typing import cast
 from dataclasses import dataclass
-import logging
 
 # Tk/CTk
 from tkinter import Event
@@ -12,7 +11,6 @@ from CTkListbox import CTkListbox
 from utils.capture import *
 from utils.constants import DEFAULT_FONT_FAMILY
 from utils.ctk import show_notify_label
-from utils.std import traceback_str
 
 # gui
 from gui.widgets.still_label import StillLabel
@@ -110,13 +108,12 @@ class WindowSelectionFrame(AISFrame):
         try:
             self.model.stream.set_capture_window(selection.window_handle)
         except Exception as e:
-            # ユーザー向けにはラベルで通知
             show_notify_label(
-                self, "error", f'"{selection.window_name}" のキャプチャ開始に失敗'
-            )
-            # 開発者向けにログを残す
-            logging.warning(
-                f'Failed to start window capture({selection.window_handle}, "{selection.window_name}")\n{traceback_str(e)}'
+                self,
+                "error",
+                str(__class__),
+                f'"{selection.window_name}" のキャプチャ開始に失敗',
+                exception=e,
             )
 
         # 描画更新

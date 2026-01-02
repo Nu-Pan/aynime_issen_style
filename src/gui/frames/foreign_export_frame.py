@@ -426,7 +426,7 @@ class ForeignExportFrame(AISFrame, TkinterDnD.DnDWrapper):
         file_to_clipboard(save_file_path)
 
         # クリップボード転送完了通知
-        show_notify_label(self, "info", "転生\nクリップボード転送完了")
+        show_notify_label(self, "info", str(__class__), "転生\nクリップボード転送完了")
 
     def _on_drop_file(self, event: DnDEvent):
         """
@@ -443,7 +443,7 @@ class ForeignExportFrame(AISFrame, TkinterDnD.DnDWrapper):
         # 読み込み対象を解決
         file_paths = cast(tuple[str], self.tk.splitlist(event_data))
         if len(file_paths) > 1:
-            show_error_dialog("ファイルは１つだけドロップしてね。")
+            show_error_dialog(str(__class__), "ファイルは１つだけドロップしてね。")
             return
         else:
             file_path = file_paths[0]
@@ -452,7 +452,7 @@ class ForeignExportFrame(AISFrame, TkinterDnD.DnDWrapper):
         try:
             new_model = load_content_model(Path(file_path))
         except Exception as e:
-            show_error_dialog("ファイルロードに失敗。", e)
+            show_error_dialog(str(__class__), "ファイルロードに失敗。", e)
             return
 
         # NIME のアス比指定を RAW に適用する（ベイクする）

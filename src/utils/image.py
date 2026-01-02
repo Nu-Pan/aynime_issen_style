@@ -8,7 +8,6 @@ from xml.sax import saxutils
 from dataclasses import dataclass
 from zipfile import ZipFile
 import re
-import logging
 
 # PIL
 from PIL import Image, ImageOps, ImageFile
@@ -24,6 +23,7 @@ from skimage.metrics import structural_similarity as ssim
 # utils
 from utils.constants import *
 from utils.duration_and_frame_rate import DFR_MAP
+from utils.ais_logging import write_log
 
 
 class AspectRatioPattern(Enum):
@@ -1012,8 +1012,10 @@ class ContentsMetadata:
             result = zlib.decompress(result).decode("utf-8")
             result = json.loads(result)
         except:
-            logging.warning(
-                f"Failed to deserialize contents metadata (body_str={body_str})"
+            write_log(
+                "warning",
+                str(__class__),
+                f"Failed to deserialize contents metadata (body_str={body_str})",
             )
             return ContentsMetadata()
 
@@ -1044,7 +1046,9 @@ class ContentsMetadata:
         try:
             body_str = body.decode("utf-8", errors="replace")
         except:
-            logging.warning(f"Failed to decode contents metadata bytes")
+            write_log(
+                "warning", str(__class__), f"Failed to decode contents metadata bytes"
+            )
             return ContentsMetadata()
 
         # 正規表現でパース
@@ -1309,8 +1313,10 @@ def smart_pil_load(
             if isinstance(xmp_body, (bytes, bytearray)):
                 return ContentsMetadata.from_xmp(xmp_body)
             else:
-                logging.warning(
-                    f"Unexpected XMP object (file={image_file.filename}, xmp_body={type(xmp_body)})"
+                write_log(
+                    "warning",
+                    __name__,
+                    f"Unexpected XMP object (file={image_file.filename}, xmp_body={type(xmp_body)})",
                 )
                 return ContentsMetadata()
         elif file_suffix in [".jpg", ".gif"]:
@@ -1318,8 +1324,10 @@ def smart_pil_load(
             if isinstance(comment_body, (bytes, bytearray)):
                 return ContentsMetadata.from_str(comment_body)
             else:
-                logging.warning(
-                    f"Unexpected comment object (file={image_file.filename}, xmp_body={type(comment_body)})"
+                write_log(
+                    "warning",
+                    __name__,
+                    f"Unexpected comment object (file={image_file.filename}, xmp_body={type(comment_body)})",
                 )
                 return ContentsMetadata()
         elif file_suffix in [".png"]:
@@ -1332,12 +1340,18 @@ def smart_pil_load(
             if isinstance(itxt_body, (str, bytes, bytearray)):
                 return ContentsMetadata.from_str(itxt_body)
             else:
-                logging.warning(
-                    f"Unexpected itxt object (file={image_file.filename}, xmp_body={type(itxt_body)})"
+                write_log(
+                    "warning",
+                    __name__,
+                    f"Unexpected itxt object (file={image_file.filename}, xmp_body={type(itxt_body)})",
                 )
                 return ContentsMetadata()
         else:
-            logging.warning(f"Unexpected contents suffix (file={image_file.filename})")
+            write_log(
+                "warning",
+                __name__,
+                f"Unexpected contents suffix (file={image_file.filename})",
+            )
             return ContentsMetadata()
 
     # ロード

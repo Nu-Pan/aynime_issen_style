@@ -44,7 +44,7 @@ from utils.duration_and_frame_rate import DFR_MAP
 from utils.constants import *
 from utils.image import PlaybackMode, ContentsMetadata
 from utils.windows import sanitize_text
-from utils.std import PerfLogger
+from utils.ais_logging import PerfLogger
 
 
 type AuxProcess = Callable[[AISImage], AISImage]

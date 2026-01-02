@@ -1,6 +1,5 @@
 # std
 import sys
-import logging
 import threading
 
 # Tk/CTk
@@ -10,7 +9,7 @@ import customtkinter as ctk
 from utils.windows import SystemWideMutex
 from utils.constants import APP_NAME_EN
 from utils.ctk import show_error_dialog
-from utils.logging import setup_logging, setup_logging_ctk
+from utils.ais_logging import setup_logging, setup_logging_ctk, write_log
 from utils.version_constants import COMMIT_HASH, BUILD_DATE
 
 # gui
@@ -40,15 +39,15 @@ def main():
     #   ここで止めないとホットキー登録でコケて、ユーザーにとって理解しにくいエラーが出る
     system_wide_mutex = SystemWideMutex(APP_NAME_EN)
     if system_wide_mutex.already_exists:
-        show_error_dialog("アプリはすでに起動しています")
+        show_error_dialog(__name__, "アプリはすでに起動しています")
         sys.exit(-1)
 
     # ロギング挙動を設定
     setup_logging()
 
     # バージョン情報をログにダンプ
-    logging.info(f"COMMIT_HASH = {COMMIT_HASH}")
-    logging.info(f"BUILD_DATE = {BUILD_DATE}")
+    write_log("info", __name__, f"COMMIT_HASH = {COMMIT_HASH}")
+    write_log("info", __name__, f"BUILD_DATE = {BUILD_DATE}")
 
     # 本体の CTk アプリを生成
     ais_app = AynimeIssenStyleApp()

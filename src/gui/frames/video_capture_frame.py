@@ -424,21 +424,25 @@ class VideoCaptureFrame(AISFrame, TkinterDnD.DnDWrapper):
         # 最低２フレーム必要
         video_model = self._model.video
         if video_model.num_enable_frames < 2:
-            show_error_dialog("動画の保存には最低でも 2 フレーム必要だよ")
+            show_error_dialog(
+                str(__class__), "動画の保存には最低でも 2 フレーム必要だよ"
+            )
             return
 
         # 動画ファイルとして保存
         try:
             video_file_path = save_content_model(video_model)
         except Exception as e:
-            show_error_dialog("動画ファイルの保存に失敗", e)
+            show_error_dialog(str(__class__), "動画ファイルの保存に失敗", e)
             return
 
         # クリップボードに転送
         file_to_clipboard(video_file_path)
 
         # クリップボード転送完了通知
-        show_notify_label(self, "info", "「一閃」\nクリップボード転送完了")
+        show_notify_label(
+            self, "info", str(__class__), "「一閃」\nクリップボード転送完了"
+        )
 
     def _on_remove_all_button_clicked(self):
         """
@@ -548,10 +552,21 @@ class VideoCaptureFrame(AISFrame, TkinterDnD.DnDWrapper):
         model = self._model.video
 
         # キャプチャ
-        frames = self._model.stream.capture_video(
-            fps=self._record_frame_rate_slider.value,
-            duration_in_sec=self._record_length_slider.value,
-        )
+        try:
+            frames = self._model.stream.capture_video(
+                fps=self._record_frame_rate_slider.value,
+                duration_in_sec=self._record_length_slider.value,
+            )
+        except Exception as e:
+            show_notify_label(
+                self,
+                "error",
+                str(__class__),
+                "キャプチャに失敗。\n"
+                "キャプチャ対象のディスプレイ・ウィンドウの選択を忘れている？",
+                exception=e,
+            )
+            return
 
         # アニメ名を解決
         if self._nime_name_entry.text != "":
@@ -584,7 +599,7 @@ class VideoCaptureFrame(AISFrame, TkinterDnD.DnDWrapper):
         # 読み込み対象を解決
         file_paths = cast(tuple[str], self.tk.splitlist(event_data))
         if len(file_paths) > 1:
-            show_error_dialog("ファイルは１つだけドロップしてね。")
+            show_error_dialog(str(__class__), "ファイルは１つだけドロップしてね。")
             return
         else:
             file_path = file_paths[0]
@@ -593,7 +608,7 @@ class VideoCaptureFrame(AISFrame, TkinterDnD.DnDWrapper):
         try:
             new_model = load_content_model(Path(file_path))
         except Exception as e:
-            show_error_dialog("ファイルロードに失敗。", e)
+            show_error_dialog(str(__class__), "ファイルロードに失敗。", e)
             return
 
         # サムネイルのリサイズ設定を避けておく
