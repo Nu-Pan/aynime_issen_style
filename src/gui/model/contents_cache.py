@@ -1899,7 +1899,7 @@ def save_content_model(model: ImageModel | VideoModel) -> Path:
             # NIME フレームを展開
             nime_frames = [
                 f.pil_image
-                for f in model.iter_frames(ImageLayer.NIME, enable_only=False)
+                for f in model.iter_frames(ImageLayer.NIME, enable_only=True)
                 if isinstance(f, AISImage)
             ]
 
