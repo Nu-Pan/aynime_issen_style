@@ -385,7 +385,7 @@ def write_log(
         fmt_str = message.strip()
     else:
         # メッセージ本体を追加
-        fmt_str = message
+        fmt_str = message.strip()
         # 位置情報を追加
         # NOTE
         #   エラー系レベルか、指定があれば表示
@@ -405,7 +405,7 @@ def write_log(
         # NOTE
         #   このログの２行目以降に空白４文字のインデントで表示する
         if "\n" in fmt_str:
-            fmt_str = "\n" + "\n".join("    " + l for l in fmt_str.split("\n"))
+            fmt_str = "▼\n" + "\n".join("    " + l for l in fmt_str.split("\n"))
 
     # ログレベルで呼び分け
     logger = logging.getLogger()

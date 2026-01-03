@@ -2000,6 +2000,7 @@ def load_content_model(file_path: Path) -> ImageModel | VideoModel:
     write_log(
         "info",
         f"file_path = {file_path}\nactual_file_path = {actual_file_path}",
+        show_location=True,
     )
 
     # 使用する NIME 名・タイムスタンプを解決
