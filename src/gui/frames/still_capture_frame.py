@@ -127,7 +127,12 @@ class StillCaptureFrame(AISFrame, TkinterDnD.DnDWrapper):
         )
         self.ais.grid_child(self._capture_timing_slider, 3, 0)
         self.ais.rowconfigure(3, weight=0)
-        self._capture_timing_slider.set_value(0.35)
+        self._capture_timing_slider.set_value(
+            self._model.user_properties.get("still_capture_timing", 0.1)
+        )
+        self._capture_timing_slider.register_handler(
+            self._on_capture_timing_slider_changed
+        )
 
         # ファイルドロップ関係
         self.drop_target_register(DND_FILES)
@@ -242,6 +247,12 @@ class StillCaptureFrame(AISFrame, TkinterDnD.DnDWrapper):
             "「一閃」\nクリップボード転送完了",
             on_click_handler=self.on_preview_label_click,
         )
+
+    def _on_capture_timing_slider_changed(self, value: float):
+        """
+        キャプチャタイミングスライダーに変更があった時に呼び出されるハンドラ
+        """
+        self._model.user_properties.set("still_capture_timing", value)
 
     def _on_drop_file(self, event: DnDEvent):
         """
