@@ -36,7 +36,7 @@ NUMERIC_FONT_PATH = Path("C:\\Windows\\Fonts\\Consolas.ttc")
 VERSION_FILE_PATH = Path("src\\utils\\version_constants.py")
 
 # ユーザープロパティファイルのパス
-USER_PROPERTIES_FILE_PATH = Path.cwd() / "user_propreties.json"
+USER_PROPERTIES_FILE_PATH = Path.cwd() / "user_properties.json"
 
 # キャプチャ保存先
 # NOTE

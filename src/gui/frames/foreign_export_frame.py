@@ -265,8 +265,7 @@ class ForeignExportFrame(AISFrame, TkinterDnD.DnDWrapper):
             # NOTE
             #   X(Twitter) の上限は長辺 4096px
             nime_resize_desc = ResizeDesc(
-                AspectRatioPattern.E_RAW,
-                Resolution(4096, 4096, "X(Twitter) Limitation"),
+                AspectRatioPattern.E_RAW, ResolutionPattern.E_X_TWITTER_STILL_LIMIT
             )
         else:
             raise ValueError("Invalid ExportTarget")
