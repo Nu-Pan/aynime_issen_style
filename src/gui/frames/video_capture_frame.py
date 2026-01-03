@@ -485,7 +485,7 @@ class VideoCaptureFrame(AISFrame, TkinterDnD.DnDWrapper):
         with VideoModelEditSession(self._model.video) as edit:
             edit.set_enable(None, False)
 
-    def _on_disable_dupe_slider_changed(self, value: float):
+    def _on_disable_dupe_slider_changed(self, value: int):
         """
         重複無効化しきい値スラーだ変更に呼び出されるハンドラ
         """

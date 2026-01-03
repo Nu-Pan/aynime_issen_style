@@ -9,22 +9,42 @@ import time
 from utils.constants import USER_PROPERTIES_FILE_PATH
 from utils.ais_logging import write_log
 
-T = TypeVar("T")
+type JsonPrimitive = str | int | float | bool | None
+type JsonValue = JsonPrimitive | list[JsonValue] | dict[str, JsonValue]
+
+T = TypeVar("T", bound=JsonValue)
 
 
-def _is_json_serializable(obj: Any, path="$") -> bool:
+def is_json_serializable(obj: Any, current_path: list[str | int] = []) -> list[str]:
     """
-    value がプロパティとして合法な値なら True をかえす
+    value がプロパティとして合法かどうかチェックし、問題のある要素のパスをリストで返す。
     list, dict みたいな構造オブジェクトの場合は再帰的に全要素をチェックする。
+    問題のある要素の情報をリストで返すので、空のリストが返ってきたら合法ということ
     """
     if isinstance(obj, (list, tuple)):
-        return all(_is_json_serializable(v) for v in obj)
+        return [
+            e
+            for i, v in enumerate(obj)
+            for e in is_json_serializable(v, current_path + [i])
+        ]
     elif isinstance(obj, dict):
-        return all(
-            isinstance(k, str) and _is_json_serializable(v) for k, v in obj.items()
-        )
+        return [
+            e
+            for k, v in obj.items()
+            for e in is_json_serializable(v, current_path + [k])
+        ]
+    elif isinstance(obj, (int, float, str)) or obj is None:
+        return []
     else:
-        return isinstance(obj, (int, float, str)) or obj is None
+        error_path_str = "root"
+        for i, p in enumerate(current_path):
+            if isinstance(p, str):
+                error_path_str += f".{p}"
+            elif isinstance(p, int):
+                error_path_str += f"[{p}]"
+            else:
+                error_path_str += "???" if i == 0 else ".???"
+        return [f"path={error_path_str}, type={type(obj)}, value={str(obj)[:20]}"]
 
 
 class UserProperties:
@@ -90,18 +110,21 @@ class UserProperties:
                 self._properties[key] = default_value
                 return default_value
 
-    def set(self, key: str, value: int | float | str | None):
+    def set(self, key: str, value: JsonValue):
         """
         値を設定する
         """
-        if _is_json_serializable(value):
+        json_check = is_json_serializable(value)
+        if len(json_check) == 0:
             with self._lock:
                 self._properties[key] = value
                 self._flush_deadline = (
                     time.monotonic() + UserProperties._DEBOUNS_DURATION
                 )
         else:
-            raise ValueError(f"{value} is not json serializable")
+            raise ValueError(
+                f"{value} is not json serializable\n" + "\n".join(json_check)
+            )
 
     def _thread_handler(self):
         """
