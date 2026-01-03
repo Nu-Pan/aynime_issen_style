@@ -208,7 +208,8 @@ class Resolution:
         elif pattern == ResolutionPattern.E_4K:
             return Resolution(3840, None, "3840")
         elif pattern == ResolutionPattern.E_X_TWITTER_STILL_LIMIT:
-            return Resolution(4096, None, "X(Twitter) STILL LIMIT")
+            # NOTE X(Twitetr) は長辺 4096 が上限なので、ここだけ width, height 両方を指定する
+            return Resolution(4096, 4096, "X(Twitter) STILL LIMIT")
         elif pattern == ResolutionPattern.E_RAW:
             return Resolution(None, None, "RAW")
         else:

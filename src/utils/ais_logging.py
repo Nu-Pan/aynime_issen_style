@@ -179,7 +179,7 @@ class TkInterExceptionHandler:
         write_log(
             "critical",
             "Uncaught exception (by CTk report_callback_exception)",
-            exception=exc,
+            exception=val,
         )
         try:
             tkinter.messagebox.showerror(
@@ -276,7 +276,7 @@ def setup_logging_ctk(ctk_app: ctk.CTk):
     ctk_app.report_callback_exception = TkInterExceptionHandler(LOG_DIR_PATH)
 
 
-def traceback_str(exception: Exception) -> str:
+def traceback_str(exception: Exception | BaseException) -> str:
     """
     excetpion からトレースバック文字列を生成する
     """
@@ -385,7 +385,7 @@ def write_log(
         fmt_str = message.strip()
     else:
         # メッセージ本体を追加
-        fmt_str = message
+        fmt_str = message.strip()
         # 位置情報を追加
         # NOTE
         #   エラー系レベルか、指定があれば表示
@@ -393,9 +393,9 @@ def write_log(
         if need_location:
             fmt_str += f"\nfrom {infer_log_category(num_frame_skip + 1)}, {infer_log_file_line(num_frame_skip + 1)}"
         # 例外情報を追加
-        if isinstance(exception, Exception):
+        if isinstance(exception, (Exception, BaseException)):
             fmt_str += "\n" + traceback_str(exception)
-        elif isinstance(exception, BaseException):
+        elif exception is not None:
             fmt_str += "\n" + str(exception)
 
         # 前後の余計な文字を削除
@@ -405,7 +405,7 @@ def write_log(
         # NOTE
         #   このログの２行目以降に空白４文字のインデントで表示する
         if "\n" in fmt_str:
-            fmt_str = "\n" + "\n".join("    " + l for l in fmt_str.split("\n"))
+            fmt_str = "▼\n" + "\n".join("    " + l for l in fmt_str.split("\n"))
 
     # ログレベルで呼び分け
     logger = logging.getLogger()

@@ -159,7 +159,7 @@ class ForeignExportFrame(AISFrame, TkinterDnD.DnDWrapper):
         self._crop_square_size_slider = AISSlider(
             self,
             "SIZE",
-            [min(1.0, max(0.0, i / 100)) for i in range(0, 101)],
+            [i / 100 for i in range(5, 101)],
             lambda lho, rho: abs(lho - rho),
             lambda x: f"{round(x * 100):3d}",
             "%",
@@ -265,8 +265,7 @@ class ForeignExportFrame(AISFrame, TkinterDnD.DnDWrapper):
             # NOTE
             #   X(Twitter) の上限は長辺 4096px
             nime_resize_desc = ResizeDesc(
-                AspectRatioPattern.E_RAW,
-                Resolution(4096, 4096, "X(Twitter) Limitation"),
+                AspectRatioPattern.E_RAW, ResolutionPattern.E_X_TWITTER_STILL_LIMIT
             )
         else:
             raise ValueError("Invalid ExportTarget")

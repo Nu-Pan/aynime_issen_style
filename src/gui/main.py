@@ -62,7 +62,10 @@ def main():
     _splash = SplashWindow(ais_app, lambda: not startup_thread.is_alive())
 
     # CTk アプリの mainloop を開始
-    ais_app.mainloop()
+    try:
+        ais_app.mainloop()
+    finally:
+        ais_app.close()
 
 
 if __name__ == "__main__":

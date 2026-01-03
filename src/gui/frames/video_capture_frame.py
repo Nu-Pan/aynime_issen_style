@@ -299,7 +299,10 @@ class VideoCaptureFrame(AISFrame, TkinterDnD.DnDWrapper):
             "%",
         )
         self._input_kind_frame.ais.grid_child(self._disable_dupe_slider, 2, 0, 1, 4)
-        self._disable_dupe_slider.set_value(99900)
+        self._disable_dupe_slider.set_value(
+            self._model.user_properties.get("disable_dupe_threshold", 99500)
+        )
+        self._disable_dupe_slider.register_handler(self._on_disable_dupe_slider_changed)
 
         # 重複無効化ボタン
         self._disable_dupe_button = ctk.CTkButton(
@@ -346,7 +349,10 @@ class VideoCaptureFrame(AISFrame, TkinterDnD.DnDWrapper):
         )
         self._input_kind_frame.ais.grid_child(self._record_length_slider, 4, 0, 1, 4)
         self._record_length_slider.set_value(
-            min(3, CAPTURE_FRAME_BUFFER_DURATION_IN_SEC)
+            self._model.user_properties.get("record_duration", 3)
+        )
+        self._record_length_slider.register_handler(
+            self._on_record_length_slider_changed
         )
 
         # レコードボタン
@@ -479,6 +485,12 @@ class VideoCaptureFrame(AISFrame, TkinterDnD.DnDWrapper):
         with VideoModelEditSession(self._model.video) as edit:
             edit.set_enable(None, False)
 
+    def _on_disable_dupe_slider_changed(self, value: int):
+        """
+        重複無効化しきい値スラーだ変更に呼び出されるハンドラ
+        """
+        self._model.user_properties.set("disable_dupe_threshold", value)
+
     def _on_disable_dupe_button_clicked(self):
         """
         重複無効化ボタンハンドラ
@@ -539,6 +551,12 @@ class VideoCaptureFrame(AISFrame, TkinterDnD.DnDWrapper):
                 aspect_ratio=resize_desc.aspect_ratio.pattern,
                 resolution=resize_desc.resolution.pattern,
             )
+
+    def _on_record_length_slider_changed(self, value: float):
+        """
+        レコード秒数スライダ変更ハンドラ
+        """
+        self._model.user_properties.set("record_duration", value)
 
     def _on_record_button_clicked(self):
         """

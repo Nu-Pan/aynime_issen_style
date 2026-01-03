@@ -112,8 +112,26 @@ class AynimeIssenStyleApp(ctk.CTk, TkinterDnD.DnDWrapper):
             "K", lambda: self.tabview.set(VideoCaptureFrame.UI_TAB_NAME)
         )
 
+        #
+        self.protocol("WM_DELETE_WINDOW", self._on_window_close)
+
+    def close(self):
+        """
+        後始末
+        """
+        self.model.close()
+
     def on_tab_change(self, tab_name: str | None = None) -> None:
-        """タブ切り替え時に呼ばれるコールバック"""
+        """
+        タブ切り替え時に呼ばれるハンドラ
+        """
         current_tab_name = tab_name or self.tabview.get()
         if current_tab_name == WindowSelectionFrame.UI_TAB_NAME:
             self.window_select_frame.update_list()
+
+    def _on_window_close(self) -> None:
+        """
+        ウィンドウ破棄時（クローズボタンクリック）に呼び出されるハンドラ
+        """
+        self.close()
+        self.destroy()

@@ -11,3 +11,4 @@ __pycache__
 /memo.md
 *.egg-info
 /proposal/*
+/user_properties.json
