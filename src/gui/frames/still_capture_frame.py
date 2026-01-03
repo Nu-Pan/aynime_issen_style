@@ -149,7 +149,6 @@ class StillCaptureFrame(AISFrame, TkinterDnD.DnDWrapper):
             show_notify_label(
                 self,
                 "error",
-                str(__class__),
                 "キャプチャに失敗。\n"
                 "キャプチャ対象のディスプレイ・ウィンドウの選択を忘れている？",
                 exception=e,
@@ -240,7 +239,6 @@ class StillCaptureFrame(AISFrame, TkinterDnD.DnDWrapper):
         show_notify_label(
             self,
             "info",
-            str(__class__),
             "「一閃」\nクリップボード転送完了",
             on_click_handler=self.on_preview_label_click,
         )
@@ -260,7 +258,7 @@ class StillCaptureFrame(AISFrame, TkinterDnD.DnDWrapper):
         # 読み込み対象を解決
         file_paths = cast(tuple[str], self.tk.splitlist(event_data))
         if len(file_paths) > 1:
-            show_error_dialog(str(__class__), "ファイルは１つだけドロップしてね。")
+            show_error_dialog("ファイルは１つだけドロップしてね。")
             return
         else:
             file_path = file_paths[0]
@@ -269,7 +267,7 @@ class StillCaptureFrame(AISFrame, TkinterDnD.DnDWrapper):
         try:
             new_model = load_content_model(Path(file_path))
         except Exception as e:
-            show_error_dialog(str(__class__), "ファイルロードに失敗。", e)
+            show_error_dialog("ファイルロードに失敗。", e)
             raise
 
         # AIS モデルに設定

@@ -41,7 +41,6 @@ def configure_presence(widget: ctk.CTkBaseClass, content: PhotoImage | str):
 def show_notify_label(
     widget: ctk.CTkBaseClass,
     level: LogLevel,
-    category: str,
     message: str,
     *,
     exception: Exception | None = None,
@@ -94,13 +93,13 @@ def show_notify_label(
         status_label.bind("<Button-1>", on_click_handler)
 
     # ログにも流す
-    write_log(level, category, message, exception=exception)
+    write_log(level, message, exception=exception, num_frame_skip=1)
 
     # 通知ラベルは一定時間後に自動破棄
     widget.after(duration_ms, status_label.destroy)
 
 
-def show_error_dialog(category: str, message: str, exception: Exception | None = None):
+def show_error_dialog(message: str, exception: Exception | None = None):
     """
     エラーダイアログを表示する。
     デバッグ情報として e の説明文字列を添付する
@@ -115,7 +114,7 @@ def show_error_dialog(category: str, message: str, exception: Exception | None =
     mb.showerror(APP_NAME_JP, dialog_str)
 
     # ロガーにも流す
-    write_log("error", category, message, exception=exception)
+    write_log("error", message, exception=exception, num_frame_skip=1)
 
 
 def place_window_to_display_center(

@@ -39,15 +39,15 @@ def main():
     #   ここで止めないとホットキー登録でコケて、ユーザーにとって理解しにくいエラーが出る
     system_wide_mutex = SystemWideMutex(APP_NAME_EN)
     if system_wide_mutex.already_exists:
-        show_error_dialog(__name__, "アプリはすでに起動しています")
+        show_error_dialog("アプリはすでに起動しています")
         sys.exit(-1)
 
     # ロギング挙動を設定
     setup_logging()
 
     # バージョン情報をログにダンプ
-    write_log("info", __name__, f"COMMIT_HASH = {COMMIT_HASH}")
-    write_log("info", __name__, f"BUILD_DATE = {BUILD_DATE}")
+    write_log("info", f"COMMIT_HASH = {COMMIT_HASH}")
+    write_log("info", f"BUILD_DATE = {BUILD_DATE}")
 
     # 本体の CTk アプリを生成
     ais_app = AynimeIssenStyleApp()

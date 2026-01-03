@@ -44,7 +44,7 @@ from utils.duration_and_frame_rate import DFR_MAP
 from utils.constants import *
 from utils.image import PlaybackMode, ContentsMetadata
 from utils.windows import sanitize_text
-from utils.ais_logging import PerfLogger
+from utils.ais_logging import write_log, PerfLogger
 
 
 type AuxProcess = Callable[[AISImage], AISImage]
@@ -1960,24 +1960,33 @@ def load_content_model(file_path: Path) -> ImageModel | VideoModel:
 
     # 対応する RAW ファイル候補を列挙
     if is_video:
-        raw_file_path_cands = [
+        raw_file_path_cands = {
             p
             for p in RAW_DIR_PATH.glob(f"**/{file_path.stem}.*")
             if p.suffix.lower() in RAW_VIDEO_INOUT_SUFFIXES
-        ]
+        }
     else:
-        raw_file_path_cands = [
+        raw_file_path_cands = {
             p
             for p in RAW_DIR_PATH.glob(f"**/{file_path.stem}.*")
             if p.suffix.lower() in RAW_STILL_INOUT_SUFFIXES
-        ]
+        }
 
     # 対応する RAW ファイルを確定させる
-    # TODO
-    #   複数ヒットした際の優先順位ルールを書くべき
-    #   zip, webp なら webp を優先みたいな話
-    if len(raw_file_path_cands) >= 1:
-        raw_file_path = sorted(raw_file_path_cands)[0]
+    # NOTE
+    #   複数候補があった場合、現行実装での出力フォーマットを優先して選択する。
+    if len(raw_file_path_cands) > 0:
+        raw_file_path_cands_first = {
+            p
+            for p in raw_file_path_cands
+            if p.suffix.lower()
+            == (RAW_VIDEO_OUT_SUFFIX if is_video else RAW_STILL_OUT_SUFFIX)
+        }
+        raw_file_path_cands_second = raw_file_path_cands - raw_file_path_cands_first
+        if len(raw_file_path_cands_first) > 0:
+            raw_file_path = sorted(raw_file_path_cands_first)[0]
+        else:
+            raw_file_path = sorted(raw_file_path_cands_second)[0]
     else:
         raw_file_path = None
 
@@ -1986,6 +1995,12 @@ def load_content_model(file_path: Path) -> ImageModel | VideoModel:
         actual_file_path = raw_file_path
     else:
         actual_file_path = file_path
+
+    # ファイルパスの解決結果をログに流す
+    write_log(
+        "info",
+        f"file_path = {file_path}\nactual_file_path = {actual_file_path}",
+    )
 
     # 使用する NIME 名・タイムスタンプを解決
     nime_name, time_stamp = parse_nime_file_stem(actual_file_path.stem)

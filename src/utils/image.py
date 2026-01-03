@@ -1014,7 +1014,6 @@ class ContentsMetadata:
         except:
             write_log(
                 "warning",
-                str(__class__),
                 f"Failed to deserialize contents metadata (body_str={body_str})",
             )
             return ContentsMetadata()
@@ -1046,9 +1045,7 @@ class ContentsMetadata:
         try:
             body_str = body.decode("utf-8", errors="replace")
         except:
-            write_log(
-                "warning", str(__class__), f"Failed to decode contents metadata bytes"
-            )
+            write_log("warning", f"Failed to decode contents metadata bytes")
             return ContentsMetadata()
 
         # 正規表現でパース
@@ -1315,7 +1312,6 @@ def smart_pil_load(
             else:
                 write_log(
                     "warning",
-                    __name__,
                     f"Unexpected XMP object (file={image_file.filename}, xmp_body={type(xmp_body)})",
                 )
                 return ContentsMetadata()
@@ -1326,7 +1322,6 @@ def smart_pil_load(
             else:
                 write_log(
                     "warning",
-                    __name__,
                     f"Unexpected comment object (file={image_file.filename}, xmp_body={type(comment_body)})",
                 )
                 return ContentsMetadata()
@@ -1342,14 +1337,12 @@ def smart_pil_load(
             else:
                 write_log(
                     "warning",
-                    __name__,
                     f"Unexpected itxt object (file={image_file.filename}, xmp_body={type(itxt_body)})",
                 )
                 return ContentsMetadata()
         else:
             write_log(
                 "warning",
-                __name__,
                 f"Unexpected contents suffix (file={image_file.filename})",
             )
             return ContentsMetadata()

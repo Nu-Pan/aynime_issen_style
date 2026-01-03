@@ -111,7 +111,6 @@ class WindowSelectionFrame(AISFrame):
             show_notify_label(
                 self,
                 "error",
-                str(__class__),
                 f'"{selection.window_name}" のキャプチャ開始に失敗',
                 exception=e,
             )
