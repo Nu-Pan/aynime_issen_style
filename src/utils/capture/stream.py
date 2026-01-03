@@ -190,16 +190,20 @@ class CaptureStream:
         """
         動画（連番静止画）をキャプチャする
         """
+        # セッション構築前の呼び出しはエラー
         if self._session is None:
-            return []
-        else:
-            frames: list[AISImage] = []
-            with ayc.Snapshot(self._session, fps, duration_in_sec) as snapshot:
-                for frame_index in range(snapshot.size):
-                    frame_args = snapshot.GetFrame(frame_index)
-                    ais_image = AISImage.from_bytes(*frame_args)
-                    frames.append(ais_image)
-            return frames
+            raise ValueError("Capture session not started")
+
+        # 直近のスナップショットを取得
+        frames: list[AISImage] = []
+        with ayc.Snapshot(self._session, fps, duration_in_sec) as snapshot:
+            for frame_index in range(snapshot.size):
+                frame_args = snapshot.GetFrame(frame_index)
+                ais_image = AISImage.from_bytes(*frame_args)
+                frames.append(ais_image)
+
+        # 正常終了
+        return frames
 
     def release(self) -> None:
         """

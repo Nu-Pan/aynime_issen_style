@@ -4,8 +4,10 @@ __pycache__
 /release/
 /raw/
 /nime/
+/tensei/
 /*.spec
 /src/utils/version_constants.py
 /log/
 /memo.md
 *.egg-info
+/proposal/*

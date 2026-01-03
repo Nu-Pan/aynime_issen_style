@@ -131,6 +131,13 @@ class DFRMap:
         """
         return self.by_frame_rate(FILM_TIMELINE_IN_FPS)
 
+    @property
+    def slowest_entry(self) -> DFREntry:
+        """
+        最もフレームレートが低い（遅い）エントリーを取得する
+        """
+        return self._entries[-1]
+
 
 # 合法で意味のある周期・フレームレートのマップ
 # NOTE

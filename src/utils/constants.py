@@ -40,6 +40,7 @@ VERSION_FILE_PATH = Path("src\\utils\\version_constants.py")
 #   nime はリサイズなどの処理適用済みの最終結果画像の保存先
 #   raw は処理適用前のオリジナルのキャプチャ画像の保存先
 NIME_DIR_PATH = Path.cwd() / "nime"
+TENSEI_DIR_PATH = Path.cwd() / "tensei"
 RAW_DIR_PATH = Path.cwd() / "raw"
 LOG_DIR_PATH = Path.cwd() / "log"
 
@@ -57,7 +58,6 @@ CAPTURE_FRAME_BUFFER_DURATION_IN_SEC = 5
 #       NIME フォルダ上に存在して良い拡張子
 #       歴史的経緯でいろいろな拡張子があり得る
 NIME_STILL_OUT_SUFFIX = ".webp"
-NIME_STILL_OUT_PIL_FORMAT = "WEBP"
 NIME_VIDEO_OUT_SUFFIX = ".avif"
 # NIME_VIDEO_OUT_PIL_FORMAT = ...
 NIME_STILL_INOUT_SUFFIXES = {NIME_STILL_OUT_SUFFIX, ".jpg", ".jpeg"}
@@ -66,7 +66,6 @@ NIME_CONTENT_INOUT_SUFFIXES = NIME_STILL_INOUT_SUFFIXES | NIME_VIDEO_INOUT_SUFFI
 
 # 拡張子(RAW)
 RAW_STILL_OUT_SUFFIX = ".png"
-RAW_STILL_OUT_PIL_FORMAT = "PNG"
 RAW_VIDEO_OUT_SUFFIX = ".webp"
 # RAW_VIDEO_OUT_PIL_FORMAT = ...
 RAW_STILL_INOUT_SUFFIXES = {RAW_STILL_OUT_SUFFIX}

@@ -34,11 +34,21 @@ from utils.image import (
     ResizeDesc,
     ResizeMode,
     AISImage,
+    is_video_file,
+    ContentsMetadata,
+    smart_pil_save,
+    smart_pil_load,
+    ExportTarget,
 )
 from utils.duration_and_frame_rate import DFR_MAP
 from utils.constants import *
+from utils.image import PlaybackMode, ContentsMetadata
 from utils.windows import sanitize_text
-from utils.std import PerfLogger
+from utils.ais_logging import write_log, PerfLogger
+
+
+type AuxProcess = Callable[[AISImage], AISImage]
+type NotifyHandler = Callable[[], None]
 
 
 class FontCache:
@@ -109,10 +119,6 @@ def parse_nime_file_stem(stem: str) -> tuple[str | None, str | None]:
         else:
             time_stamp = None
     return nime_name, time_stamp
-
-
-type AuxProcess = Callable[[AISImage], AISImage]
-type NotifyHandler = Callable[[], None]
 
 
 class CachedContent(ABC):
@@ -215,6 +221,102 @@ class CachedSourceImage(CachedContent):
         return self._source
 
 
+class CachedCropSquareImage(CachedContent):
+    """
+    正方形領域の切り出しとそのキャッシュ機能を持つ画像クラス
+    """
+
+    type Output = AISImage
+
+    def __init__(self, parent: CachedContent):
+        """
+        コンストラクタ
+        """
+        super().__init__(parent)
+        self._size_ratio = None
+        self._x_ratio = None
+        self._y_ratio = None
+        self._output: AISImage | None = None
+
+    def set_crop_params(
+        self, size_ratio: float | None, x_ratio: float | None, y_ratio: float | None
+    ) -> Self:
+        """
+        切り出しパラメータを設定する
+        元画像上のどこを切り出すか？　これを決める
+        位置・サイズ共に元画像に対する比率で指定する
+        """
+        if (
+            self._size_ratio != size_ratio
+            or self._x_ratio != x_ratio
+            or self._y_ratio != y_ratio
+        ):
+            self._size_ratio = size_ratio
+            self._x_ratio = x_ratio
+            self._y_ratio = y_ratio
+            self.mark_dirty()
+        return self
+
+    @property
+    def crop_params(self) -> tuple[float | None, float | None, float | None]:
+        """
+        切り出しパラメータを取得する
+        """
+        return self._size_ratio, self._x_ratio, self._y_ratio
+
+    @property
+    def output(self) -> AISImage | None:
+        """
+        出力を取得する
+        ダーティー状態は暗黙に解決される。
+        """
+        # ダーティ状態を解消
+        if self.is_dirty:
+            # 必要なものが…
+            parent_output = self.parent_output
+            if (
+                isinstance(parent_output, AISImage)
+                and self._size_ratio is not None
+                and self._x_ratio is not None
+                and self._y_ratio is not None
+            ):
+                # すべて揃っている場合、更新
+                square_size = self._size_ratio * min(
+                    parent_output.width, parent_output.height
+                )
+                left = self._x_ratio * parent_output.width - square_size / 2
+                right = self._x_ratio * parent_output.width + square_size / 2
+                if left < 0:
+                    left = 0
+                    right = square_size
+                elif right > parent_output.width:
+                    left = parent_output.width - square_size
+                    right = parent_output.width
+                top = self._y_ratio * parent_output.height - square_size / 2
+                bottom = self._y_ratio * parent_output.height + square_size / 2
+                if top < 0:
+                    top = 0
+                    bottom = square_size
+                elif bottom > parent_output.height:
+                    top = parent_output.height - square_size
+                    bottom = parent_output.height
+                self._output = AISImage(
+                    parent_output.pil_image.crop(
+                        (round(left), round(top), round(right), round(bottom))
+                    )
+                )
+            elif isinstance(parent_output, AISImage):
+                # 元画像はあるけど切り出しパラメータが未指定なら、パススルー
+                self._output = parent_output
+            else:
+                # 画像すらない場合、単にクリア
+                self._output = None
+            self.mark_resolved()
+
+        # 正常終了
+        return self._output
+
+
 class CachedScalableImage(CachedContent):
     """
     拡大縮小とそのキャッシュ機能を持つ画像クラス
@@ -225,7 +327,7 @@ class CachedScalableImage(CachedContent):
     def __init__(
         self,
         parent: CachedContent,
-        mode: ResizeMode,
+        resize_mode: ResizeMode,
         aux_process: AuxProcess | None = None,
     ):
         """
@@ -235,7 +337,7 @@ class CachedScalableImage(CachedContent):
         super().__init__(parent)
 
         # 定数
-        self._mode = mode
+        self._resize_mode = resize_mode
         self._aux_process = aux_process
 
         # 遅延変数
@@ -251,12 +353,28 @@ class CachedScalableImage(CachedContent):
             self._size = size
         return self
 
+    def set_resize_mode(self, resize_mode: ResizeMode) -> Self:
+        """
+        リサイズモードを設定
+        """
+        if self._resize_mode != resize_mode:
+            self.mark_dirty()
+            self._resize_mode = resize_mode
+        return self
+
     @property
     def size(self) -> ResizeDesc:
         """
         スケーリング後のサイズを取得
         """
         return self._size
+
+    @property
+    def resize_mode(self) -> ResizeMode:
+        """
+        リサイズモードを取得
+        """
+        return self._resize_mode
 
     @property
     def output(self) -> AISImage | None:
@@ -271,7 +389,7 @@ class CachedScalableImage(CachedContent):
             if parent_output is not None and self._size is not None:
                 # 揃っている場合、更新
                 if isinstance(parent_output, AISImage):
-                    self._output = parent_output.resize(self._size, self._mode)
+                    self._output = parent_output.resize(self._size, self._resize_mode)
                 else:
                     raise TypeError(type(parent_output))
                 if self._aux_process is not None:
@@ -636,6 +754,7 @@ class ImageModel:
         nime_name: str | None = None,
         time_stamp: str | None = None,
         enable: bool = True,
+        nime_resize_mode: ResizeMode | None = None,
     ):
         """
         コンストラクタ
@@ -645,29 +764,31 @@ class ImageModel:
         """
         # 各画像メンバ
         self._raw_image = CachedSourceImage()
+        self._crop_square_image = CachedCropSquareImage(self._raw_image)
         self._nime_image = CachedScalableImage(
-            self._raw_image, ResizeMode.COVER, aux_process=self._aux_process_nime
+            self._crop_square_image,
+            ResizeMode.COVER if nime_resize_mode is None else nime_resize_mode,
+            aux_process=self._aux_process_nime,
         )
-        self._preview_pil_image = CachedScalableImage(
-            self._nime_image, ResizeMode.CONTAIN
-        )
-        self._thumbnail_pil_image_enable = CachedScalableImage(
+        self._preview_image = CachedScalableImage(self._nime_image, ResizeMode.CONTAIN)
+        self._thumbnail_image_enable = CachedScalableImage(
             self._nime_image, ResizeMode.COVER
         )
-        self._thumbnail_pil_image_disable = CachedScalableImage(
-            self._thumbnail_pil_image_enable,
+        self._thumbnail_image_disable = CachedScalableImage(
+            self._thumbnail_image_enable,
             ResizeMode.COVER,
             aux_process=make_disabled_image,
         )
 
         # 通知ハンドラ
-        self._notify_handlers = {
+        self._image_changed_handlers = {
             image_layer: cast(list[NotifyHandler], []) for image_layer in ImageLayer
         }
 
         # 初期設定
         self._raw_image.set_source(raw_image)
         self._nime_name = nime_name
+        self._overlay_nime_name = True
         self._time_stamp = time_stamp
         self._enable = enable
 
@@ -677,6 +798,13 @@ class ImageModel:
         アニメ名を取得する
         """
         return self._nime_name
+
+    @property
+    def overlay_nime_name(self) -> bool:
+        """
+        True なら、画像のアニメ名をオーバーレイする
+        """
+        return self._overlay_nime_name
 
     @property
     def time_stamp(self) -> str | None:
@@ -692,6 +820,13 @@ class ImageModel:
         """
         return self._enable
 
+    @property
+    def crop_params(self) -> tuple[float | None, float | None, float | None]:
+        """
+        切り出しパラメータを取得する
+        """
+        return self._crop_square_image.crop_params
+
     def get_size(self, layer: ImageLayer) -> ResizeDesc:
         """
         指定 layer のリサイズ挙動を取得する。
@@ -702,9 +837,31 @@ class ImageModel:
             case ImageLayer.NIME:
                 return self._nime_image.size
             case ImageLayer.PREVIEW:
-                return self._preview_pil_image.size
+                return self._preview_image.size
             case ImageLayer.THUMBNAIL:
-                return self._thumbnail_pil_image_enable.size
+                if self._enable:
+                    return self._thumbnail_image_enable.size
+                else:
+                    return self._thumbnail_image_disable.size
+            case _:
+                raise ValueError(layer)
+
+    def get_resize_mode(self, layer: ImageLayer) -> ResizeMode:
+        """
+        指定 layer のリサイズモードを取得する。
+        """
+        match layer:
+            case ImageLayer.RAW:
+                raise ValueError("RAW set_size NOT supported.")
+            case ImageLayer.NIME:
+                return self._nime_image.resize_mode
+            case ImageLayer.PREVIEW:
+                return self._preview_image.resize_mode
+            case ImageLayer.THUMBNAIL:
+                if self._enable:
+                    return self._thumbnail_image_enable.resize_mode
+                else:
+                    return self._thumbnail_image_disable.resize_mode
             case _:
                 raise ValueError(layer)
 
@@ -718,30 +875,47 @@ class ImageModel:
             case ImageLayer.NIME:
                 return self._nime_image.output
             case ImageLayer.PREVIEW:
-                return self._preview_pil_image.output
+                return self._preview_image.output
             case ImageLayer.THUMBNAIL:
                 if self._enable:
-                    return self._thumbnail_pil_image_enable.output
+                    return self._thumbnail_image_enable.output
                 else:
-                    return self._thumbnail_pil_image_disable.output
+                    return self._thumbnail_image_disable.output
             case _:
                 raise ValueError(layer)
 
-    def register_notify_handler(
+    @property
+    def contents_metadata(self) -> ContentsMetadata:
+        """
+        メタデータを取得する
+        """
+        nime_resize_desc = self.get_size(ImageLayer.NIME)
+        return ContentsMetadata(
+            _overlay_nime_name=self.overlay_nime_name,
+            _crop_params=self.crop_params,
+            _resize_aspect_ratio_pattern=nime_resize_desc.aspect_ratio,
+            _resize_resolution_pattern=nime_resize_desc.resolution,
+            _playback_mode=None,
+            _disabled_frame_indices=None,
+        )
+
+    def register_layer_changed_handler(
         self, layer: ImageLayer, handler: NotifyHandler
     ) -> Self:
         """
-        画像に「何か」があったあった時にコールバックされる「通知ハンドラ」を登録する。
-        画像がダーティー化した時の通知に使われることを想定。
+        画像に「何か」があったあった時にコールバックされる通知ハンドラを登録する。
         """
-        self._notify_handlers[layer].append(handler)
+        self._image_changed_handlers[layer].append(handler)
         return self
 
     def _aux_process_nime(self, source_image: AISImage) -> AISImage:
         """
         NIME 用の外部プロセス
         """
-        return overlay_nime_name(source_image, self._nime_name)
+        if self._overlay_nime_name:
+            return overlay_nime_name(source_image, self._nime_name)
+        else:
+            return source_image
 
 
 class ImageModelEditSession:
@@ -768,9 +942,9 @@ class ImageModelEditSession:
         with 句終了
         """
         if exc_type is None and self._does_notify:
-            self._notify(ImageLayer.RAW)
+            self._notify_image_changed(ImageLayer.RAW)
 
-    def _notify(self, layer: ImageLayer) -> Self:
+    def _notify_image_changed(self, layer: ImageLayer) -> Self:
         """
         あらかじめ登録しておいた通知ハンドラを呼び出す。
         layer と、その影響受けるすべてのレイヤーの通知ハンドラが呼び出される。
@@ -785,27 +959,27 @@ class ImageModelEditSession:
             case ImageLayer.NIME:
                 is_dirty = model._nime_image.is_dirty
             case ImageLayer.PREVIEW:
-                is_dirty = model._preview_pil_image.is_dirty
+                is_dirty = model._preview_image.is_dirty
             case ImageLayer.THUMBNAIL:
                 is_dirty = (
-                    model._thumbnail_pil_image_enable.is_dirty
-                    or model._thumbnail_pil_image_disable
+                    model._thumbnail_image_enable.is_dirty
+                    or model._thumbnail_image_disable
                 )
             case _:
                 raise ValueError(f"Invalid ImageLayer(={layer})")
 
         # ダーティ状態ならハンドラを呼び出す
         if is_dirty:
-            for handler in model._notify_handlers[layer]:
+            for handler in model._image_changed_handlers[layer]:
                 handler()
 
         # 影響先のレイヤーの通知ハンドラを再帰的に呼び出す
         match layer:
             case ImageLayer.RAW:
-                self._notify(ImageLayer.NIME)
+                self._notify_image_changed(ImageLayer.NIME)
             case ImageLayer.NIME:
-                self._notify(ImageLayer.PREVIEW)
-                self._notify(ImageLayer.THUMBNAIL)
+                self._notify_image_changed(ImageLayer.PREVIEW)
+                self._notify_image_changed(ImageLayer.THUMBNAIL)
             case ImageLayer.PREVIEW:
                 pass
             case ImageLayer.THUMBNAIL:
@@ -845,6 +1019,20 @@ class ImageModelEditSession:
         # 正常終了
         return self
 
+    def set_overlay_nime_name(self, overlay_nime_name: bool) -> Self:
+        """
+        アニメ名オーバーレイの有効・無効を設定するする。
+        NIME 画像が影響を受ける。
+        """
+        # アニメ名更新・通知
+        model = self._model
+        if model._overlay_nime_name != overlay_nime_name:
+            model._overlay_nime_name = overlay_nime_name
+            model._nime_image.mark_dirty()
+
+        # 正常終了
+        return self
+
     def set_time_stamp(self, time_stamp: str | None) -> Self:
         """
         タイムスタンプを設定する
@@ -872,8 +1060,31 @@ class ImageModelEditSession:
         model = self._model
         if model._enable != enable:
             model._enable = enable
-            model._thumbnail_pil_image_enable.mark_dirty()
-            model._thumbnail_pil_image_disable.mark_dirty()
+            model._thumbnail_image_enable.mark_dirty()
+            model._thumbnail_image_disable.mark_dirty()
+        return self
+
+    def set_crop_params(
+        self, size_ratio: float | None, x_ratio: float | None, y_ratio: float | None
+    ) -> Self:
+        """
+        正方形切り出しのパラメータを設定する。
+        パラメータに１つでも None が混じっている場合、切り出しを行わない。
+        初期値はすべて None になっている。
+
+        size_ratio:
+            正方形の大きさ
+            元画像の短辺側に対する比率で指定
+
+        x_ratio:
+            正方形の中心位置（水平）
+            元画像の横幅に対する比率で指定
+
+        y_ratio:
+            正方形の中心位置（垂直）
+            元画像の高さに対する比率で指定
+        """
+        self._model._crop_square_image.set_crop_params(size_ratio, x_ratio, y_ratio)
         return self
 
     def set_size(self, layer: ImageLayer, size: ResizeDesc) -> Self:
@@ -888,12 +1099,112 @@ class ImageModelEditSession:
             case ImageLayer.NIME:
                 model._nime_image.set_size(size)
             case ImageLayer.PREVIEW:
-                model._preview_pil_image.set_size(size)
+                model._preview_image.set_size(size)
             case ImageLayer.THUMBNAIL:
-                model._thumbnail_pil_image_enable.set_size(size)
+                model._thumbnail_image_enable.set_size(size)
+                model._thumbnail_image_disable.set_size(size)
             case _:
                 raise ValueError(layer)
 
+        # 正常終了
+        return self
+
+    def set_resize_mode(self, layer: ImageLayer, resize_mode: ResizeMode) -> Self:
+        """
+        指定 layer のリサイズモードを設定する。
+        """
+        # layer 分岐
+        model = self._model
+        match layer:
+            case ImageLayer.RAW:
+                raise ValueError("RAW set_size NOT supported.")
+            case ImageLayer.NIME:
+                model._nime_image.set_resize_mode(resize_mode)
+            case ImageLayer.PREVIEW:
+                model._preview_image.set_resize_mode(resize_mode)
+            case ImageLayer.THUMBNAIL:
+                model._thumbnail_image_enable.set_resize_mode(resize_mode)
+                model._thumbnail_image_disable.set_resize_mode(resize_mode)
+            case _:
+                raise ValueError(layer)
+
+        # 正常終了
+        return self
+
+    def set_contents_metadata(self, contents_metadata: ContentsMetadata) -> Self:
+        """
+        メタデータを元に内部状態を変更する
+        """
+        # エイリアス
+        model = self._model
+        crop_params = contents_metadata.crop_params
+        overlay_nime_name = contents_metadata.overlay_nime_name
+        new_aspect_ratio_pattern = contents_metadata.resize_aspect_ratio_pattern
+        new_resolution_pattern = contents_metadata.resize_resolution_pattern
+
+        # 正方形クロップ設定をロード
+        if crop_params is not None:
+            self.set_crop_params(*crop_params)
+
+        # NIME 名オーバーレイ可否をロード
+        if overlay_nime_name is not None:
+            self.set_overlay_nime_name(overlay_nime_name)
+
+        # リサイズ挙動をロード
+        # NOTE
+        #   アス比・解像度は同時指定が必要なので、足りてない方は既存値で埋める。
+        if new_aspect_ratio_pattern is not None or new_resolution_pattern is not None:
+            model_resize_desc = model.get_size(ImageLayer.NIME)
+            if new_aspect_ratio_pattern is None:
+                new_aspect_ratio_pattern = model_resize_desc.aspect_ratio.pattern
+            if new_resolution_pattern is None:
+                new_resolution_pattern = model_resize_desc.resolution.pattern
+            new_resize_desc = ResizeDesc(
+                new_aspect_ratio_pattern, new_resolution_pattern
+            )
+            self.set_size(ImageLayer.NIME, new_resize_desc)
+
+        # 正常終了
+        return self
+
+    def set_model(self, other: "ImageModel | VideoModel") -> Self:
+        """
+        他のモデルの内容を自身に設定する
+        実質的にはディープコピー関数
+        """
+        # ビデオの場合、可能な限り先頭側の１フレームを採用する
+        if isinstance(other, VideoModel):
+            # 元にするフレーム番号を解決
+            if other.num_enable_frames > 1:
+                source_frame_index = 0
+                for frame_index in range(other.num_total_frames):
+                    if other.get_enable(frame_index):
+                        source_frame_index = frame_index
+                        break
+            elif other.num_total_frames > 1:
+                source_frame_index = 0
+            else:
+                raise ValueError("Empty video model is passed")
+            # 必要な要素を取り出し
+            raw_image = other.get_frame(ImageLayer.RAW, source_frame_index)
+            enable = other.get_enable(source_frame_index)
+        elif isinstance(other, ImageModel):
+            # 必要な要素を取り出し
+            raw_image = other.get_image(ImageLayer.RAW)
+            enable = other.enable
+        # 状態を書き込み
+        # NOTE
+        #   set_contents_metadata も同じコピー系で、書き込み対象が被ってるので呼ばなくて良い。
+        self.set_raw_image(raw_image)
+        self.set_nime_name(other.nime_name)
+        self.set_overlay_nime_name(other.overlay_nime_name)
+        self.set_time_stamp(other.time_stamp)
+        self.set_enable(enable)
+        self.set_crop_params(*other.crop_params)
+        for layer in ImageLayer:
+            if layer != ImageLayer.RAW:
+                self.set_size(layer, other.get_size(layer))
+                self.set_resize_mode(layer, other.get_resize_mode(layer))
         # 正常終了
         return self
 
@@ -904,19 +1215,26 @@ class VideoModel:
     View-Model 的な意味でのモデル
     """
 
-    def __init__(self):
+    def __init__(self, nime_resize_mode: ResizeMode | None = None):
         """
         コンストラクタ
         """
-        # 各メンバを初期化
+        # モデル
         # NOTE
         #   サイズとかの全フレーム共通の情報は self._global_model をマスターとして管理する
         #   フレーム個別の情報は self._frame で管理する
-        self._global_model = ImageModel()
+        self._global_model = ImageModel(nime_resize_mode=nime_resize_mode)
         self._frames: list[ImageModel] = []
+
+        # 再生時の更新間隔
         self._duration_in_msec = DFR_MAP.default_entry.duration_in_msec
         self._duration_is_dirty = False
         self._duration_change_handlers: list[NotifyHandler] = []
+
+        # 再生モード
+        self._playback_mode = PlaybackMode.FORWARD
+        self._playback_mode_is_dirty = False
+        self._playback_mode_change_handlers: list[NotifyHandler] = []
 
     @property
     def nime_name(self) -> str | None:
@@ -924,6 +1242,13 @@ class VideoModel:
         アニメ名
         """
         return self._global_model.nime_name
+
+    @property
+    def overlay_nime_name(self) -> bool:
+        """
+        アニメ名オーバーレイ有効・無効
+        """
+        return self._global_model.overlay_nime_name
 
     @property
     def time_stamp(self) -> str | None:
@@ -938,11 +1263,24 @@ class VideoModel:
         """
         return self._frames[frame_index].enable
 
+    @property
+    def crop_params(self) -> tuple[float | None, float | None, float | None]:
+        """
+        切り出しパラメータを取得する
+        """
+        return self._global_model.crop_params
+
     def get_size(self, layer: ImageLayer) -> ResizeDesc:
         """
         フレームサイズを取得する
         """
         return self._global_model.get_size(layer)
+
+    def get_resize_mode(self, layer: ImageLayer) -> ResizeMode:
+        """
+        リサイズモードを取得する
+        """
+        return self._global_model.get_resize_mode(layer)
 
     @property
     def num_total_frames(self) -> int:
@@ -965,7 +1303,7 @@ class VideoModel:
         return len([f for f in self._frames if f.enable])
 
     def iter_frames(
-        self, layer: ImageLayer, enable_only: bool = True
+        self, layer: ImageLayer, enable_only: bool
     ) -> Generator[AISImage | None, None, None]:
         """
         全てのフレームをイテレートする
@@ -984,22 +1322,52 @@ class VideoModel:
     @property
     def duration_in_msec(self) -> int:
         """
-        再生フレームレート
+        再生時の更新間隔
         """
         return self._duration_in_msec
 
-    def register_notify_handler(self, layer: ImageLayer, handler: NotifyHandler):
+    @property
+    def playback_mode(self) -> PlaybackMode:
         """
-        通知ハンドラーを登録する
-        各画像に変更があった時にコールバックされる
+        再生モード
         """
-        self._global_model.register_notify_handler(layer, handler)
+        return self._playback_mode
 
-    def register_duration_change_handler(self, handler: NotifyHandler):
+    @property
+    def contents_metadata(self) -> ContentsMetadata:
         """
-        フレームレート変更ハンドラーを登録する
+        メタデータを取得
+        """
+        contents_metadata = self._global_model.contents_metadata
+        contents_metadata.set_playback_mode(self.playback_mode)
+        for frame_index in range(self.num_total_frames):
+            contents_metadata.set_frame_enable(
+                frame_index, self.get_enable(frame_index)
+            )
+        return contents_metadata
+
+    def register_layer_changed_handler(
+        self, layer: ImageLayer, handler: NotifyHandler
+    ) -> Self:
+        """
+        layer に「何か」があったあった時にコールバックされる通知ハンドラを登録する。
+        """
+        self._global_model.register_layer_changed_handler(layer, handler)
+        return self
+
+    def register_duration_change_handler(self, handler: NotifyHandler) -> Self:
+        """
+        再生時更新間隔の変更ハンドラーを登録する
         """
         self._duration_change_handlers.append(handler)
+        return self
+
+    def register_playback_mode_change_handler(self, handler: NotifyHandler) -> Self:
+        """
+        再生モードの変更ハンドラーを登録する
+        """
+        self._playback_mode_change_handlers.append(handler)
+        return self
 
 
 class VideoModelEditSession:
@@ -1044,6 +1412,36 @@ class VideoModelEditSession:
             for handler in model._duration_change_handlers:
                 handler()
 
+        # 再生モードによる通知
+        if model._playback_mode_is_dirty:
+            for handler in model._playback_mode_change_handlers:
+                handler()
+
+        # 正常終了
+        return self
+
+    def set_raw_image(
+        self, frame_index: int, raw_image: AISImage | None, *, _does_notify: bool = True
+    ) -> Self:
+        """
+        RAW 画像を設定する。
+        """
+        # エイリアス
+        model = self._model
+
+        # フレーム側を書き換え
+        with ImageModelEditSession(
+            model._frames[frame_index], _does_notify=False
+        ) as edit:
+            edit.set_raw_image(raw_image)
+
+        # グローバルモデルに状態を反映
+        # NOTE
+        #   こんな実装になっている理由は ImageModelEditSession.set_raw_image のコメントを参照。
+        if _does_notify:
+            with ImageModelEditSession(model._global_model, _does_notify=False) as e:
+                e.set_raw_image(AISImage.empty())
+
         # 正常終了
         return self
 
@@ -1062,6 +1460,25 @@ class VideoModelEditSession:
         # グローバル
         with ImageModelEditSession(model._global_model, _does_notify=False) as e:
             e.set_nime_name(nime_name)
+
+        # 正常終了
+        return self
+
+    def set_overlay_nime_name(self, overlay_nime_name: bool) -> Self:
+        """
+        アニメ名を設定する。
+        """
+        # エイリアス
+        model = self._model
+
+        # 各フレーム
+        for frame in model._frames:
+            with ImageModelEditSession(frame, _does_notify=False) as e:
+                e.set_overlay_nime_name(overlay_nime_name)
+
+        # グローバル
+        with ImageModelEditSession(model._global_model, _does_notify=False) as e:
+            e.set_overlay_nime_name(overlay_nime_name)
 
         # 正常終了
         return self
@@ -1132,6 +1549,27 @@ class VideoModelEditSession:
         # 正常終了
         return self
 
+    def set_crop_params(
+        self, size_ratio: float | None, x_ratio: float | None, y_ratio: float | None
+    ) -> Self:
+        """
+        正方形切り出しのパラメータを設定する。
+        """
+        # エイリアス
+        model = self._model
+
+        # 各フレーム
+        for frame in model._frames:
+            with ImageModelEditSession(frame, _does_notify=False) as e:
+                e.set_crop_params(size_ratio, x_ratio, y_ratio)
+
+        # グローバル
+        with ImageModelEditSession(model._global_model, _does_notify=False) as e:
+            e.set_crop_params(size_ratio, x_ratio, y_ratio)
+
+        # 正常終了
+        return self
+
     def set_size(self, layer: ImageLayer, size: ResizeDesc) -> Self:
         """
         フレームサイズを設定する
@@ -1147,6 +1585,25 @@ class VideoModelEditSession:
         # グローバル
         with ImageModelEditSession(model._global_model, _does_notify=False) as e:
             e.set_size(layer, size)
+
+        # 正常終了
+        return self
+
+    def set_resize_mode(self, layer: ImageLayer, resize_mode: ResizeMode) -> Self:
+        """
+        リサイズモードを設定する
+        """
+        # エイリアス
+        model = self._model
+
+        # 各フレーム
+        for frame in model._frames:
+            with ImageModelEditSession(frame, _does_notify=False) as e:
+                e.set_resize_mode(layer, resize_mode)
+
+        # グローバル
+        with ImageModelEditSession(model._global_model, _does_notify=False) as e:
+            e.set_resize_mode(layer, resize_mode)
 
         # 正常終了
         return self
@@ -1181,15 +1638,15 @@ class VideoModelEditSession:
             # ImageModel の場合、通常の追加フロー
 
             with ImageModelEditSession(new_obj, _does_notify=False) as e:
-                # サイズを統一
+                # いろいろ統一
+                e.set_crop_params(*model._global_model.crop_params)
                 for layer in ImageLayer:
                     if layer != ImageLayer.RAW:
                         e.set_size(layer, model._global_model.get_size(layer))
-
-                # タイムスタンプを統一
+                        e.set_resize_mode(
+                            layer, model._global_model.get_resize_mode(layer)
+                        )
                 e.set_time_stamp(model._global_model.time_stamp)
-
-                # アニメ名を統一
                 e.set_nime_name(model._global_model.nime_name)
 
                 # フレームリストに挿入
@@ -1258,7 +1715,7 @@ class VideoModelEditSession:
 
     def set_duration_in_msec(self, duration_in_msec: int) -> Self:
         """
-        再生フレームレートを設定する
+        再生時更新間隔を設定する
         """
         model = self._model
         if model._duration_in_msec != duration_in_msec:
@@ -1266,24 +1723,84 @@ class VideoModelEditSession:
             model._duration_is_dirty |= True
         return self
 
+    def set_playback_mode(self, playback_mode: PlaybackMode) -> Self:
+        """
+        再生モードを設定する
+        """
+        model = self._model
+        if model._playback_mode != playback_mode:
+            model._playback_mode = playback_mode
+            model._playback_mode_is_dirty |= True
+        return self
 
-class PlaybackMode(Enum):
-    FORWARD = "FORWARD"
-    BACKWARD = "BACKWARD"
-    REFLECT = "REFLECT"
+    def set_contents_metadata(self, contents_metadata: ContentsMetadata) -> Self:
+        """
+        メタデータをm元に内部状態を設定する
+        """
+        # エイリアス
+        model = self._model
+        # スチルレベルの設定、各フレーム
+        for frame in model._frames:
+            with ImageModelEditSession(frame, _does_notify=False) as edit:
+                edit.set_contents_metadata(contents_metadata)
+        # スチルレベルの設定、グローバル
+        with ImageModelEditSession(model._global_model, _does_notify=False) as edit:
+            edit.set_contents_metadata(contents_metadata)
+        # 再生モード
+        if contents_metadata.playback_mode is not None:
+            self.set_playback_mode(contents_metadata.playback_mode)
+        # フレーム個別無効化
+        if not contents_metadata.disable_frame_indices_is_none:
+            for frame_index in range(model.num_total_frames):
+                self.set_enable(
+                    frame_index, contents_metadata.is_frame_enable(frame_index)
+                )
+        # 正常終了
+        return self
+
+    def set_model(self, other: ImageModel | VideoModel) -> Self:
+        """
+        他のモデルの内容を自身に設定する
+        実質的にはディープコピー関数
+        """
+        # 先にフレームリストをどうにかする
+        self.clear_frames()
+        if isinstance(other, ImageModel):
+            # NOTE
+            #   フレーム数１の動画とみなす
+            #   可能なメンバーのみ設定する
+            self.append_frames(other)
+        elif isinstance(other, VideoModel):
+            for frame_index in range(other.num_total_frames):
+                frame = other.get_frame(ImageLayer.RAW, frame_index)
+                if frame is not None:
+                    self.append_frames(frame)
+            self.set_duration_in_msec(other.duration_in_msec)
+            self.set_playback_mode(other.playback_mode)
+        else:
+            raise TypeError(f"Unexpected other type ({type(other)})")
+
+        # スチル・ビデオ共通部分
+        # NOTE
+        #   set_enable, set_enable_batch は呼ばなくて良い（append_frame で状態コピーされるので）
+        self.set_nime_name(other.nime_name)
+        self.set_overlay_nime_name(other.overlay_nime_name)
+        self.set_time_stamp(other.time_stamp)
+        self.set_crop_params(*other.crop_params)
+        for layer in ImageLayer:
+            if layer != ImageLayer.RAW:
+                self.set_size(layer, other.get_size(layer))
+                self.set_resize_mode(layer, other.get_resize_mode(layer))
+        self.set_contents_metadata(other.contents_metadata)
+
+        # 正常終了
+        return self
 
 
-def save_content_model(
-    model: ImageModel | VideoModel,
-    playback_mode: PlaybackMode = PlaybackMode.FORWARD,
-) -> Path:
+def save_content_model(model: ImageModel | VideoModel) -> Path:
     """
     model をファイル保存する。
     画像・動画の両方に対応している。
-
-    Args:
-        model: 保存したいモデル
-        palyback_mode:
 
     Return:
         Path: 保存先ファイルパス
@@ -1298,8 +1815,6 @@ def save_content_model(
 
     # モデルを保存する
     if isinstance(model, ImageModel):
-        # ImageModel
-
         # raw 画像は必須
         raw_image = model.get_image(ImageLayer.RAW)
         if not isinstance(raw_image, AISImage):
@@ -1318,14 +1833,15 @@ def save_content_model(
             RAW_DIR_PATH
             / f"{model.nime_name}__{model.time_stamp}{RAW_STILL_OUT_SUFFIX}"
         )
-        if not raw_file_path.exists():
-            raw_image.pil_image.convert("RGB").save(
-                str(raw_file_path),
-                format=RAW_STILL_OUT_PIL_FORMAT,
-                optimize=True,
-                compress_levvel=9,
-                transparency=(0, 0, 0),
-            )
+        smart_pil_save(
+            raw_file_path,
+            raw_image.pil_image,
+            duration_in_msec=None,
+            metadata=model.contents_metadata,
+            lossless=True,
+            quality_ratio=1.0,
+            encode_speed_ratio=0.0,
+        )
 
         # nime ディレクトリにスチル画像を保存
         # NOTE
@@ -1334,79 +1850,61 @@ def save_content_model(
             NIME_DIR_PATH
             / f"{model.nime_name}__{model.time_stamp}{NIME_STILL_OUT_SUFFIX}"
         )
-        nime_image.pil_image.convert("RGB").save(
-            str(still_file_path),
-            format=NIME_STILL_OUT_PIL_FORMAT,
+        smart_pil_save(
+            still_file_path,
+            nime_image.pil_image,
+            duration_in_msec=None,
+            metadata=model.contents_metadata,
             lossless=False,
-            quality=88,
-            alpha_quality=88,
-            method=6,
-            exact=False,  # 透明画素の RGB 値は保持しない
+            quality_ratio=0.88,
+            encode_speed_ratio=0.0,
         )
 
         # 正常終了
         return still_file_path
 
     elif isinstance(model, VideoModel):
-        # VideoModel
-
         # RAW ディレクトリに保存
         with PerfLogger("Save RAW Video"):
+            # RAW フレームを展開
+            raw_frames = [
+                f.pil_image
+                for f in model.iter_frames(ImageLayer.RAW, enable_only=False)
+                if isinstance(f, AISImage)
+            ]
+
+            # ファイル保存
+            # NOTE
+            #   - 無圧縮で保存（これはマスト）
+            #   - 保存にかかる時間の短縮を最優先
+            #   - 完全な無圧縮は避けたい
+            #   という観点から WebP(lossless) を選択した。
+            #   エンコード時間を短縮したいので、圧縮率は最大限妥協している。
             raw_file_path = (
                 RAW_DIR_PATH
                 / f"{model.nime_name}__{model.time_stamp}{RAW_VIDEO_OUT_SUFFIX}"
             )
-            if not raw_file_path.exists():
-                # RAW フレームを展開
-                raw_frames = [
-                    f.pil_image
-                    for f in model.iter_frames(ImageLayer.RAW)
-                    if isinstance(f, AISImage)
-                ]
-
-                # 再生モードを反映
-                match playback_mode:
-                    case PlaybackMode.FORWARD:
-                        pass
-                    case PlaybackMode.BACKWARD:
-                        raw_frames.reverse()
-                    case PlaybackMode.REFLECT:
-                        if len(raw_frames) >= 3:
-                            raw_frames = (
-                                raw_frames + [f for f in reversed(raw_frames)][1:-1]
-                            )
-                    case _:
-                        raise RuntimeError()
-
-                # ファイル保存
-                # NOTE
-                #   - 無圧縮で保存（これはマスト）
-                #   - 保存にかかる時間の短縮を最優先
-                #   - 完全な無圧縮は避けたい
-                #   という観点から WebP(lossless) を選択した。
-                #   エンコード時間を短縮したいので、圧縮率は最大限妥協している。
-                raw_frames[0].save(
-                    str(raw_file_path),
-                    save_all=True,
-                    append_images=raw_frames[1:],
-                    duration=model.duration_in_msec,
-                    loop=0,  # 無限ループ
-                    lossless=True,  # 可逆圧縮
-                    quality=0,  # エンコード時間を最優先
-                    method=0,  # エンコード時間を最優先
-                )
+            smart_pil_save(
+                raw_file_path,
+                raw_frames,
+                duration_in_msec=model.duration_in_msec,
+                metadata=model.contents_metadata,
+                lossless=True,
+                quality_ratio=0.0,
+                encode_speed_ratio=1.0,
+            )
 
         # NIME ディレクトリに保存
         with PerfLogger("Save NIME Video"):
             # NIME フレームを展開
             nime_frames = [
                 f.pil_image
-                for f in model.iter_frames(ImageLayer.NIME)
+                for f in model.iter_frames(ImageLayer.NIME, enable_only=False)
                 if isinstance(f, AISImage)
             ]
 
             # 再生モードを反映
-            match playback_mode:
+            match model.playback_mode:
                 case PlaybackMode.FORWARD:
                     pass
                 case PlaybackMode.BACKWARD:
@@ -1424,16 +1922,14 @@ def save_content_model(
                 NIME_DIR_PATH
                 / f"{model.nime_name}__{model.time_stamp}{NIME_VIDEO_OUT_SUFFIX}"
             )
-            nime_frames[0].save(
-                str(nime_file_path),
-                save_all=True,
-                append_images=nime_frames[1:],
-                duration=model.duration_in_msec,
-                quality=65,
-                subsampling="4:2:0",
-                speed=7,
-                range="full",
-                codec="auto",
+            smart_pil_save(
+                nime_file_path,
+                nime_frames,
+                duration_in_msec=model.duration_in_msec,
+                metadata=model.contents_metadata,
+                lossless=False,
+                quality_ratio=0.65,
+                encode_speed_ratio=0.7,
             )
 
             # 正常終了
@@ -1460,41 +1956,37 @@ def load_content_model(file_path: Path) -> ImageModel | VideoModel:
         AISImage: 読み込んだ画像
     """
     # 先に静画・動画を判定
-    # NOTE
-    #   webp はどっちもありえるので、ヘッダで判断する。
-    #   それ以外は拡張子で判断する。
-    if file_path.suffix == ".webp":
-        with Image.open(file_path) as im:
-            if getattr(im, "is_animated", False) and getattr(im, "n_frames", 1) > 1:
-                is_video = True
-            else:
-                is_video = False
-    elif file_path.suffix.lower() in ALL_STILL_INOUT_SUFFIXES:
-        is_video = False
-    elif file_path.suffix.lower() in ALL_VIDEO_INOUT_SUFFIXES:
-        is_video = True
-    else:
-        raise ValueError(
-            f"Unsupported file type. Only extensions {ALL_CONTENT_INOUT_SUFFIXES} are supported."
-        )
+    is_video = is_video_file(file_path)
 
     # 対応する RAW ファイル候補を列挙
     if is_video:
-        raw_file_path_cands = [
-            p
-            for p in RAW_DIR_PATH.glob(f"**/{file_path.stem}.*")
-            if p.suffix.lower() in RAW_STILL_INOUT_SUFFIXES
-        ]
-    else:
-        raw_file_path_cands = [
+        raw_file_path_cands = {
             p
             for p in RAW_DIR_PATH.glob(f"**/{file_path.stem}.*")
             if p.suffix.lower() in RAW_VIDEO_INOUT_SUFFIXES
-        ]
+        }
+    else:
+        raw_file_path_cands = {
+            p
+            for p in RAW_DIR_PATH.glob(f"**/{file_path.stem}.*")
+            if p.suffix.lower() in RAW_STILL_INOUT_SUFFIXES
+        }
 
     # 対応する RAW ファイルを確定させる
-    if len(raw_file_path_cands) >= 1:
-        raw_file_path = sorted(raw_file_path_cands)[0]
+    # NOTE
+    #   複数候補があった場合、現行実装での出力フォーマットを優先して選択する。
+    if len(raw_file_path_cands) > 0:
+        raw_file_path_cands_first = {
+            p
+            for p in raw_file_path_cands
+            if p.suffix.lower()
+            == (RAW_VIDEO_OUT_SUFFIX if is_video else RAW_STILL_OUT_SUFFIX)
+        }
+        raw_file_path_cands_second = raw_file_path_cands - raw_file_path_cands_first
+        if len(raw_file_path_cands_first) > 0:
+            raw_file_path = sorted(raw_file_path_cands_first)[0]
+        else:
+            raw_file_path = sorted(raw_file_path_cands_second)[0]
     else:
         raw_file_path = None
 
@@ -1504,107 +1996,49 @@ def load_content_model(file_path: Path) -> ImageModel | VideoModel:
     else:
         actual_file_path = file_path
 
-    # 使用する NIEM 名・タイムスタンプを解決
+    # ファイルパスの解決結果をログに流す
+    write_log(
+        "info",
+        f"file_path = {file_path}\nactual_file_path = {actual_file_path}",
+    )
+
+    # 使用する NIME 名・タイムスタンプを解決
     nime_name, time_stamp = parse_nime_file_stem(actual_file_path.stem)
     if time_stamp is None:
         time_stamp = current_time_stamp()
 
     # コンテンツをロード
-    if is_video and actual_file_path.suffix.lower() == ".zip":
-        # ZIP ファイルの場合、中身を連番静止画として読み込む
-        # NOTE
-        #   ZIP ファイルはこのアプリによって出力されたものであることを前提としている
-        #   その中身は RAW_STILL_SUFFIX であることを前提としている
-
-        # 動画ファイルからフレームレートをロード
-        try:
-            delays = []
-            with Image.open(file_path) as img:
-                while True:
-                    delays.append(
-                        img.info.get("duration", DFR_MAP.default_entry.duration_in_msec)
-                    )
-                    try:
-                        img.seek(img.tell() + 1)
-                    except EOFError:
-                        break
-            avg_delay = round(sum(delays) / len(delays))
-        except Exception:
-            avg_delay = None
-
-        # ビデオモデルを構築
-        content_model = VideoModel()
-        with VideoModelEditSession(content_model) as edit:
+    if is_video:
+        # 動画ファイルをロード
+        load_result = smart_pil_load(actual_file_path)
+        if not isinstance(load_result.contents, list):
+            raise ValueError(f"'{actual_file_path}' is NOT video file")
+        # モデルを構築
+        contents_model = VideoModel()
+        with VideoModelEditSession(contents_model) as edit:
             edit.set_nime_name(nime_name)
             edit.set_time_stamp(time_stamp)
-            if avg_delay is not None:
-                edit.set_duration_in_msec(avg_delay)
-            with ZipFile(actual_file_path, "r") as zip_file:
-                file_list = zip_file.namelist()
-                for file_name in file_list:
-                    # ステムを抽出
-                    # NOTE
-                    #   拡張子が想定通りじゃない場合はスキップ
-                    file_name = Path(file_name)
-                    if file_name.suffix not in RAW_STILL_INOUT_SUFFIXES:
-                        continue
-
-                    # フレームの有効・無効を解決する
-                    # NOTE
-                    #   ファイル名から解決する
-                    #   なんかおかしい時は何も言わずに有効扱いする
-                    enable_match = re.search(r"_([de])$", file_name.stem)
-                    if enable_match is None:
-                        enable = True
-                    else:
-                        enable_str = enable_match.group(1)
-                        if enable_str == "d":
-                            enable = False
-                        else:
-                            enable = True
-
-                    # フレームを追加
-                    edit.append_frames(
-                        ImageModel(
-                            AISImage(
-                                Image.open(zip_file.open(file_name.name)).convert("RGB")
-                            ),
-                            nime_name,
-                            time_stamp,
-                            enable,
-                        )
-                    )
-    elif is_video:
-        # 動画ファイルの場合はそのまま読み込む
-        content_model = VideoModel()
-        with VideoModelEditSession(content_model) as edit:
-            edit.set_nime_name(nime_name)
-            edit.set_time_stamp(time_stamp)
-            delays = []
-            with Image.open(actual_file_path) as img:
-                try:
-                    while True:
-                        pil_image = img.copy().convert("RGB")
-                        edit.append_frames(
-                            [ImageModel(AISImage(pil_image), nime_name, time_stamp)]
-                        )
-                        delays.append(
-                            img.info.get(
-                                "duration", DFR_MAP.default_entry.duration_in_msec
-                            )
-                        )
-                        img.seek(img.tell() + 1)
-                except EOFError:
-                    pass
-            avg_delay = round(sum(delays) / len(delays))
-            edit.set_duration_in_msec(avg_delay)
+            edit.append_frames(
+                ImageModel(AISImage(pil_image), nime_name, time_stamp)
+                for pil_image in load_result.contents
+            )
+            if load_result.duration_in_msec is not None:
+                edit.set_duration_in_msec(load_result.duration_in_msec)
+            edit.set_contents_metadata(load_result.metadata)
     else:
-        # 画像ファイルの場合はそのまま読み込む
-        pil_image = Image.open(actual_file_path).convert("RGB")
-        content_model = ImageModel(AISImage(pil_image), nime_name, time_stamp)
+        # 画像ファイルをロード
+        load_result = smart_pil_load(actual_file_path)
+        if not isinstance(load_result.contents, Image.Image):
+            raise ValueError(f"'{actual_file_path}' is NOT still file")
+        # モデルを構築
+        contents_model = ImageModel(
+            AISImage(load_result.contents), nime_name, time_stamp
+        )
+        with ImageModelEditSession(contents_model) as edit:
+            edit.set_contents_metadata(load_result.metadata)
 
     # 正常終了
-    return content_model
+    return contents_model
 
 
 def _remove_unmatched_nime_raw_file():

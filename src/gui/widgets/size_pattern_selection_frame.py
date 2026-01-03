@@ -1,5 +1,5 @@
 # std
-from typing import Callable, Sequence
+from typing import Callable, Sequence, Self
 
 # Tk/CTk
 import customtkinter as ctk
@@ -66,6 +66,13 @@ class AspectRatioSelectionFrame(AISFrame):
         """
         return AspectRatioPattern(self._aspect_ratio_var.get())
 
+    def set_value(self, value: AspectRatioPattern | None):
+        """
+        値を設定
+        """
+        if value is not None and self._aspect_ratio_var.get() != value.value:
+            self._aspect_ratio_var.set(value.value)
+
 
 class ResolutionSelectionFrame(AISFrame):
     """
@@ -119,6 +126,13 @@ class ResolutionSelectionFrame(AISFrame):
         選択中の値を取得
         """
         return ResolutionPattern(self._resolution_var.get())
+
+    def set_value(self, value: ResolutionPattern | None):
+        """
+        値を設定
+        """
+        if value is not None and self._resolution_var.get() != value.value:
+            self._resolution_var.set(value.value)
 
 
 class SizePatternSlectionFrame(AISFrame):
@@ -211,3 +225,16 @@ class SizePatternSlectionFrame(AISFrame):
             Resolution: 解像度
         """
         return self._resolution_frame.value
+
+    def set_pattern(
+        self,
+        *,
+        aspect_ratio: AspectRatioPattern | None = None,
+        resolution: ResolutionPattern | None = None,
+    ) -> Self:
+        """
+        パターン選択状況を変更する
+        """
+        self._aspect_ratio_frame.set_value(aspect_ratio)
+        self._resolution_frame.set_value(resolution)
+        return self

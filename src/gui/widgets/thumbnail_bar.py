@@ -228,7 +228,7 @@ class ThumbnailBar(ctk.CTkScrollableFrame):
         self._parent_canvas.bind("<Leave>", self._mouse_leave)
 
         # コールバック設定
-        self._model.video.register_notify_handler(
+        self._model.video.register_layer_changed_handler(
             ImageLayer.THUMBNAIL, self._on_thumbnail_change
         )
 

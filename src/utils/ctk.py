@@ -12,7 +12,7 @@ import tkinter.messagebox as mb
 
 # utils
 from utils.constants import DEFAULT_FONT_FAMILY, APP_NAME_JP
-from utils.std import traceback_str
+from utils.ais_logging import LogLevel, write_log
 
 
 def silent_configure(widget: ctk.CTkBaseClass, **kwargs):
@@ -40,8 +40,10 @@ def configure_presence(widget: ctk.CTkBaseClass, content: PhotoImage | str):
 
 def show_notify_label(
     widget: ctk.CTkBaseClass,
-    level: Literal["info", "warning", "error"],
+    level: LogLevel,
     message: str,
+    *,
+    exception: Exception | None = None,
     duration_ms: int = 2000,
     on_click_handler: Callable[[Event], None] | None = None,
 ) -> None:
@@ -68,12 +70,19 @@ def show_notify_label(
         case _:
             raise ValueError(f"Invalid level {level}")
 
+    # ラベル表示用文字列を生成
+    if exception is None:
+        label_str = message
+    else:
+        label_str = f"{message}\nwhat: {exception}"
+
     # 通知ラベルを生成
     # NOTE
     #   ラベルの四隅の外側はテーマ色でフィルされてしまうので、角丸のないラベルを使用する(corner_radius=0)。
+    #   ユーザー向け通知
     status_label = ctk.CTkLabel(
         widget,
-        text=message,
+        text=label_str,
         fg_color=fg_color,
         text_color="white",
         corner_radius=0,
@@ -83,37 +92,29 @@ def show_notify_label(
     if on_click_handler is not None:
         status_label.bind("<Button-1>", on_click_handler)
 
+    # ログにも流す
+    write_log(level, message, exception=exception, num_frame_skip=1)
+
     # 通知ラベルは一定時間後に自動破棄
     widget.after(duration_ms, status_label.destroy)
 
 
-def show_error_dialog(
-    message: str, exception: Exception | list[Exception] | None = None
-):
+def show_error_dialog(message: str, exception: Exception | None = None):
     """
     エラーダイアログを表示する。
     デバッグ情報として e の説明文字列を添付する
     """
-    # 例外文字列を生成
+    # ダイアログ表示用文字列を生成
     if exception is None:
-        tb_str = ""
-    elif isinstance(exception, Exception):
-        tb_str = traceback_str(exception)
-    elif isinstance(exception, list):
-        tb_str = ""
-        for e in exception:
-            if isinstance(e, Exception):
-                tb_str += traceback_str(e)
-            else:
-                tb_str += str(e)
+        dialog_str = message
     else:
-        tb_str = str(e)
+        dialog_str = f"{message}\nwhat: {exception}"
 
     # エラーダイアログを表示
-    mb.showerror(
-        APP_NAME_JP,
-        f"{message}\n{tb_str}",
-    )
+    mb.showerror(APP_NAME_JP, dialog_str)
+
+    # ロガーにも流す
+    write_log("error", message, exception=exception, num_frame_skip=1)
 
 
 def place_window_to_display_center(

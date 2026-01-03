@@ -9,7 +9,7 @@ from tkinterdnd2.TkinterDnD import DnDEvent
 from tkinter import Event
 
 # utils
-from utils.image import AspectRatioPattern, ResolutionPattern, ResizeDesc
+from utils.image import AspectRatioPattern, ResolutionPattern, ResizeDesc, ExportTarget
 from gui.model.contents_cache import (
     ImageModel,
     VideoModel,
@@ -53,7 +53,9 @@ class StillCaptureFrame(AISFrame, TkinterDnD.DnDWrapper):
 
         # モデル
         self._model = model
-        self._model.still.register_notify_handler(ImageLayer.NIME, self.on_nime_changed)
+        self._model.still.register_layer_changed_handler(
+            ImageLayer.NIME, self.on_nime_changed
+        )
 
         # レイアウト設定
         self.ais.columnconfigure(0, weight=1)
@@ -89,12 +91,9 @@ class StillCaptureFrame(AISFrame, TkinterDnD.DnDWrapper):
             [
                 AspectRatioPattern.E_16_9,
                 AspectRatioPattern.E_4_3,
-                AspectRatioPattern.E_1_1,
                 AspectRatioPattern.E_RAW,
             ],
             [
-                ResolutionPattern.E_DISCORD_EMOJI,
-                ResolutionPattern.E_DISCORD_STAMP,
                 ResolutionPattern.E_VGA,
                 ResolutionPattern.E_HD,
                 ResolutionPattern.E_FHD,
@@ -151,8 +150,8 @@ class StillCaptureFrame(AISFrame, TkinterDnD.DnDWrapper):
                 self,
                 "error",
                 "キャプチャに失敗。\n"
-                "キャプチャ対象のディスプレイ・ウィンドウの選択を忘れている？\n"
-                f"what: {e}",
+                "キャプチャ対象のディスプレイ・ウィンドウの選択を忘れている？",
+                exception=e,
             )
             return
 
@@ -200,6 +199,21 @@ class StillCaptureFrame(AISFrame, TkinterDnD.DnDWrapper):
         """
         NIME 画像に変更があった際に呼び出されるハンドラ
         """
+        # エイリアス
+        model = self._model.still
+
+        # 設定変更を各 UI に反映
+        resize_desc = model.get_size(ImageLayer.NIME)
+        if (
+            self._size_pattern_selection_frame.aspect_ratio != resize_desc.aspect_ratio
+            or self._size_pattern_selection_frame.resolution != resize_desc.resolution
+        ):
+            self._size_pattern_selection_frame.set_pattern(
+                aspect_ratio=resize_desc.aspect_ratio.pattern,
+                resolution=resize_desc.resolution.pattern,
+            )
+
+        # エクスポートを実行
         self.export_image()
 
     def export_image(self):
@@ -251,32 +265,13 @@ class StillCaptureFrame(AISFrame, TkinterDnD.DnDWrapper):
 
         # モデルロード
         try:
-            load_result = load_content_model(Path(file_path))
+            new_model = load_content_model(Path(file_path))
         except Exception as e:
             show_error_dialog("ファイルロードに失敗。", e)
-            return
-
-        # モデルの中身を展開
-        if isinstance(load_result, ImageModel):
-            image = load_result.get_image(ImageLayer.RAW)
-            nime_name = load_result.nime_name
-            time_stamp = load_result.time_stamp
-        elif isinstance(load_result, VideoModel):
-            image = load_result.get_frame(ImageLayer.RAW, 0)
-            nime_name = load_result.nime_name
-            time_stamp = load_result.time_stamp
-        else:
-            show_error_dialog(f"ファイルロードに失敗。", TypeError(type(load_result)))
-            return
-
-        # NIEM 名を解決
-        if self._nime_name_entry.text != "":
-            actual_nime_name = self._nime_name_entry.text
-        else:
-            actual_nime_name = nime_name
+            raise
 
         # AIS モデルに設定
         with ImageModelEditSession(self._model.still) as edit:
-            edit.set_raw_image(image)
-            edit.set_nime_name(actual_nime_name)
-            edit.set_time_stamp(time_stamp)
+            edit.set_model(new_model)
+            if self._nime_name_entry.text != "":
+                edit.set_nime_name(self._nime_name_entry.text)
