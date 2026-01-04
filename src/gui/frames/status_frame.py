@@ -144,7 +144,7 @@ class StatusFrame(AISFrame):
         # NIME フォルダボタン
         self._nime_button = ctk.CTkButton(
             self,
-            text="OPEN NIME FOLDER",
+            text="NIME FOLDER",
             width=WIDGET_MIN_WIDTH,
             command=lambda: os.startfile(NIME_DIR_PATH),
         )
@@ -153,7 +153,7 @@ class StatusFrame(AISFrame):
         # 転生フォルダボタン
         self._tensei_button = ctk.CTkButton(
             self,
-            text="OPEN TENSEI FOLDER",
+            text="TENSEI FOLDER",
             width=WIDGET_MIN_WIDTH,
             command=lambda: os.startfile(TENSEI_DIR_PATH),
         )
