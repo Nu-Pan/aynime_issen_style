@@ -3,12 +3,19 @@ from inspect import cleandoc
 import re
 import webbrowser
 import sys
+import os
 
 # Tk/CTk
 import customtkinter as ctk
 
 # utils
-from utils.constants import DEFAULT_FONT_FAMILY, VERSION_FILE_PATH
+from utils.constants import (
+    DEFAULT_FONT_FAMILY,
+    VERSION_FILE_PATH,
+    WIDGET_MIN_WIDTH,
+    NIME_DIR_PATH,
+    TENSEI_DIR_PATH,
+)
 from gui.widgets.ais_frame import AISFrame
 
 # バージョン情報のインポート
@@ -27,17 +34,12 @@ from utils.version_constants import COMMIT_HASH, BUILD_DATE
 
 class VersionFrame(AISFrame):
     """
-    バージョン情報フレーム
+    バージョン情報を表示するためだけのフレーム
     """
-
-    UI_TAB_NAME = "バージョン"
 
     def __init__(self, master, **kwargs):
         """
         コンストラクタ
-
-        Args:
-            master (_type_): 親ウィジェット
         """
         super().__init__(master, **kwargs)
 
@@ -70,7 +72,7 @@ class VersionFrame(AISFrame):
         """
         version_text = cleandoc(version_text)
 
-        # プレビュー画像表示領域
+        # バージョン情報テキストボックス
         self.version_text_box = ctk.CTkTextbox(
             self, font=default_font, border_width=0, fg_color="transparent", wrap="word"
         )
@@ -117,3 +119,47 @@ class VersionFrame(AISFrame):
 
         # 表示用なので変更不可
         self.version_text_box.configure(state="disabled")
+
+
+class StatusFrame(AISFrame):
+    """
+    ステータスフレーム
+    その他いろいろを詰めるためのフレーム
+    """
+
+    UI_TAB_NAME = "ステータス"
+
+    def __init__(self, master, **kwargs):
+        """
+        コンストラクタ
+
+        Args:
+            master (_type_): 親ウィジェット
+        """
+        super().__init__(master, **kwargs)
+
+        # レイアウト
+        self.ais.columnconfigure(2, weight=1)
+
+        # NIME フォルダボタン
+        self._nime_button = ctk.CTkButton(
+            self,
+            text="OPEN NIME FOLDER",
+            width=WIDGET_MIN_WIDTH,
+            command=lambda: os.startfile(NIME_DIR_PATH),
+        )
+        self.ais.grid_child(self._nime_button, 0, 0)
+
+        # 転生フォルダボタン
+        self._tensei_button = ctk.CTkButton(
+            self,
+            text="OPEN TENSEI FOLDER",
+            width=WIDGET_MIN_WIDTH,
+            command=lambda: os.startfile(TENSEI_DIR_PATH),
+        )
+        self.ais.grid_child(self._tensei_button, 0, 1)
+
+        # バージョン情報フレーム
+        self._version_frame = VersionFrame(self)
+        self.ais.grid_child(self._version_frame, 1, 0, 1, 3)
+        self.ais.rowconfigure(1, weight=1)
