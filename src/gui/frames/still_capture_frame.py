@@ -9,10 +9,8 @@ from tkinterdnd2.TkinterDnD import DnDEvent
 from tkinter import Event
 
 # utils
-from utils.image import AspectRatioPattern, ResolutionPattern, ResizeDesc, ExportTarget
+from utils.image import AspectRatioPattern, ResolutionPattern, ResizeDesc
 from gui.model.contents_cache import (
-    ImageModel,
-    VideoModel,
     save_content_model,
     load_content_model,
     ImageModelEditSession,
@@ -20,7 +18,11 @@ from gui.model.contents_cache import (
 from utils.windows import file_to_clipboard
 from utils.ctk import show_notify_label, show_error_dialog
 from utils.capture import *
-from utils.constants import CAPTURE_FRAME_BUFFER_DURATION_IN_SEC, WIDGET_MIN_WIDTH
+from utils.constants import (
+    CAPTURE_FRAME_BUFFER_DURATION_IN_SEC,
+    WIDGET_MIN_WIDTH,
+    WIDGET_MIN_HEIGHT,
+)
 
 # gui
 from gui.widgets.still_label import StillLabel
@@ -61,7 +63,7 @@ class StillCaptureFrame(AISFrame, TkinterDnD.DnDWrapper):
         self.ais.columnconfigure(0, weight=1)
 
         # プレビューラベル兼キャプチャボタン
-        self._preview_label = StillLabel(self, model.still, "Click Here or Ctrl+Alt+P")
+        self._preview_label = StillLabel(self, model.still, "Click Here to Capture")
         self.ais.grid_child(self._preview_label, 0, 0, 1, 2)
         self.ais.rowconfigure(0, weight=1)
         self._preview_label.bind("<Button-1>", self._on_preview_label_click)
@@ -138,6 +140,7 @@ class StillCaptureFrame(AISFrame, TkinterDnD.DnDWrapper):
             self,
             text="STORAGE",
             width=2 * WIDGET_MIN_WIDTH,
+            height=WIDGET_MIN_HEIGHT,
             command=lambda: self._on_save_button_clicked(False),
         )
         self.ais.grid_child(self._save_overwrite_button, 1, 1, 2, 1)
@@ -147,6 +150,7 @@ class StillCaptureFrame(AISFrame, TkinterDnD.DnDWrapper):
             self,
             text="STORAGE AS",
             width=2 * WIDGET_MIN_WIDTH,
+            height=WIDGET_MIN_HEIGHT,
             command=lambda: self._on_save_button_clicked(True),
         )
         self.ais.grid_child(self._save_new_button, 3, 1, 1, 1)

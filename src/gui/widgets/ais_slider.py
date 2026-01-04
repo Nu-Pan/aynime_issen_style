@@ -9,6 +9,7 @@ from utils.constants import (
     DEFAULT_FONT_FAMILY,
     NUMERIC_FONT_FAMILY,
     WIDGET_MIN_WIDTH,
+    WIDGET_MIN_HEIGHT,
 )
 
 # gui
@@ -37,7 +38,9 @@ class AISSlider(AISFrame, Generic[T]):
         コンストラクタ
         """
         # 基底コンストラクタ
-        super().__init__(master, **kwargs)
+        super().__init__(
+            master, width=WIDGET_MIN_WIDTH, height=WIDGET_MIN_HEIGHT, **kwargs
+        )
 
         # 値リストは最低でも１つ必要
         if len(value_list) < 1:

@@ -9,7 +9,7 @@ from CTkListbox import CTkListbox
 
 # utils
 from utils.capture import *
-from utils.constants import DEFAULT_FONT_FAMILY
+from utils.constants import DEFAULT_FONT_FAMILY, WIDGET_MIN_WIDTH, WIDGET_MIN_HEIGHT
 from utils.ctk import show_notify_label
 
 # gui
@@ -63,6 +63,8 @@ class WindowSelectionFrame(AISFrame):
         # ウィンドウ一覧再読み込みボタン
         self._reload_capture_target_list_button = ctk.CTkButton(
             self,
+            width=WIDGET_MIN_WIDTH,
+            height=WIDGET_MIN_HEIGHT,
             text="RELOAD",
             command=self.update_list,
             font=default_font,
@@ -78,7 +80,12 @@ class WindowSelectionFrame(AISFrame):
 
         # フルサイズウィンドウ名表示用
         self._capture_target_full_name_label = ctk.CTkLabel(
-            self, font=default_font, fg_color="transparent", bg_color="transparent"
+            self,
+            width=WIDGET_MIN_WIDTH,
+            height=WIDGET_MIN_HEIGHT,
+            font=default_font,
+            fg_color="transparent",
+            bg_color="transparent",
         )
         self.ais.grid_child(self._capture_target_full_name_label, 0, 1)
 

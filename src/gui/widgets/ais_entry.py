@@ -6,7 +6,7 @@ import time
 import customtkinter as ctk
 
 # utils
-from utils.constants import DEFAULT_FONT_FAMILY
+from utils.constants import DEFAULT_FONT_FAMILY, WIDGET_MIN_WIDTH, WIDGET_MIN_HEIGHT
 
 
 class AISEntry(ctk.CTkEntry):
@@ -19,7 +19,9 @@ class AISEntry(ctk.CTkEntry):
         コンストラクタ
         """
         # 基底コンストラクタ
-        super().__init__(master, **kwargs)
+        super().__init__(
+            master, width=WIDGET_MIN_WIDTH, height=WIDGET_MIN_HEIGHT, **kwargs
+        )
 
         # フォントを設定
         default_font = ctk.CTkFont(DEFAULT_FONT_FAMILY)

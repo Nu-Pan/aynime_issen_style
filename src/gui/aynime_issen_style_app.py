@@ -20,7 +20,7 @@ from gui.frames.window_selection_frame import WindowSelectionFrame
 from gui.frames.still_capture_frame import StillCaptureFrame
 from gui.frames.video_capture_frame import VideoCaptureFrame
 from gui.frames.foreign_export_frame import ForeignExportFrame
-from gui.frames.version_frame import VersionFrame
+from gui.frames.status_frame import StatusFrame
 
 # local
 from gui.model.aynime_issen_style import AynimeIssenStyleModel
@@ -72,14 +72,14 @@ class AynimeIssenStyleApp(ctk.CTk, TkinterDnD.DnDWrapper):
         )
         self.window_select_frame.pack(fill="both", expand=True)
 
-        # スチルキャプチャタブを追加
+        # 一閃タブを追加
         self.tabview.add(StillCaptureFrame.UI_TAB_NAME)
         self.still_capture_frame = StillCaptureFrame(
             self.tabview.tab(StillCaptureFrame.UI_TAB_NAME), self.model
         )
         self.still_capture_frame.pack(fill="both", expand=True)
 
-        # ビデオキャプチャタブを追加
+        # キンキンタブを追加
         self.tabview.add(VideoCaptureFrame.UI_TAB_NAME)
         self.video_capture_frame = VideoCaptureFrame(
             self.tabview.tab(VideoCaptureFrame.UI_TAB_NAME),
@@ -87,7 +87,7 @@ class AynimeIssenStyleApp(ctk.CTk, TkinterDnD.DnDWrapper):
         )
         self.video_capture_frame.pack(fill="both", expand=True)
 
-        # 外部サービスエクスポートタブを追加
+        # 転生タブを追加
         self.tabview.add(ForeignExportFrame.UI_TAB_NAME)
         self.foregin_export_frame = ForeignExportFrame(
             self.tabview.tab(ForeignExportFrame.UI_TAB_NAME),
@@ -95,9 +95,9 @@ class AynimeIssenStyleApp(ctk.CTk, TkinterDnD.DnDWrapper):
         )
         self.foregin_export_frame.pack(fill="both", expand=True)
 
-        # バージョン情報タブを追加
-        self.tabview.add(VersionFrame.UI_TAB_NAME)
-        self.version_frame = VersionFrame(self.tabview.tab(VersionFrame.UI_TAB_NAME))
+        # ステータスタブを追加
+        self.tabview.add(StatusFrame.UI_TAB_NAME)
+        self.version_frame = StatusFrame(self.tabview.tab(StatusFrame.UI_TAB_NAME))
         self.version_frame.pack(fill="both", expand=True)
 
         # 初期選択
