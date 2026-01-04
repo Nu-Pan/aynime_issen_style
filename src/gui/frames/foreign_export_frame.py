@@ -441,7 +441,9 @@ class ForeignExportFrame(AISFrame, TkinterDnD.DnDWrapper):
         file_to_clipboard(save_file_path)
 
         # クリップボード転送完了通知
-        show_notify_label(self, "info", "転生\nクリップボード転送完了")
+        show_notify_label(
+            self, "info", f"{ForeignExportFrame.UI_TAB_NAME}\nクリップボード転送完了"
+        )
 
     def _on_drop_file(self, event: DnDEvent):
         """

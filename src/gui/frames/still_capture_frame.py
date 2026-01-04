@@ -271,7 +271,7 @@ class StillCaptureFrame(AISFrame, TkinterDnD.DnDWrapper):
         show_notify_label(
             self,
             "info",
-            "「一閃」\nクリップボード転送完了",
+            f"{StillCaptureFrame.UI_TAB_NAME}\nクリップボード転送完了",
             on_click_handler=self._on_preview_label_click,
         )
 
