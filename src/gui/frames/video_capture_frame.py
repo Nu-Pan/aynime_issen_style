@@ -8,7 +8,7 @@ from tkinterdnd2 import TkinterDnD, DND_FILES
 from tkinterdnd2.TkinterDnD import DnDEvent
 
 # utils
-from utils.constants import WIDGET_MIN_WIDTH, DEFAULT_FONT_FAMILY
+from utils.constants import WIDGET_MIN_WIDTH, WIDGET_MIN_HEIGHT, DEFAULT_FONT_FAMILY
 from utils.image import (
     AspectRatioPattern,
     PlaybackMode,
@@ -59,7 +59,9 @@ class PlaybackModeSelectionFrame(AISFrame):
         """
         コンストラクタ
         """
-        super().__init__(master, **kwargs)
+        super().__init__(
+            master, width=WIDGET_MIN_WIDTH, height=WIDGET_MIN_HEIGHT, **kwargs
+        )
 
         # メンバー保存
         self._model = model
@@ -153,7 +155,6 @@ class VideoCaptureFrame(AISFrame, TkinterDnD.DnDWrapper):
         # アニメ名テキストボックス
         self._nime_name_entry = AISEntry(
             self._output_kind_frame,
-            width=WIDGET_MIN_WIDTH,
             placeholder_text="Override NIME name ...",
         )
         self._output_kind_frame.ais.grid_child(self._nime_name_entry, 1, 0)
@@ -221,6 +222,7 @@ class VideoCaptureFrame(AISFrame, TkinterDnD.DnDWrapper):
             self._output_kind_frame,
             text="STORAGE",
             width=2 * WIDGET_MIN_WIDTH,
+            height=WIDGET_MIN_HEIGHT,
             command=lambda: self._on_save_button_clicked(False),
         )
         self._output_kind_frame.ais.grid_child(self._save_overwrite_button, 1, 1, 3, 1)
@@ -230,6 +232,7 @@ class VideoCaptureFrame(AISFrame, TkinterDnD.DnDWrapper):
             self._output_kind_frame,
             text="STORAGE AS",
             width=2 * WIDGET_MIN_WIDTH,
+            height=WIDGET_MIN_HEIGHT,
             command=lambda: self._on_save_button_clicked(True),
         )
         self._output_kind_frame.ais.grid_child(self._save_new_button, 4, 1)
@@ -255,6 +258,7 @@ class VideoCaptureFrame(AISFrame, TkinterDnD.DnDWrapper):
             self._input_kind_frame,
             text="REMOVE ALL",
             width=2 * WIDGET_MIN_WIDTH,
+            height=WIDGET_MIN_HEIGHT,
             command=self._on_remove_all_button_clicked,
         )
         self._input_kind_frame.ais.grid_child(self._wipe_button, 1, 1, sticky="ns")
@@ -264,6 +268,7 @@ class VideoCaptureFrame(AISFrame, TkinterDnD.DnDWrapper):
             self._input_kind_frame,
             text="REMOVE DISABLED",
             width=2 * WIDGET_MIN_WIDTH,
+            height=WIDGET_MIN_HEIGHT,
             command=self._on_remove_disable_button_clicked,
         )
         self._input_kind_frame.ais.grid_child(
@@ -275,6 +280,7 @@ class VideoCaptureFrame(AISFrame, TkinterDnD.DnDWrapper):
             self._input_kind_frame,
             text="ENABLE ALL",
             width=2 * WIDGET_MIN_WIDTH,
+            height=WIDGET_MIN_HEIGHT,
             command=self._on_enable_all_button_clicked,
         )
         self._input_kind_frame.ais.grid_child(
@@ -286,6 +292,7 @@ class VideoCaptureFrame(AISFrame, TkinterDnD.DnDWrapper):
             self._input_kind_frame,
             text="DISABLE ALL",
             width=2 * WIDGET_MIN_WIDTH,
+            height=WIDGET_MIN_HEIGHT,
             command=self._on_disable_all_button_clicked,
         )
         self._input_kind_frame.ais.grid_child(
@@ -316,6 +323,7 @@ class VideoCaptureFrame(AISFrame, TkinterDnD.DnDWrapper):
             self._input_kind_frame,
             text="DISABLE DUPE",
             width=2 * WIDGET_MIN_WIDTH,
+            height=WIDGET_MIN_HEIGHT,
             command=self._on_disable_dupe_button_clicked,
         )
         self._input_kind_frame.ais.grid_child(self._disable_dupe_button, 2, 4)
@@ -367,6 +375,7 @@ class VideoCaptureFrame(AISFrame, TkinterDnD.DnDWrapper):
             self._input_kind_frame,
             text="RECORD",
             width=2 * WIDGET_MIN_WIDTH,
+            height=WIDGET_MIN_HEIGHT,
             command=self._on_record_button_clicked,
         )
         self._input_kind_frame.ais.grid_child(self._record_button, 3, 4, 2, 1)

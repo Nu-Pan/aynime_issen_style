@@ -5,8 +5,8 @@ from typing import Callable, Sequence, Self
 import customtkinter as ctk
 
 # utils
-from utils.constants import WIDGET_MIN_WIDTH, DEFAULT_FONT_FAMILY
-from utils.image import AspectRatioPattern, AspectRatio, ResolutionPattern, Resolution
+from utils.constants import WIDGET_MIN_WIDTH, WIDGET_MIN_HEIGHT, DEFAULT_FONT_FAMILY
+from utils.image import AspectRatioPattern, ResolutionPattern, Resolution
 
 # gui
 from gui.widgets.ais_frame import AISFrame
@@ -162,7 +162,9 @@ class SizePatternSlectionFrame(AISFrame):
             master (ctk.CTkBaseClass): 親ウィジェット
             aux_on_radio_change (Callable): 変更があった時に呼び出されるハンドラ
         """
-        super().__init__(master, **kwargs)
+        super().__init__(
+            master, width=WIDGET_MIN_WIDTH, height=WIDGET_MIN_HEIGHT, **kwargs
+        )
 
         # モデル
         self._model = model

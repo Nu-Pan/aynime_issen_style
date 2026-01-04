@@ -13,7 +13,6 @@ from utils.image import (
     AspectRatio,
     AspectRatioPattern,
     PlaybackMode,
-    Resolution,
     ResolutionPattern,
     ResizeDesc,
     ResizeMode,
@@ -25,16 +24,14 @@ from utils.capture import *
 from utils.constants import (
     DEFAULT_FONT_FAMILY,
     WIDGET_MIN_WIDTH,
+    WIDGET_MIN_HEIGHT,
     TENSEI_DIR_PATH,
 )
 from utils.duration_and_frame_rate import (
     DFR_MAP,
 )
 from utils.image import (
-    apply_color_palette,
-    ContentsMetadata,
     smart_pil_save,
-    smart_pil_load,
     AISImage,
 )
 
@@ -211,6 +208,7 @@ class ForeignExportFrame(AISFrame, TkinterDnD.DnDWrapper):
             self,
             text="STORAGE",
             width=2 * WIDGET_MIN_WIDTH,
+            height=WIDGET_MIN_HEIGHT,
             command=lambda: self._on_save_button_clicked(False),
         )
         self.ais.grid_child(self._save_overwrite_button, 1, 1, 3, 1)
@@ -220,6 +218,7 @@ class ForeignExportFrame(AISFrame, TkinterDnD.DnDWrapper):
             self,
             text="STORAGE AS",
             width=2 * WIDGET_MIN_WIDTH,
+            height=WIDGET_MIN_HEIGHT,
             command=lambda: self._on_save_button_clicked(True),
         )
         self.ais.grid_child(self._save_new_button, 4, 1)

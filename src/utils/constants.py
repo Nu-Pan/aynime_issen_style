@@ -9,8 +9,9 @@ APP_NAME_JP = "えぃにめ一閃流奥義「一閃」"
 # ウィジェットのパディングサイズ
 WIDGET_PADDING = 6
 
-# ウィジェットの最小幅
+# ウィジェットの最小サイズ
 WIDGET_MIN_WIDTH = 60
+WIDGET_MIN_HEIGHT = 32
 
 # ウィンドウの最小サイズ
 # NOTE
