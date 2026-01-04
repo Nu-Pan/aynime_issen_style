@@ -14,6 +14,7 @@ from io import BytesIO
 import re
 from abc import ABC, abstractmethod
 from enum import Enum
+from copy import deepcopy
 
 # numpy
 import numpy as np
@@ -1404,8 +1405,11 @@ class VideoModelEditSession:
         model = self._model
 
         # グローバルモデルによる通知
-        with ImageModelEditSession(model._global_model):
-            pass
+        # NOTE
+        #   _notify_image_changed を呼びだしたいが、
+        #   __exit__ からの _notify_image_changed(ImageLayer.RAW) 呼び出しは避けたい。
+        #   ので、 with 句を使わない
+        ImageModelEditSession(model._global_model)._notify_image_changed(layer)
 
         # フレーム更新間隔による通知
         if model._duration_is_dirty:
@@ -1635,10 +1639,12 @@ class VideoModelEditSession:
 
         # 追加フレームが…
         if isinstance(new_obj, ImageModel):
-            # ImageModel の場合、通常の追加フロー
-
+            # ImageModel の場合、普通の追加処理
+            # NOTE
+            #   呼び出し側に副作用が出ないように、先にコピーを取っておく
+            #   フレームのプロパティは global と整合させる
+            new_obj = deepcopy(new_obj)
             with ImageModelEditSession(new_obj, _does_notify=False) as e:
-                # いろいろ統一
                 e.set_crop_params(*model._global_model.crop_params)
                 for layer in ImageLayer:
                     if layer != ImageLayer.RAW:
@@ -1648,8 +1654,6 @@ class VideoModelEditSession:
                         )
                 e.set_time_stamp(model._global_model.time_stamp)
                 e.set_nime_name(model._global_model.nime_name)
-
-                # フレームリストに挿入
                 model._frames.append(new_obj)
         else:
             # ImageModel ではない場合、 ImageModel の呼び出しに変換
@@ -1768,7 +1772,6 @@ class VideoModelEditSession:
         if isinstance(other, ImageModel):
             # NOTE
             #   フレーム数１の動画とみなす
-            #   可能なメンバーのみ設定する
             self.append_frames(other)
         elif isinstance(other, VideoModel):
             for frame_index in range(other.num_total_frames):
@@ -1783,6 +1786,7 @@ class VideoModelEditSession:
         # スチル・ビデオ共通部分
         # NOTE
         #   set_enable, set_enable_batch は呼ばなくて良い（append_frame で状態コピーされるので）
+        #   set_contents_metadata も呼ばなくて良い（他の set_* を呼ぶのと同じことなので）
         self.set_nime_name(other.nime_name)
         self.set_overlay_nime_name(other.overlay_nime_name)
         self.set_time_stamp(other.time_stamp)
@@ -1791,7 +1795,6 @@ class VideoModelEditSession:
             if layer != ImageLayer.RAW:
                 self.set_size(layer, other.get_size(layer))
                 self.set_resize_mode(layer, other.get_resize_mode(layer))
-        self.set_contents_metadata(other.contents_metadata)
 
         # 正常終了
         return self
