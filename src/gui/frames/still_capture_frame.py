@@ -61,7 +61,7 @@ class StillCaptureFrame(AISFrame, TkinterDnD.DnDWrapper):
         self.ais.columnconfigure(0, weight=1)
 
         # プレビューラベル兼キャプチャボタン
-        self._preview_label = StillLabel(self, model.still, "Click Here or Ctrl+Alt+P")
+        self._preview_label = StillLabel(self, model.still, "Click Here to Capture")
         self.ais.grid_child(self._preview_label, 0, 0, 1, 2)
         self.ais.rowconfigure(0, weight=1)
         self._preview_label.bind("<Button-1>", self._on_preview_label_click)
