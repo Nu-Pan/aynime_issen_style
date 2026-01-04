@@ -20,7 +20,7 @@ from gui.model.contents_cache import (
 from utils.windows import file_to_clipboard
 from utils.ctk import show_notify_label, show_error_dialog
 from utils.capture import *
-from utils.constants import CAPTURE_FRAME_BUFFER_DURATION_IN_SEC
+from utils.constants import CAPTURE_FRAME_BUFFER_DURATION_IN_SEC, WIDGET_MIN_WIDTH
 
 # gui
 from gui.widgets.still_label import StillLabel
@@ -54,7 +54,7 @@ class StillCaptureFrame(AISFrame, TkinterDnD.DnDWrapper):
         # モデル
         self._model = model
         self._model.still.register_layer_changed_handler(
-            ImageLayer.NIME, self.on_nime_changed
+            ImageLayer.NIME, self._on_nime_changed
         )
 
         # レイアウト設定
@@ -62,15 +62,15 @@ class StillCaptureFrame(AISFrame, TkinterDnD.DnDWrapper):
 
         # プレビューラベル兼キャプチャボタン
         self._preview_label = StillLabel(self, model.still, "Click Here or Ctrl+Alt+P")
-        self.ais.grid_child(self._preview_label, 0, 0)
+        self.ais.grid_child(self._preview_label, 0, 0, 1, 2)
         self.ais.rowconfigure(0, weight=1)
-        self._preview_label.bind("<Button-1>", self.on_preview_label_click)
+        self._preview_label.bind("<Button-1>", self._on_preview_label_click)
 
         # グローバルホットキーを登録
         # NOTE
         #   I は「一閃」の頭文字
         self._model.global_hotkey.register(
-            "I", lambda: self.on_preview_label_click(None)
+            "I", lambda: self._on_preview_label_click(None)
         )
 
         # アニメ名テキストボックス
@@ -79,13 +79,13 @@ class StillCaptureFrame(AISFrame, TkinterDnD.DnDWrapper):
         )
         self.ais.grid_child(self._nime_name_entry, 1, 0)
         self.ais.rowconfigure(1, weight=0)
-        self._nime_name_entry.register_handler(self.on_nime_name_entry_changed)
+        self._nime_name_entry.register_handler(self._on_nime_name_entry_changed)
 
         # 解像度選択フレーム
         self._size_pattern_selection_frame = SizePatternSlectionFrame(
             self,
             model,
-            self.on_resolution_changes,
+            self._on_resolution_changes,
             AspectRatioPattern.E_RAW,
             ResolutionPattern.E_HD,
             [
@@ -126,7 +126,6 @@ class StillCaptureFrame(AISFrame, TkinterDnD.DnDWrapper):
             "SEC",
         )
         self.ais.grid_child(self._capture_timing_slider, 3, 0)
-        self.ais.rowconfigure(3, weight=0)
         self._capture_timing_slider.set_value(
             self._model.user_properties.get("still_capture_timing", 0.1)
         )
@@ -134,11 +133,47 @@ class StillCaptureFrame(AISFrame, TkinterDnD.DnDWrapper):
             self._on_capture_timing_slider_changed
         )
 
+        # 上書きセーブボタン
+        self._save_overwrite_button = ctk.CTkButton(
+            self,
+            text="STORAGE",
+            width=2 * WIDGET_MIN_WIDTH,
+            command=lambda: self._on_save_button_clicked(False),
+        )
+        self.ais.grid_child(self._save_overwrite_button, 1, 1, 2, 1)
+
+        # 新規セーブボタン
+        self._save_new_button = ctk.CTkButton(
+            self,
+            text="STORAGE AS",
+            width=2 * WIDGET_MIN_WIDTH,
+            command=lambda: self._on_save_button_clicked(True),
+        )
+        self.ais.grid_child(self._save_new_button, 3, 1, 1, 1)
+
         # ファイルドロップ関係
         self.drop_target_register(DND_FILES)
         self.dnd_bind("<<Drop>>", self._on_drop_file)
 
-    def on_preview_label_click(self, event: Event | None) -> None:
+    def _on_nime_changed(self):
+        """
+        NIME 画像に変更があった際に呼び出されるハンドラ
+        """
+        # エイリアス
+        model = self._model.still
+
+        # 設定変更を各 UI に反映
+        resize_desc = model.get_size(ImageLayer.NIME)
+        if (
+            self._size_pattern_selection_frame.aspect_ratio != resize_desc.aspect_ratio
+            or self._size_pattern_selection_frame.resolution != resize_desc.resolution
+        ):
+            self._size_pattern_selection_frame.set_pattern(
+                aspect_ratio=resize_desc.aspect_ratio.pattern,
+                resolution=resize_desc.resolution.pattern,
+            )
+
+    def _on_preview_label_click(self, event: Event | None) -> None:
         """
         プレビューラベルクリックイベントハンドラ
 
@@ -167,14 +202,15 @@ class StillCaptureFrame(AISFrame, TkinterDnD.DnDWrapper):
             actual_nime_name = self._model.stream.nime_window_text
 
         # モデルに反映
-        # NOTE
-        #   通知の結果エクスポートも行われる
         with ImageModelEditSession(self._model.still) as edit:
             edit.set_raw_image(pil_raw_capture_image)
             edit.set_nime_name(actual_nime_name)
             edit.set_time_stamp(None)
 
-    def on_nime_name_entry_changed(self, text: str):
+        # エクスポート
+        self._on_save_button_clicked(False)
+
+    def _on_nime_name_entry_changed(self, text: str):
         """
         アニメ名テキストボックスが変更されたときに呼び出される
         """
@@ -184,7 +220,7 @@ class StillCaptureFrame(AISFrame, TkinterDnD.DnDWrapper):
             else:
                 edit.set_nime_name(self._model.stream.nime_window_text)
 
-    def on_resolution_changes(
+    def _on_resolution_changes(
         self, aspect_ratio: AspectRatioPattern, resolution: ResolutionPattern
     ):
         """
@@ -195,47 +231,38 @@ class StillCaptureFrame(AISFrame, TkinterDnD.DnDWrapper):
             resolution (Resolution): 解像度
         """
         # リサイズを適用
-        # NOTE
-        #   リサイズさえすればコールバック経由でエクスポートまで走るはず
         with ImageModelEditSession(self._model.still) as edit:
             edit.set_size(ImageLayer.NIME, ResizeDesc(aspect_ratio, resolution))
 
-    def on_nime_changed(self):
+    def _on_capture_timing_slider_changed(self, value: float):
         """
-        NIME 画像に変更があった際に呼び出されるハンドラ
+        キャプチャタイミングスライダーに変更があった時に呼び出されるハンドラ
+        """
+        self._model.user_properties.set("still_capture_timing", value)
+
+    def _on_save_button_clicked(self, update_timestamp: bool):
+        """
+        画像のセーブ処理を行う
         """
         # エイリアス
         model = self._model.still
 
-        # 設定変更を各 UI に反映
-        resize_desc = model.get_size(ImageLayer.NIME)
-        if (
-            self._size_pattern_selection_frame.aspect_ratio != resize_desc.aspect_ratio
-            or self._size_pattern_selection_frame.resolution != resize_desc.resolution
-        ):
-            self._size_pattern_selection_frame.set_pattern(
-                aspect_ratio=resize_desc.aspect_ratio.pattern,
-                resolution=resize_desc.resolution.pattern,
-            )
-
-        # エクスポートを実行
-        self.export_image()
-
-    def export_image(self):
-        """
-        画像のエクスポート処理を行う
-        """
         # キャプチャがない場合は何もしない
-        if self._model.still.get_image(ImageLayer.NIME) is None:
+        if model.get_image(ImageLayer.NIME) is None:
+            show_notify_label(self, "info", "キャプチャ画像なし")
             return
 
+        # タイムスタンプ更新
+        if update_timestamp:
+            with ImageModelEditSession(model) as edit:
+                edit.set_time_stamp(None)
+
         # キャプチャをローカルにファイルに保存する
-        nime_file_path = save_content_model(self._model.still)
-        if not isinstance(nime_file_path, Path):
-            raise TypeError(
-                f"Expected Path, got {type(nime_file_path)}. "
-                "integrated_save_image should return a single Path."
-            )
+        try:
+            nime_file_path = save_content_model(model)
+        except Exception as e:
+            show_notify_label(self, "error", "画像ファイルの保存に失敗", exception=e)
+            return
 
         # 保存したファイルをクリップボードに乗せる
         file_to_clipboard(nime_file_path)
@@ -244,15 +271,9 @@ class StillCaptureFrame(AISFrame, TkinterDnD.DnDWrapper):
         show_notify_label(
             self,
             "info",
-            "「一閃」\nクリップボード転送完了",
-            on_click_handler=self.on_preview_label_click,
+            f"{StillCaptureFrame.UI_TAB_NAME}\nクリップボード転送完了",
+            on_click_handler=self._on_preview_label_click,
         )
-
-    def _on_capture_timing_slider_changed(self, value: float):
-        """
-        キャプチャタイミングスライダーに変更があった時に呼び出されるハンドラ
-        """
-        self._model.user_properties.set("still_capture_timing", value)
 
     def _on_drop_file(self, event: DnDEvent):
         """
