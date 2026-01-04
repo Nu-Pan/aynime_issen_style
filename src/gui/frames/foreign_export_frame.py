@@ -201,18 +201,28 @@ class ForeignExportFrame(AISFrame, TkinterDnD.DnDWrapper):
         )
 
         # モデル側切り出しパラメータ変更ハンドラ
+        # NOTE size, x, y まとめて１つのハンドラーで拾う
         self._model.foreign.register_duration_change_handler(
             self._on_crop_square_param_changed
         )
 
-        # セーブボタン
-        self._save_button = ctk.CTkButton(
+        # 上書きセーブボタン
+        self._save_overwrite_button = ctk.CTkButton(
             self,
-            text="SAVE",
+            text="STORAGE",
             width=2 * WIDGET_MIN_WIDTH,
-            command=self._on_save_button_clicked,
+            command=lambda: self._on_save_button_clicked(False),
         )
-        self.ais.grid_child(self._save_button, 1, 1, 4, 1)
+        self.ais.grid_child(self._save_overwrite_button, 1, 1, 3, 1)
+
+        # 新規セーブボタン
+        self._save_new_button = ctk.CTkButton(
+            self,
+            text="STORAGE AS",
+            width=2 * WIDGET_MIN_WIDTH,
+            command=lambda: self._on_save_button_clicked(True),
+        )
+        self.ais.grid_child(self._save_new_button, 4, 1)
 
         # ファイルドロップ関係
         self.drop_target_register(DND_FILES)
@@ -230,7 +240,7 @@ class ForeignExportFrame(AISFrame, TkinterDnD.DnDWrapper):
         # エイリアス
         export_target = self._export_target_radio.value
 
-        # オーバーレイ有効・無効
+        # NIME 名オーバーレイ有効・無効
         if export_target in [
             ExportTarget.DISCORD_EMOJI,
             ExportTarget.DISCORD_STAMP,
@@ -278,7 +288,7 @@ class ForeignExportFrame(AISFrame, TkinterDnD.DnDWrapper):
 
     def _on_crop_square_param_changed(self):
         """
-        モデル側の切り出し正方形の変更ハンドラ
+        モデル上の正方形切り出しパラメータの変更ハンドラ
         """
         size_ratio, x_ratio, y_ratio = self._model.foreign.crop_params
         if size_ratio is not None and self._crop_square_size_slider.value != size_ratio:
@@ -288,9 +298,9 @@ class ForeignExportFrame(AISFrame, TkinterDnD.DnDWrapper):
         if y_ratio is not None and self._crop_square_y_slider.value != y_ratio:
             self._crop_square_y_slider.set_value(y_ratio)
 
-    def _on_save_button_clicked(self):
+    def _on_save_button_clicked(self, update_timestamp: bool):
         """
-        エクスポートボタンクリックハンドラ
+        セーブボタンクリックハンドラ
         """
         # エイリアス
         export_target = self._export_target_radio.value
@@ -298,11 +308,17 @@ class ForeignExportFrame(AISFrame, TkinterDnD.DnDWrapper):
 
         # スチル・ビデオを解決、ロードされてなければなにもしない
         if model.num_total_frames < 1:
+            show_notify_label(self, "info", "転生メディアなし")
             return
         elif model.num_total_frames == 1:
             is_still = True
         else:
             is_still = False
+
+        # タイムスタンプ更新
+        if update_timestamp:
+            with VideoModelEditSession(model) as edit:
+                edit.set_time_stamp(None)
 
         # エクスポートファイルの仕様を決定
         if export_target == ExportTarget.DISCORD_EMOJI:

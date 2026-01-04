@@ -156,7 +156,7 @@ class VideoCaptureFrame(AISFrame, TkinterDnD.DnDWrapper):
             width=WIDGET_MIN_WIDTH,
             placeholder_text="Override NIME name ...",
         )
-        self._output_kind_frame.ais.grid_child(self._nime_name_entry, 1, 0, 1, 2)
+        self._output_kind_frame.ais.grid_child(self._nime_name_entry, 1, 0)
         self._nime_name_entry.register_handler(self.on_nime_name_entry_changed)
 
         # 解像度選択フレーム
@@ -178,9 +178,7 @@ class VideoCaptureFrame(AISFrame, TkinterDnD.DnDWrapper):
                 ResolutionPattern.E_RAW,
             ],
         )
-        self._output_kind_frame.ais.grid_child(
-            self._size_pattern_selection_frame, 2, 0, 1, 2
-        )
+        self._output_kind_frame.ais.grid_child(self._size_pattern_selection_frame, 2, 0)
 
         # UI とモデルの解像度を揃える
         with VideoModelEditSession(self._model.video) as edit:
@@ -218,14 +216,23 @@ class VideoCaptureFrame(AISFrame, TkinterDnD.DnDWrapper):
         )
         self._save_frame_rate_slider.set_value(DFR_MAP.default_entry)
 
-        # セーブボタン
-        self._save_button = ctk.CTkButton(
+        # 上書きセーブボタン
+        self._save_overwrite_button = ctk.CTkButton(
             self._output_kind_frame,
-            text="SAVE",
+            text="STORAGE",
             width=2 * WIDGET_MIN_WIDTH,
-            command=self._on_save_button_clicked,
+            command=lambda: self._on_save_button_clicked(False),
         )
-        self._output_kind_frame.ais.grid_child(self._save_button, 3, 1, 2, 1)
+        self._output_kind_frame.ais.grid_child(self._save_overwrite_button, 1, 1, 3, 1)
+
+        # 新規セーブボタン
+        self._save_new_button = ctk.CTkButton(
+            self._output_kind_frame,
+            text="STORAGE AS",
+            width=2 * WIDGET_MIN_WIDTH,
+            command=lambda: self._on_save_button_clicked(True),
+        )
+        self._output_kind_frame.ais.grid_child(self._save_new_button, 4, 1)
 
         # 入力関係フレーム
         # NOTE
@@ -423,21 +430,28 @@ class VideoCaptureFrame(AISFrame, TkinterDnD.DnDWrapper):
         dfr_entry = DFR_MAP.by_duration_in_msec(duration_in_msec)
         self._save_frame_rate_slider.set_value(dfr_entry)
 
-    def _on_save_button_clicked(self):
+    def _on_save_button_clicked(self, update_timestamp: bool):
         """
-        セーブボタンクリックハンドラ
+        セーブ処理ハンドラ
         """
+        # エイリアス
+        model = self._model.video
+
         # 最低２フレーム必要
-        video_model = self._model.video
-        if video_model.num_enable_frames < 2:
-            show_error_dialog("動画の保存には最低でも 2 フレーム必要だよ")
+        if model.num_enable_frames < 2:
+            show_notify_label(self, "info", "動画の保存には最低でも 2 フレーム必要だよ")
             return
+
+        # タイムスタンプ更新
+        if update_timestamp:
+            with VideoModelEditSession(model) as edit:
+                edit.set_time_stamp(None)
 
         # 動画ファイルとして保存
         try:
-            video_file_path = save_content_model(video_model)
+            video_file_path = save_content_model(model)
         except Exception as e:
-            show_error_dialog("動画ファイルの保存に失敗", e)
+            show_notify_label(self, "error", "動画ファイルの保存に失敗", exception=e)
             return
 
         # クリップボードに転送
