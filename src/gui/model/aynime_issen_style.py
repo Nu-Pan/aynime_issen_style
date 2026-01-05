@@ -5,6 +5,7 @@ import customtkinter as ctk
 from utils.capture import *
 from utils.windows import GlobalHotkey
 from utils.user_properties import UserProperties
+from utils.ffmpeg import FFmpeg
 
 # model
 from gui.model.contents_cache import ImageModel, VideoModel
@@ -26,6 +27,7 @@ class AynimeIssenStyleModel:
         self.video = VideoModel()
         self.foreign = VideoModel()
         self.user_properties = UserProperties()
+        self.ffmpeg = FFmpeg()
 
     def close(self):
         """

@@ -468,7 +468,9 @@ class VideoCaptureFrame(AISFrame, TkinterDnD.DnDWrapper):
 
         # クリップボード転送完了通知
         show_notify_label(
-            self, "info", f"{VideoCaptureFrame.UI_TAB_NAME}\nクリップボード転送完了"
+            self,
+            "info",
+            f"{VideoCaptureFrame.UI_TAB_NAME}\nクリップボードに「収納」しました",
         )
 
     def _on_remove_all_button_clicked(self):

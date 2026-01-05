@@ -5,6 +5,7 @@ __pycache__
 /raw/
 /nime/
 /tensei/
+/ffmpeg/
 /*.spec
 /src/utils/version_constants.py
 /log/

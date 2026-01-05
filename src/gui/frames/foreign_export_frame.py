@@ -78,6 +78,7 @@ class ExportTargetRadioFrame(AISFrame):
             ExportTarget.DISCORD_EMOJI,
             ExportTarget.DISCORD_STAMP,
             ExportTarget.X_TWITTER,
+            ExportTarget.GABIGABI,
         ]
         self._radio_buttons: list[ctk.CTkRadioButton] = []
         for i, export_target in enumerate(_EXPORT_TARGETS):
@@ -276,6 +277,12 @@ class ForeignExportFrame(AISFrame, TkinterDnD.DnDWrapper):
             nime_resize_desc = ResizeDesc(
                 AspectRatioPattern.E_RAW, ResolutionPattern.E_X_TWITTER_STILL_LIMIT
             )
+        elif export_target == ExportTarget.GABIGABI:
+            # NOTE
+            #   2000 年代初頭っぽくしたいので 512 までガッツリ落とす
+            nime_resize_desc = ResizeDesc(
+                AspectRatioPattern.E_RAW, ResolutionPattern.E_512
+            )
         else:
             raise ValueError("Invalid ExportTarget")
 
@@ -326,18 +333,28 @@ class ForeignExportFrame(AISFrame, TkinterDnD.DnDWrapper):
                 file_suffix = ".png"
             else:
                 file_suffix = ".avif"
+            gabigabi = False
         elif export_target == ExportTarget.DISCORD_STAMP:
             subdir_name = "discord_stamp"
             if is_still:
                 file_suffix = ".png"
             else:
                 file_suffix = ".gif"
+            gabigabi = False
         elif export_target == ExportTarget.X_TWITTER:
             subdir_name = "x_twitter"
             if is_still:
                 file_suffix = ".jpg"
             else:
+                file_suffix = ".mp4"
+            gabigabi = False
+        elif export_target == ExportTarget.GABIGABI:
+            subdir_name = "'00s"
+            if is_still:
+                file_suffix = ".jpg"
+            else:
                 file_suffix = ".gif"
+            gabigabi = True
         else:
             raise ValueError(export_target)
 
@@ -369,7 +386,11 @@ class ForeignExportFrame(AISFrame, TkinterDnD.DnDWrapper):
                 encode_speed_ratio = 0.0
             elif file_suffix == ".jpg":
                 lossless = False
-                quality_ratio = 92 / 95
+                quality_ratio = 65 / 95 if gabigabi else 92 / 95
+                encode_speed_ratio = 0.0
+            elif file_suffix == ".gif":
+                lossless = False
+                quality_ratio = 0.0 if gabigabi else 1.0
                 encode_speed_ratio = 0.0
             else:
                 raise ValueError(f"Invalid still file_suffix ({file_suffix})")
@@ -413,35 +434,51 @@ class ForeignExportFrame(AISFrame, TkinterDnD.DnDWrapper):
                 case _:
                     raise ValueError(f"Invalid PlaybaclMode ({model.playback_mode})")
 
-            # エンコード設定を解決
-            if file_suffix in {".avif", ".gif"}:
-                lossless = False
-                quality_ratio = 0.6
-                encode_speed_ratio = 0.2
-            elif file_suffix == ".apng":
-                lossless = True
-                quality_ratio = 1.0
-                encode_speed_ratio = 0.0
+            # 出力 API を呼び出す
+            # NOTE
+            #   動画コンテナ系は PIL 出力できないので ffmpeg を使う。
+            #   それ以外は PIL を使う。
+            if save_file_path.suffix in {".mp4"}:
+                # ffmpeg でエンコード
+                self._model.ffmpeg.encode(
+                    save_file_path, pil_frames, 1000 / model.duration_in_msec
+                )
             else:
-                raise ValueError(f"Invalid video file_suffix ({file_suffix})")
+                # エンコード設定を解決
+                if file_suffix == ".avif":
+                    lossless = False
+                    quality_ratio = 0.6
+                    encode_speed_ratio = 0.2
+                elif file_suffix == ".apng":
+                    lossless = True
+                    quality_ratio = 1.0
+                    encode_speed_ratio = 0.0
+                elif file_suffix == ".gif":
+                    lossless = False
+                    quality_ratio = 0.0 if gabigabi else 1.0
+                    encode_speed_ratio = 0.0
+                else:
+                    raise ValueError(f"Invalid video file_suffix ({file_suffix})")
 
-            # PIL でファイル出力
-            smart_pil_save(
-                save_file_path,
-                pil_frames,
-                duration_in_msec=model.duration_in_msec,
-                metadata=model.contents_metadata,
-                lossless=lossless,
-                quality_ratio=quality_ratio,
-                encode_speed_ratio=encode_speed_ratio,
-            )
+                # PIL でファイル出力
+                smart_pil_save(
+                    save_file_path,
+                    pil_frames,
+                    duration_in_msec=model.duration_in_msec,
+                    metadata=model.contents_metadata,
+                    lossless=lossless,
+                    quality_ratio=quality_ratio,
+                    encode_speed_ratio=encode_speed_ratio,
+                )
 
         # クリップボードに転送
         file_to_clipboard(save_file_path)
 
         # クリップボード転送完了通知
         show_notify_label(
-            self, "info", f"{ForeignExportFrame.UI_TAB_NAME}\nクリップボード転送完了"
+            self,
+            "info",
+            f"{ForeignExportFrame.UI_TAB_NAME}\nクリップボードに「収納」しました",
         )
 
     def _on_drop_file(self, event: DnDEvent):

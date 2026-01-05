@@ -11,6 +11,7 @@ from utils.constants import APP_NAME_EN
 from utils.ctk import show_error_dialog
 from utils.ais_logging import setup_logging, setup_logging_ctk, write_log
 from utils.version_constants import COMMIT_HASH, BUILD_DATE
+from utils.ffmpeg import FFmpeg
 
 # gui
 from gui.aynime_issen_style_app import AynimeIssenStyleApp
@@ -24,6 +25,8 @@ def _startup_job():
     """
     # nime, raw を整理
     standardize_nime_raw_dile()
+    # ffmpeg をインストール
+    FFmpeg.ensure_ffmpeg()
 
 
 def main():

@@ -153,14 +153,15 @@ class ResolutionPattern(Enum):
     横幅だけを定義する
     """
 
-    E_DISCORD_EMOJI = "128"  # Dsicord 絵文字の上限
-    E_DISCORD_STAMP = "320"  # 320
-    E_VGA = "640"  # 640
-    E_QHD = "960"  # 960
-    E_HD = "1280"  # 1280
-    E_FHD = "1920"  # 1920
-    E_3K = "2880"  # 2880
-    E_4K = "3840"  # 3840
+    E_DISCORD_EMOJI = "128"  # Dsicord 絵文字のサイズ
+    E_DISCORD_STAMP = "320"  # Discord スタンプのサイズ
+    E_512 = "512"  # 2000 年代 gif 職人的サイズ
+    E_VGA = "640"
+    E_QHD = "960"
+    E_HD = "1280"
+    E_FHD = "1920"
+    E_3K = "2880"
+    E_4K = "3840"
     E_X_TWITTER_STILL_LIMIT = "4096"  # X(Twitter) の静止画の上限サイズ（長辺側）
     E_RAW = "RAW"  # オリジナルの解像度をそのまま使う
 
@@ -195,6 +196,8 @@ class Resolution:
             return Resolution(128, None, "DISCORD EMOJI")
         elif pattern == ResolutionPattern.E_DISCORD_STAMP:
             return Resolution(320, None, "DISCORD STAMP")
+        elif pattern == ResolutionPattern.E_512:
+            return Resolution(512, None, "512")
         elif pattern == ResolutionPattern.E_VGA:
             return Resolution(640, None, "640")
         elif pattern == ResolutionPattern.E_QHD:
@@ -668,10 +671,75 @@ def calc_ssim(image_A: AISImage, image_B: AISImage) -> float:
     return score
 
 
-def apply_color_palette(pil_frames: list[Image.Image]) -> list[Image.Image]:
+# 8x8 Bayer matrix (values 0..63)
+_BAYER_8 = np.array(
+    [
+        [0, 48, 12, 60, 3, 51, 15, 63],
+        [32, 16, 44, 28, 35, 19, 47, 31],
+        [8, 56, 4, 52, 11, 59, 7, 55],
+        [40, 24, 36, 20, 43, 27, 39, 23],
+        [2, 50, 14, 62, 1, 49, 13, 61],
+        [34, 18, 46, 30, 33, 17, 45, 29],
+        [10, 58, 6, 54, 9, 57, 5, 53],
+        [42, 26, 38, 22, 41, 25, 37, 21],
+    ],
+    dtype=np.float32,
+)
+
+# normalize to [-0.5, +0.5)
+_BAYER_8_NORM = (_BAYER_8 + 0.5) / 64.0 - 0.5
+
+
+def ordered_dither_rgb(pil_image: Image.Image, amplitude: float) -> Image.Image:
+    """
+    ベイヤーパターンに基づいたディザを適用する。
+    """
+    # RGB 化
+    if pil_image.mode != "RGB":
+        pil_image = pil_image.convert("RGB")
+
+    # numpy array 化
+    arr = np.asanyarray(pil_image, dtype=np.int16)  # (H, W, 3)
+    h, w = arr.shape[0], arr.shape[1]
+
+    # タイルマップを作成
+    yy = (np.arange(h) % 8)[:, None]
+    xx = (np.arange(w) % 8)[None, :]
+    t = _BAYER_8_NORM[yy, xx]  # (H, W) in [-0.5, 0.5)
+
+    # ディザを適用
+    # NOTE
+    #   Different phase per channel (still deterministic)
+    off0 = (t * amplitude).astype(np.int16)
+    off1 = (np.roll(t, shift=2, axis=1) * amplitude).astype(np.int16)
+    off2 = (np.roll(t, shift=4, axis=0) * amplitude).astype(np.int16)
+    arr[:, :, 0] += off0
+    arr[:, :, 1] += off1
+    arr[:, :, 2] += off2
+
+    # PIL 画像に戻して終了
+    arr = np.clip(arr, 0, 255).astype(np.uint8)
+    return Image.fromarray(arr, mode="RGB")
+
+
+def apply_color_palette(
+    pil_frames: list[Image.Image],
+    num_colors: int,
+    dither_amplitude: float,
+) -> list[Image.Image]:
     """
     pil_frames にカラーパレットを適用する
     カラーパレットは pil_frames 全体から計算され、これが全フレームに適用される。
+
+    num_colors_ratio:
+        カラーパレットの色数の比率。
+        1.0 なら 256 色。
+        0.0 なら 0 色。
+
+    dither_amplitude:
+        ディザ強度の比率
+        今風の見た目重視なら強度 8 ~ 12 くらい。
+        00 年代狙いなら強度 16 ~ 24 くらい。
     """
     # フレームの横幅を解決
     frame_width = {f.width for f in pil_frames}
@@ -688,40 +756,35 @@ def apply_color_palette(pil_frames: list[Image.Image]) -> list[Image.Image]:
         raise ValueError("Multiple frame height contaminated.")
 
     # すべての NIME フレームを１つの atlas 画像に結合
+    # NOTE
+    #   オリジナルのサイズのままだとパレット計算が重すぎるので、
+    #   適当なサイズまで縮小する。
+    ATLAS_SIZE = min(256, frame_width, frame_height)
     nime_atlas = Image.new(
-        "RGB", (frame_width, frame_height * len(pil_frames)), color=None
+        "RGB", (ATLAS_SIZE, ATLAS_SIZE * len(pil_frames)), color=None
     )
     for frame_index, nime_frame in enumerate(pil_frames):
-        nime_atlas.paste(nime_frame, (0, frame_index * frame_height))
+        nime_atlas.paste(
+            nime_frame.resize((ATLAS_SIZE, ATLAS_SIZE), Image.Resampling.BOX),
+            (0, frame_index * ATLAS_SIZE),
+        )
 
-    # atlas 画像を 256 色パレット化
+    # atlas 画像からグローバルパレットを計算
     # NOTE
-    #   ちらつき対策として 6bit 量子化を先にやる
+    #   昔はちらつき対策として 6bit 量子化をやってたが、パレット色数可変になったのでやめた
     #   メディアンフィルタは輪郭線がちらつく原因になるので却下
     #   FASTOCTREE はフリッカーが出やすい傾向があったので却下
     #   kmeans は品質と速度の兼ね合いで 2 にした
-    nime_atlas = ImageOps.posterize(nime_atlas, bits=6)
-    nime_atlas = nime_atlas.quantize(
-        colors=256, method=Image.Quantize.MEDIANCUT, kmeans=2
-    )
-    nime_atlas = nime_atlas.convert("P", dither=Image.Dither.NONE, colors=256)
-    atlas_palette = nime_atlas.getpalette()
-    if atlas_palette is None:
-        raise TypeError("Failed to getpalette")
+    # NOTE
+    #   quantize で mode="P" になる
+    nime_atlas = nime_atlas.quantize(colors=num_colors, kmeans=2)
 
-    # atlas から 256 色パレット化された NIME 画像を切り出す
+    # グローバルパレットを全フレームに適用
     out_pil_frames: list[Image.Image] = []
-    for frame_index in range(len(pil_frames)):
-        pil_cropped_frame = nime_atlas.crop(
-            (
-                0,
-                frame_index * frame_height,
-                frame_width,
-                (frame_index + 1) * frame_height,
-            )
-        )
-        pil_cropped_frame.putpalette(atlas_palette)
-        out_pil_frames.append(pil_cropped_frame)
+    for f in pil_frames:
+        f = ordered_dither_rgb(f, dither_amplitude)
+        f = f.quantize(palette=nime_atlas, dither=Image.Dither.NONE)
+        out_pil_frames.append(f)
 
     # 正常終了
     return out_pil_frames
@@ -760,6 +823,7 @@ class ExportTarget(Enum):
     DISCORD_EMOJI = "Discord Emoji"
     DISCORD_STAMP = "Discord Stamp"
     X_TWITTER = "X(Twitter)"
+    GABIGABI = "'00s"
 
 
 class ContentsMetadata:
@@ -1070,6 +1134,7 @@ def smart_pil_save(
     lossless: bool,
     quality_ratio: float,
     encode_speed_ratio: float,
+    gabigabi: bool = False,
 ):
     """
     contents を file_path に保存する。
@@ -1141,6 +1206,18 @@ def smart_pil_save(
     if isinstance(contents, list):
         contents = [_to_pil_image(f) for f in contents]
 
+    # gif 用パラメータ
+    # NOTE
+    #   スチル・ビデオで共通なので if の外で計算する
+    #   gif 以外だと無駄処理だけど、コスト極小なので気にしない
+    # NOTE
+    #   色数は 64 ... 256
+    #   ディザ強度は 24 ... 8
+    num_colors = (256 - 64) * quality_ratio + 64
+    num_colors = max(0, min(256, round(num_colors)))
+    dither_amplitude = (24.0 - 8.0) * (1.0 - quality_ratio) + 8.0
+    dither_amplitude = max(0, min(256, dither_amplitude))
+
     # 引数の指定内容で分岐
     suffix = file_path.suffix
     if suffix == ".png" and isinstance(contents, Image.Image) and lossless:
@@ -1171,12 +1248,16 @@ def smart_pil_save(
         )
     elif suffix == ".jpg" and isinstance(contents, Image.Image) and not lossless:
         # still jpg
+        # NOTE
+        #   クオリティが 75 を切ったら '00s モードだとみなす
+        #   '00s モードではあえてクオリティ以外の設定を落とす
+        gabigabi_threshold = 75 / 95
         contents.save(
             str(file_path),
             quality=_ratio_to_pil_param(0, 95, quality_ratio),
-            subsampling=0,
+            subsampling=0 if quality_ratio > gabigabi_threshold else 2,
             optimize=True,
-            progressive=True,
+            progressive=True if quality_ratio > gabigabi_threshold else False,
             comment=metadata.to_str,
         )
     elif (
@@ -1225,12 +1306,24 @@ def smart_pil_save(
             codec="auto",
             xmp=metadata.to_xmp,
         )
+    elif (
+        file_path.suffix == ".gif"
+        and isinstance(contents, Image.Image)
+        and not lossless
+    ):
+        # gif
+        contents = apply_color_palette([contents], num_colors, dither_amplitude)[0]
+        contents.save(
+            str(file_path),
+            optimize=False,
+            comment=metadata.to_str,
+        )
     elif file_path.suffix == ".gif" and isinstance(contents, list) and not lossless:
         # gif
         # NOTE
         #   gif の仕様として更新周期の分解能は 10 msec
         #   チラつき防止のため、全フレームで共通のパレットを使う
-        contents = apply_color_palette(contents)
+        contents = apply_color_palette(contents, num_colors, dither_amplitude)
         contents[0].save(
             str(file_path),
             save_all=True,
