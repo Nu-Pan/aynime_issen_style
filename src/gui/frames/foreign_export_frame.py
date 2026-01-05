@@ -337,7 +337,7 @@ class ForeignExportFrame(AISFrame, TkinterDnD.DnDWrapper):
             if is_still:
                 file_suffix = ".jpg"
             else:
-                file_suffix = ".gif"
+                file_suffix = ".mp4"
         else:
             raise ValueError(export_target)
 
@@ -350,11 +350,25 @@ class ForeignExportFrame(AISFrame, TkinterDnD.DnDWrapper):
 
         # エクスポート処理実行
         # NOTE
+        #   動画コンテナ系は PIL 出力できないので ffmpeg を使う。
+        #   使う API 違うので特別処理。
+        # NOTE
         #   エクスポートは NIME, RAW とは事情が異なるので、
         #   save_content_model を使わず、
         #   ここで直接ファイル出力を書く。
         save_file_path.parent.mkdir(parents=True, exist_ok=True)
-        if is_still:
+        if save_file_path.suffix in {".mp4"}:
+            # 動画フレームを解決
+            pil_frames = [
+                f.pil_image
+                for f in model.iter_frames(ImageLayer.NIME, enable_only=True)
+                if f is not None
+            ]
+            # ffmpeg でエンコード
+            self._model.ffmpeg.encode(
+                save_file_path, pil_frames, 1000 / model.duration_in_msec
+            )
+        elif is_still:
             # スチルを解決
             ais_image = model.get_frame(ImageLayer.NIME, 0)
             if ais_image is None:
@@ -441,7 +455,9 @@ class ForeignExportFrame(AISFrame, TkinterDnD.DnDWrapper):
 
         # クリップボード転送完了通知
         show_notify_label(
-            self, "info", f"{ForeignExportFrame.UI_TAB_NAME}\nクリップボード転送完了"
+            self,
+            "info",
+            f"{ForeignExportFrame.UI_TAB_NAME}\nクリップボードに「収納」しました",
         )
 
     def _on_drop_file(self, event: DnDEvent):

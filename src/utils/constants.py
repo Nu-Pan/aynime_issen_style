@@ -47,6 +47,7 @@ NIME_DIR_PATH = Path.cwd() / "nime"
 TENSEI_DIR_PATH = Path.cwd() / "tensei"
 RAW_DIR_PATH = Path.cwd() / "raw"
 LOG_DIR_PATH = Path.cwd() / "log"
+FFMPEG_DIR_PATH = Path.cwd() / "ffmpeg"
 
 # サムネイルの高さ方向のサイズ
 THUMBNAIL_HEIGHT = 120
