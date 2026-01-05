@@ -1421,10 +1421,15 @@ def smart_pil_load(
                 return ContentsMetadata()
         elif file_suffix in [".png"]:
             # itxt を取り出す
-            # NOTE 大抵は info に居るが text も見に行く
-            itxt_body = image_file.info.get(APP_NAME_EN)
-            if itxt_body is None and hasattr(image_file, "text"):
-                itxt_body = vars(image_file)["text"].get(APP_NAME_EN)
+            # NOTE
+            #   大抵は info に居るが text も見に行く
+            image_file_info = getattr(image_file, "info", None)
+            image_file_text = getattr(image_file, "text", None)
+            itxt_body = None
+            if itxt_body is None and isinstance(image_file_info, dict):
+                itxt_body = image_file_info.get(APP_NAME_EN)
+            if itxt_body is None and isinstance(image_file_text, dict):
+                itxt_body = image_file_text.get(APP_NAME_EN)
             # メタデータへ
             if isinstance(itxt_body, (str, bytes, bytearray)):
                 return ContentsMetadata.from_str(itxt_body)
