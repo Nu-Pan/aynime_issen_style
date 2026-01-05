@@ -1384,7 +1384,7 @@ def smart_pil_load(
                     else:
                         frame_enable = True
                 # パース結果を保存
-                pil_frames.append(Image.open(zip_file.open(file_name.name)))
+                pil_frames.append(Image.open(zip_file.open(file_name.name)).copy())
                 frame_enable_list.append(frame_enable)
         # 結果を返す
         return SmartPILLoadResult(
