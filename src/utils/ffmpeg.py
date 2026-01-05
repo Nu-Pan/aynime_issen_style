@@ -164,203 +164,189 @@ def _detect_h264_encoder(ffmpeg_path: Path) -> str:
     )
 
 
-class FFmpeg:
+def ensure_ffmpeg() -> Path:
     """
-    ffmpeg による連番静止画の動画エンコードをラップするクラス。
-    ポータブル版 ffmpeg をダウンロードしてそれを呼び出す。
+    ffmpeg を呼び出し可能な状態にする
+    内部的にはダウンロードして展開してるだけ
+    ffmpeg.exe のパスを返す
     """
+    # すでに ffmpeg があるならそれを使う
+    ffmpeg_exe_file_path = _find_file_under_dir(FFMPEG_DIR_PATH, "ffmpeg.exe")
+    if ffmpeg_exe_file_path:
+        return ffmpeg_exe_file_path
 
-    def __init__(self):
-        """
-        コンストラクタ
-        """
-        # ffmpeg をインストール
-        self._ffmpeg_path = FFmpeg.ensure_ffmpeg()
+    # 展開先をクリア
+    if FFMPEG_DIR_PATH.exists():
+        shutil.rmtree(FFMPEG_DIR_PATH)
+    FFMPEG_DIR_PATH.mkdir(parents=True, exist_ok=True)
 
-        # エンコーダーを決定
-        self._encoder = _detect_h264_encoder(self._ffmpeg_path)
+    # zip をダウンロード
+    ffmpeg_zip_file_path = FFMPEG_DIR_PATH / "ffmpeg.zip"
+    _download_file(
+        BTBN_LATEST_WIN64_LGPL_ZIP,
+        ffmpeg_zip_file_path,
+    )
 
-        # 試行する引数を展開
-        # NOTE
-        #   環境依存で合法な引数が変わるので、最初はリッチに、ダメなら最小構成で。
-        QUALITY = 24
-        if self._encoder == "h264_nvenc":
-            self._extra_args = [
-                # 推奨（CQベースのVBR）
-                [
-                    "-c:v",
-                    "h264_nvenc",
-                    "-rc",
-                    "vbr",
-                    "-cq",
-                    str(QUALITY),
-                    "-b:v",
-                    "0",
-                    "-preset",
-                    "p5",
-                ],
-                # 最低限
-                ["-c:v", "h264_nvenc"],
-            ]
-        elif self._encoder == "h264_qsv":
-            self._extra_args = [
-                # QSV は -global_quality が通りやすい（値は概ね“品質パラメータ”）
-                [
-                    "-c:v",
-                    "h264_qsv",
-                    "-global_quality",
-                    str(QUALITY),
-                    "-preset",
-                    "medium",
-                ],
-                ["-c:v", "h264_qsv"],
-            ]
-        elif self._encoder == "h264_amf":
-            self._extra_args = [
-                # AMF は rc/qp 系が環境差大きいので、まずはCQP寄せ
-                [
-                    "-c:v",
-                    "h264_amf",
-                    "-rc",
-                    "cqp",
-                    "-qp_i",
-                    str(QUALITY),
-                    "-qp_p",
-                    str(QUALITY),
-                    "-quality",
-                    "speed",
-                ],
-                ["-c:v", "h264_amf"],
-            ]
-        else:
-            raise ValueError(f"Unexpected encoder ({self._encoder})")
+    # zip を展開
+    _extract_zip(ffmpeg_zip_file_path, FFMPEG_DIR_PATH)
 
-    @classmethod
-    def ensure_ffmpeg(cls) -> Path:
-        """
-        ffmpeg を呼び出し可能な状態にする
-        内部的にはダウンロードして展開してるだけ
-        ffmpeg.exe のパスを返す
-        """
-        # すでに ffmpeg があるならそれを使う
-        ffmpeg_exe_file_path = _find_file_under_dir(FFMPEG_DIR_PATH, "ffmpeg.exe")
-        if ffmpeg_exe_file_path:
-            return ffmpeg_exe_file_path
+    # ffmpeg.exe のパスを返す
+    ffmpeg_exe_file_path = _find_file_under_dir(FFMPEG_DIR_PATH, "ffmpeg.exe")
+    if ffmpeg_exe_file_path:
+        return ffmpeg_exe_file_path
+    else:
+        raise FileNotFoundError(f"ffmpeg.exe not found under {FFMPEG_DIR_PATH}")
 
-        # 展開先をクリア
-        if FFMPEG_DIR_PATH.exists():
-            shutil.rmtree(FFMPEG_DIR_PATH)
-        FFMPEG_DIR_PATH.mkdir(parents=True, exist_ok=True)
 
-        # zip をダウンロード
-        ffmpeg_zip_file_path = FFMPEG_DIR_PATH / "ffmpeg.zip"
-        _download_file(
-            BTBN_LATEST_WIN64_LGPL_ZIP,
-            ffmpeg_zip_file_path,
-        )
+def ffmpeg_encode_h264(
+    dest_file_path: Path, frames: list[Image.Image], frame_rate: float
+):
+    """
+    frames を ffmpeg を使って h264 エンコードして dest_file_path に保存する。
+    """
+    # 空はエラー
+    if not frames:
+        raise ValueError("frames is empty")
 
-        # zip を展開
-        _extract_zip(ffmpeg_zip_file_path, FFMPEG_DIR_PATH)
+    # ffmpeg をインストール
+    ffmpeg_path = ensure_ffmpeg()
 
-        # ffmpeg.exe のパスを返す
-        ffmpeg_exe_file_path = _find_file_under_dir(FFMPEG_DIR_PATH, "ffmpeg.exe")
-        if ffmpeg_exe_file_path:
-            return ffmpeg_exe_file_path
-        else:
-            raise FileNotFoundError(f"ffmpeg.exe not found under {FFMPEG_DIR_PATH}")
+    # エンコーダーを決定
+    encoder = _detect_h264_encoder(ffmpeg_path)
 
-    def encode(
-        self, dest_file_path: Path, frames: list[Image.Image], frame_rate: float
-    ):
-        """
-        frames を mp4(h264) エンコードして dest_file_path に保存する。
-        """
-        # 空はエラー
-        if not frames:
-            raise ValueError("frames is empty")
-
-        # コピーを取る
-        frames = copy(frames)
-
-        # フレームを h264 エンコード用に正規化
-        head_frame = frames[0]
-        head_width, head_height = head_frame.size
-        head_even_width = head_width - (head_width % 2)
-        head_even_height = head_height - (head_height % 2)
-        for i in range(len(frames)):
-            # フレームサイズ不一致はエラー
-            if (head_width, head_height) != head_frame.size:
-                raise ValueError(
-                    f"Frame size missmatch (head={head_frame.size}, index={i}, frame={frames[i].size})"
-                )
-            # サイズを偶数化
-            width, height = frames[i].size
-            if width != head_even_width or height != head_even_height:
-                frames[i] = frames[i].crop((0, 0, head_even_width, head_even_height))
-            # RGB フォーマット化
-            if frames[i].mode != "RGB":
-                frames[i] = frames[i].convert("RGB")
-
-        # 基本コマンド
-        base_args = [
-            str(self._ffmpeg_path),
-            "-y",
-            "-hide_banner",
-            "-loglevel",
-            "error",
-            # 入力関係
-            "-f",
-            "rawvideo",
-            "-pix_fmt",
-            "rgb24",
-            "-s",
-            f"{head_even_width}x{head_even_height}",
-            "-r",
-            str(frame_rate),
-            "-i",
-            "pipe:0",
-            # 出力関係
-            "-pix_fmt",
-            "yuv420p",
-            "-movflags",
-            "+faststart",
-            "-an",  # 音声なし
+    # 試行する引数を展開
+    # NOTE
+    #   環境依存で合法な引数が変わるので、最初はリッチに、ダメなら最小構成で。
+    QUALITY = 24
+    if encoder == "h264_nvenc":
+        extra_args = [
+            # 推奨（CQベースのVBR）
+            [
+                "-c:v",
+                "h264_nvenc",
+                "-rc",
+                "vbr",
+                "-cq",
+                str(QUALITY),
+                "-b:v",
+                "0",
+                "-preset",
+                "p5",
+            ],
+            # 最低限
+            ["-c:v", "h264_nvenc"],
         ]
+    elif encoder == "h264_qsv":
+        extra_args = [
+            # QSV は -global_quality が通りやすい（値は概ね“品質パラメータ”）
+            [
+                "-c:v",
+                "h264_qsv",
+                "-global_quality",
+                str(QUALITY),
+                "-preset",
+                "medium",
+            ],
+            ["-c:v", "h264_qsv"],
+        ]
+    elif encoder == "h264_amf":
+        extra_args = [
+            # AMF は rc/qp 系が環境差大きいので、まずはCQP寄せ
+            [
+                "-c:v",
+                "h264_amf",
+                "-rc",
+                "cqp",
+                "-qp_i",
+                str(QUALITY),
+                "-qp_p",
+                str(QUALITY),
+                "-quality",
+                "speed",
+            ],
+            ["-c:v", "h264_amf"],
+        ]
+    else:
+        raise ValueError(f"Unexpected encoder ({encoder})")
 
-        # ffmpeg 実行
-        last_error = None
-        for extra_args in self._extra_args:
-            cmd = base_args + extra_args + [dest_file_path]
-            try:
-                # プロセス起動
-                proc = subprocess.Popen(
-                    cmd,
-                    stdin=subprocess.PIPE,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
-                    bufsize=1024 * 1024,
+    # フレームを h264 エンコード用に正規化
+    frames = copy(frames)
+    head_frame = frames[0]
+    head_width, head_height = head_frame.size
+    head_even_width = head_width - (head_width % 2)
+    head_even_height = head_height - (head_height % 2)
+    for i in range(len(frames)):
+        # フレームサイズ不一致はエラー
+        if (head_width, head_height) != head_frame.size:
+            raise ValueError(
+                f"Frame size missmatch (head={head_frame.size}, index={i}, frame={frames[i].size})"
+            )
+        # サイズを偶数化
+        width, height = frames[i].size
+        if width != head_even_width or height != head_even_height:
+            frames[i] = frames[i].crop((0, 0, head_even_width, head_even_height))
+        # RGB フォーマット化
+        if frames[i].mode != "RGB":
+            frames[i] = frames[i].convert("RGB")
+
+    # 基本コマンド
+    base_args = [
+        str(ffmpeg_path),
+        "-y",
+        "-hide_banner",
+        "-loglevel",
+        "error",
+        # 入力関係
+        "-f",
+        "rawvideo",
+        "-pix_fmt",
+        "rgb24",
+        "-s",
+        f"{head_even_width}x{head_even_height}",
+        "-r",
+        str(frame_rate),
+        "-i",
+        "pipe:0",
+        # 出力関係
+        "-pix_fmt",
+        "yuv420p",
+        "-movflags",
+        "+faststart",
+        "-an",  # 音声なし
+    ]
+
+    # ffmpeg 実行
+    last_error = None
+    for extra_args in extra_args:
+        cmd = base_args + extra_args + [dest_file_path]
+        try:
+            # プロセス起動
+            proc = subprocess.Popen(
+                cmd,
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                bufsize=1024 * 1024,
+            )
+            if proc.stdin is None:
+                raise ValueError("subprocess stdin is None")
+            # フレームをパイプに流し込む
+            for frame in frames:
+                proc.stdin.write(frame.tobytes())
+            proc.stdin.close()
+            # 実行結果を処理
+            _, err = proc.communicate()
+            err_str = err.decode("utf-8", "replace")
+            if proc.returncode != 0:
+                raise RuntimeError(
+                    f"ffmpeg failed (return code={proc.returncode})\n"
+                    f"stderr:\n{err_str}"
                 )
-                if proc.stdin is None:
-                    raise ValueError("subprocess stdin is None")
-                # フレームをパイプに流し込む
-                for frame in frames:
-                    proc.stdin.write(frame.tobytes())
-                proc.stdin.close()
-                # 実行結果を処理
-                _, err = proc.communicate()
-                err_str = err.decode("utf-8", "replace")
-                if proc.returncode != 0:
-                    raise RuntimeError(
-                        f"ffmpeg failed (return code={proc.returncode})\n"
-                        f"stderr:\n{err_str}"
-                    )
-                # 正常終了
-                return
-            except Exception as e:
-                last_error = e
-                continue
+            # 正常終了
+            return
+        except Exception as e:
+            last_error = e
+            continue
 
-        # 全部失敗
-        raise RuntimeError(
-            f"ffmpeg encode failed with encoder={self._encoder}"
-        ) from last_error
+    # 全部失敗
+    raise RuntimeError(f"ffmpeg encode failed with encoder={encoder}") from last_error
