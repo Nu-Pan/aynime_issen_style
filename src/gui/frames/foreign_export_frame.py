@@ -350,25 +350,11 @@ class ForeignExportFrame(AISFrame, TkinterDnD.DnDWrapper):
 
         # エクスポート処理実行
         # NOTE
-        #   動画コンテナ系は PIL 出力できないので ffmpeg を使う。
-        #   使う API 違うので特別処理。
-        # NOTE
         #   エクスポートは NIME, RAW とは事情が異なるので、
         #   save_content_model を使わず、
         #   ここで直接ファイル出力を書く。
         save_file_path.parent.mkdir(parents=True, exist_ok=True)
-        if save_file_path.suffix in {".mp4"}:
-            # 動画フレームを解決
-            pil_frames = [
-                f.pil_image
-                for f in model.iter_frames(ImageLayer.NIME, enable_only=True)
-                if f is not None
-            ]
-            # ffmpeg でエンコード
-            self._model.ffmpeg.encode(
-                save_file_path, pil_frames, 1000 / model.duration_in_msec
-            )
-        elif is_still:
+        if is_still:
             # スチルを解決
             ais_image = model.get_frame(ImageLayer.NIME, 0)
             if ais_image is None:
@@ -427,28 +413,38 @@ class ForeignExportFrame(AISFrame, TkinterDnD.DnDWrapper):
                 case _:
                     raise ValueError(f"Invalid PlaybaclMode ({model.playback_mode})")
 
-            # エンコード設定を解決
-            if file_suffix in {".avif", ".gif"}:
-                lossless = False
-                quality_ratio = 0.6
-                encode_speed_ratio = 0.2
-            elif file_suffix == ".apng":
-                lossless = True
-                quality_ratio = 1.0
-                encode_speed_ratio = 0.0
+            # 出力 API を呼び出す
+            # NOTE
+            #   動画コンテナ系は PIL 出力できないので ffmpeg を使う。
+            #   それ以外は PIL を使う。
+            if save_file_path.suffix in {".mp4"}:
+                # ffmpeg でエンコード
+                self._model.ffmpeg.encode(
+                    save_file_path, pil_frames, 1000 / model.duration_in_msec
+                )
             else:
-                raise ValueError(f"Invalid video file_suffix ({file_suffix})")
+                # エンコード設定を解決
+                if file_suffix in {".avif", ".gif"}:
+                    lossless = False
+                    quality_ratio = 0.6
+                    encode_speed_ratio = 0.2
+                elif file_suffix == ".apng":
+                    lossless = True
+                    quality_ratio = 1.0
+                    encode_speed_ratio = 0.0
+                else:
+                    raise ValueError(f"Invalid video file_suffix ({file_suffix})")
 
-            # PIL でファイル出力
-            smart_pil_save(
-                save_file_path,
-                pil_frames,
-                duration_in_msec=model.duration_in_msec,
-                metadata=model.contents_metadata,
-                lossless=lossless,
-                quality_ratio=quality_ratio,
-                encode_speed_ratio=encode_speed_ratio,
-            )
+                # PIL でファイル出力
+                smart_pil_save(
+                    save_file_path,
+                    pil_frames,
+                    duration_in_msec=model.duration_in_msec,
+                    metadata=model.contents_metadata,
+                    lossless=lossless,
+                    quality_ratio=quality_ratio,
+                    encode_speed_ratio=encode_speed_ratio,
+                )
 
         # クリップボードに転送
         file_to_clipboard(save_file_path)

@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any
 import subprocess
 import re
-import tempfile
+from copy import copy
 
 # PIL
 from PIL import Image
@@ -279,61 +279,88 @@ class FFmpeg:
         if not frames:
             raise ValueError("frames is empty")
 
-        # フレームのサイズチェック
+        # コピーを取る
+        frames = copy(frames)
+
+        # フレームを h264 エンコード用に正規化
         head_frame = frames[0]
-        for frame_index, frame in enumerate(frames[1:]):
-            if frame.size != head_frame.size:
+        head_width, head_height = head_frame.size
+        head_even_width = head_width - (head_width % 2)
+        head_even_height = head_height - (head_height % 2)
+        for i in range(len(frames)):
+            # フレームサイズ不一致はエラー
+            if (head_width, head_height) != head_frame.size:
                 raise ValueError(
-                    f"Frame size missmatch (head={head_frame.size}, index={frame_index}, frame={frame.size})"
+                    f"Frame size missmatch (head={head_frame.size}, index={i}, frame={frames[i].size})"
                 )
+            # サイズを偶数化
+            width, height = frames[i].size
+            if width != head_even_width or height != head_even_height:
+                frames[i] = frames[i].crop((0, 0, head_even_width, head_even_height))
+            # RGB フォーマット化
+            if frames[i].mode != "RGB":
+                frames[i] = frames[i].convert("RGB")
 
-        # エンコード
-        with tempfile.TemporaryDirectory(prefix=f"{APP_NAME_EN}_ffmpeg_frames") as td:
-            # 全てのフレームを png で保存する
-            # TODO できれば .webp (lossless) で保存したい...
-            for frame_index, frame in enumerate(frames):
-                frame_png_path = Path(td) / f"{frame_index:06d}.png"
-                smart_pil_save(
-                    frame_png_path,
-                    frame,
-                    duration_in_msec=None,
-                    metadata=ContentsMetadata(),
-                    lossless=True,
-                    quality_ratio=0.0,
-                    encode_speed_ratio=1.0,
+        # 基本コマンド
+        base_args = [
+            str(self._ffmpeg_path),
+            "-y",
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            # 入力関係
+            "-f",
+            "rawvideo",
+            "-pix_fmt",
+            "rgb24",
+            "-s",
+            f"{head_even_width}x{head_even_height}",
+            "-r",
+            str(frame_rate),
+            "-i",
+            "pipe:0",
+            # 出力関係
+            "-pix_fmt",
+            "yuv420p",
+            "-movflags",
+            "+faststart",
+            "-an",  # 音声なし
+        ]
+
+        # ffmpeg 実行
+        last_error = None
+        for extra_args in self._extra_args:
+            cmd = base_args + extra_args + [dest_file_path]
+            try:
+                # プロセス起動
+                proc = subprocess.Popen(
+                    cmd,
+                    stdin=subprocess.PIPE,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    bufsize=1024 * 1024,
                 )
+                if proc.stdin is None:
+                    raise ValueError("subprocess stdin is None")
+                # フレームをパイプに流し込む
+                for frame in frames:
+                    proc.stdin.write(frame.tobytes())
+                proc.stdin.close()
+                # 実行結果を処理
+                _, err = proc.communicate()
+                err_str = err.decode("utf-8", "replace")
+                if proc.returncode != 0:
+                    raise RuntimeError(
+                        f"ffmpeg failed (return code={proc.returncode})\n"
+                        f"stderr:\n{err_str}"
+                    )
+                # 正常終了
+                return
+            except Exception as e:
+                last_error = e
+                continue
 
-            # 基本コマンド
-            base_args = [
-                str(self._ffmpeg_path),
-                "-y",
-                "-hide_banner",
-                "-loglevel",
-                "error",
-                "-framerate",
-                str(frame_rate),
-                "-i",
-                Path(td) / "%06d.png",
-                "-vf",
-                "scale=trunc(iw/2)*2:trunc(ih/2)*2",
-                "-pix_fmt",
-                "yuv420p",
-                "-movflags",
-                "+faststart",
-                "-an",  # 音声なし
-            ]
-
-            # ffmpeg 実行
-            last_error = None
-            for extra_args in self._extra_args:
-                try:
-                    _run(base_args + extra_args + [dest_file_path])
-                    return
-                except Exception as e:
-                    last_error = e
-                    continue
-
-            # 全部失敗
-            raise RuntimeError(
-                f"ffmpeg encode failed with encoder={self._encoder}"
-            ) from last_error
+        # 全部失敗
+        raise RuntimeError(
+            f"ffmpeg encode failed with encoder={self._encoder}"
+        ) from last_error
