@@ -236,6 +236,24 @@ def video_encode_gif(
     """
     frames を gif エンコードして dest_file_path に保存する。
     ffmpeg で gif ファイル化して gifsicle で最適化する。
+
+    dest_file_path:
+        出力ファイルパス
+
+    frames:
+        エンコードしたいフレーム列
+
+    frame_rate:
+        フレームレート
+
+    num_colors:
+        gif パレット色数
+        最大 256 色まで
+
+    bayer_scale:
+        ディザリングのスケール
+        0 ... 5 で指定
+        0 が最も強烈にディザがかかる
     """
     # 空はエラー
     if not frames:
@@ -264,7 +282,15 @@ def video_encode_gif(
     gifsicle_path = ensure_gifsicle()
 
     # ffmpeg のフィルタを構築
-    STATS_MODE = "full"
+    # NOTE
+    #   一閃流の使われ方から考えて、キャラが動いているシーンがメインストリームなはず。
+    #   ということは、キャラの階調が足りないとものすごく悪目立ちするはず。
+    #   逆に動かない背景は注目度が低いので階調が足りなくてもオタクは気にしなさそう。
+    #   つまり、キャラに階調を割くべきなので stats_mode=diff が適切。
+    # NOTE
+    #   diff_mode は none, rectangle で切り替えても画質・サイズにほとんど変化がなかった。
+    #   理論上で言えば rectangle のほうがサイズが小さくなりやすいはずなので、そうした。
+    STATS_MODE = "diff"
     DIFF_MODE = "rectangle"
     filter_complex = (
         f"split[a][b];"
@@ -302,6 +328,9 @@ def video_encode_gif(
     gifsicle_cmd = [
         str(gifsicle_path),
         "-O3",
+        "--no-comments",
+        "--no-names",
+        "--no-extensions",
         "-o", "-", # stdout
         "-", # stdin
         # "--lossy=80",

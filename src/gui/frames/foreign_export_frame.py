@@ -282,7 +282,7 @@ class ForeignExportFrame(AISFrame, TkinterDnD.DnDWrapper):
             # NOTE
             #   2000 年代初頭っぽくしたいので 512 までガッツリ落とす
             nime_resize_desc = ResizeDesc(
-                AspectRatioPattern.E_RAW, ResolutionPattern.E_512
+                AspectRatioPattern.E_RAW, ResolutionPattern.E_480
             )
         else:
             raise ValueError("Invalid ExportTarget")
@@ -451,7 +451,7 @@ class ForeignExportFrame(AISFrame, TkinterDnD.DnDWrapper):
             elif file_suffix == ".gif":
                 # ffmpeg + gifsicle
                 video_encode_gif(
-                    save_file_path, pil_frames, 1000 / model.duration_in_msec, 64, 5
+                    save_file_path, pil_frames, 1000 / model.duration_in_msec, 64, 1
                 )
             else:
                 # エンコード設定を解決

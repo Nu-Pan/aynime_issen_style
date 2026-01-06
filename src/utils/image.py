@@ -155,7 +155,7 @@ class ResolutionPattern(Enum):
 
     E_DISCORD_EMOJI = "128"  # Dsicord 絵文字のサイズ
     E_DISCORD_STAMP = "320"  # Discord スタンプのサイズ
-    E_512 = "512"  # 2000 年代 gif 職人的サイズ
+    E_480 = "480"  # 2000 年代 gif 職人的サイズ
     E_VGA = "640"
     E_QHD = "960"
     E_HD = "1280"
@@ -196,8 +196,8 @@ class Resolution:
             return Resolution(128, None, "DISCORD EMOJI")
         elif pattern == ResolutionPattern.E_DISCORD_STAMP:
             return Resolution(320, None, "DISCORD STAMP")
-        elif pattern == ResolutionPattern.E_512:
-            return Resolution(512, None, "512")
+        elif pattern == ResolutionPattern.E_480:
+            return Resolution(480, None, "480")
         elif pattern == ResolutionPattern.E_VGA:
             return Resolution(640, None, "640")
         elif pattern == ResolutionPattern.E_QHD:
