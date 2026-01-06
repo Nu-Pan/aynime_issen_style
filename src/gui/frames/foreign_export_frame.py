@@ -34,7 +34,7 @@ from utils.image import (
     smart_pil_save,
     AISImage,
 )
-from utils.ffmpeg import ffmpeg_encode_h264
+from utils.video_encoder import video_encode_h264, video_encode_gif
 
 # gui
 from gui.widgets.ais_frame import AISFrame
@@ -445,8 +445,13 @@ class ForeignExportFrame(AISFrame, TkinterDnD.DnDWrapper):
             #   それ以外は PIL を使う。
             if save_file_path.suffix in {".mp4"}:
                 # ffmpeg でエンコード
-                ffmpeg_encode_h264(
+                video_encode_h264(
                     save_file_path, pil_frames, 1000 / model.duration_in_msec
+                )
+            elif file_suffix == ".gif":
+                # ffmpeg + gifsicle
+                video_encode_gif(
+                    save_file_path, pil_frames, 1000 / model.duration_in_msec, 64, 5
                 )
             else:
                 # エンコード設定を解決
