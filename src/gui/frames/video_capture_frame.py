@@ -456,9 +456,12 @@ class VideoCaptureFrame(AISFrame, TkinterDnD.DnDWrapper):
             with VideoModelEditSession(model) as edit:
                 edit.set_time_stamp(None)
 
+        # 互換性設定をロード
+        compat = self._model.user_properties.get("save_content_model_compat", False)
+
         # 動画ファイルとして保存
         try:
-            video_file_path = save_content_model(model)
+            video_file_path = save_content_model(model, compat)
         except Exception as e:
             show_notify_label(self, "error", "動画ファイルの保存に失敗", exception=e)
             return

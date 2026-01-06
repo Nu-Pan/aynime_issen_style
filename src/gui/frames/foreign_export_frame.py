@@ -359,6 +359,9 @@ class ForeignExportFrame(AISFrame, TkinterDnD.DnDWrapper):
         else:
             raise ValueError(export_target)
 
+        # 互換性設定をロード
+        compat = self._model.user_properties.get("smart_pil_save_compat", False)
+
         # 出力ファイルパスを構築
         save_file_path = (
             TENSEI_DIR_PATH
@@ -412,6 +415,7 @@ class ForeignExportFrame(AISFrame, TkinterDnD.DnDWrapper):
                 lossless=lossless,
                 quality_ratio=quality_ratio,
                 encode_speed_ratio=encode_speed_ratio,
+                compat=compat,
             )
         else:
             # 動画フレームを解決
@@ -470,6 +474,7 @@ class ForeignExportFrame(AISFrame, TkinterDnD.DnDWrapper):
                     lossless=lossless,
                     quality_ratio=quality_ratio,
                     encode_speed_ratio=encode_speed_ratio,
+                    compat=compat,
                 )
 
         # クリップボードに転送

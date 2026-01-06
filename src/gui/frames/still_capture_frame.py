@@ -261,9 +261,12 @@ class StillCaptureFrame(AISFrame, TkinterDnD.DnDWrapper):
             with ImageModelEditSession(model) as edit:
                 edit.set_time_stamp(None)
 
+        # 互換性設定をロード
+        compat = self._model.user_properties.get("save_content_model_compat", False)
+
         # キャプチャをローカルにファイルに保存する
         try:
-            nime_file_path = save_content_model(model)
+            nime_file_path = save_content_model(model, compat)
         except Exception as e:
             show_notify_label(self, "error", "画像ファイルの保存に失敗", exception=e)
             return

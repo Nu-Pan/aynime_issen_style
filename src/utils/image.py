@@ -1134,7 +1134,7 @@ def smart_pil_save(
     lossless: bool,
     quality_ratio: float,
     encode_speed_ratio: float,
-    compat: bool = False,
+    compat: bool,
 ):
     """
     contents を file_path に保存する。

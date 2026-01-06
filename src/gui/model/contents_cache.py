@@ -1800,7 +1800,7 @@ class VideoModelEditSession:
         return self
 
 
-def save_content_model(model: ImageModel | VideoModel) -> Path:
+def save_content_model(model: ImageModel | VideoModel, compat: bool) -> Path:
     """
     model をファイル保存する。
     画像・動画の両方に対応している。
@@ -1844,6 +1844,7 @@ def save_content_model(model: ImageModel | VideoModel) -> Path:
             lossless=True,
             quality_ratio=1.0,
             encode_speed_ratio=0.0,
+            compat=compat,
         )
 
         # nime ディレクトリにスチル画像を保存
@@ -1861,6 +1862,7 @@ def save_content_model(model: ImageModel | VideoModel) -> Path:
             lossless=False,
             quality_ratio=0.88,
             encode_speed_ratio=0.0,
+            compat=compat,
         )
 
         # 正常終了
@@ -1895,6 +1897,7 @@ def save_content_model(model: ImageModel | VideoModel) -> Path:
                 lossless=True,
                 quality_ratio=0.0,
                 encode_speed_ratio=1.0,
+                compat=compat,
             )
 
         # NIME ディレクトリに保存
@@ -1933,6 +1936,7 @@ def save_content_model(model: ImageModel | VideoModel) -> Path:
                 lossless=False,
                 quality_ratio=0.65,
                 encode_speed_ratio=0.7,
+                compat=compat,
             )
 
             # 正常終了
