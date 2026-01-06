@@ -208,11 +208,61 @@ def ffmpeg_encode_h264(
     if not frames:
         raise ValueError("frames is empty")
 
+    # 呼び出し元の変数を壊さないようにコピー
+    frames = copy(frames)
+
+    # 先頭フレームの情報を取得
+    head_frame = frames[0]
+    head_width, head_height = head_frame.size
+    head_even_width = head_width - (head_width % 2)
+    head_even_height = head_height - (head_height % 2)
+
+    # フレームを h264 エンコード用に正規化
+    for i in range(len(frames)):
+        # フレームサイズ不一致はエラー
+        if (head_width, head_height) != head_frame.size:
+            raise ValueError(
+                f"Frame size missmatch (head={head_frame.size}, index={i}, frame={frames[i].size})"
+            )
+        # サイズを偶数化
+        width, height = frames[i].size
+        if width != head_even_width or height != head_even_height:
+            frames[i] = frames[i].crop((0, 0, head_even_width, head_even_height))
+        # RGB フォーマット化
+        if frames[i].mode != "RGB":
+            frames[i] = frames[i].convert("RGB")
+
     # ffmpeg をインストール
     ffmpeg_path = ensure_ffmpeg()
 
     # エンコーダーを決定
     encoder = _detect_h264_encoder(ffmpeg_path)
+
+    # 基本コマンド
+    base_args = [
+        str(ffmpeg_path),
+        "-y",
+        "-hide_banner",
+        "-loglevel",
+        "error",
+        # 入力関係
+        "-f",
+        "rawvideo",
+        "-pix_fmt",
+        "rgb24",
+        "-s",
+        f"{head_even_width}x{head_even_height}",
+        "-r",
+        str(frame_rate),
+        "-i",
+        "pipe:0",
+        # 出力関係
+        "-pix_fmt",
+        "yuv420p",
+        "-movflags",
+        "+faststart",
+        "-an",  # 音声なし
+    ]
 
     # 試行する引数を展開
     # NOTE
@@ -268,52 +318,6 @@ def ffmpeg_encode_h264(
         ]
     else:
         raise ValueError(f"Unexpected encoder ({encoder})")
-
-    # フレームを h264 エンコード用に正規化
-    frames = copy(frames)
-    head_frame = frames[0]
-    head_width, head_height = head_frame.size
-    head_even_width = head_width - (head_width % 2)
-    head_even_height = head_height - (head_height % 2)
-    for i in range(len(frames)):
-        # フレームサイズ不一致はエラー
-        if (head_width, head_height) != head_frame.size:
-            raise ValueError(
-                f"Frame size missmatch (head={head_frame.size}, index={i}, frame={frames[i].size})"
-            )
-        # サイズを偶数化
-        width, height = frames[i].size
-        if width != head_even_width or height != head_even_height:
-            frames[i] = frames[i].crop((0, 0, head_even_width, head_even_height))
-        # RGB フォーマット化
-        if frames[i].mode != "RGB":
-            frames[i] = frames[i].convert("RGB")
-
-    # 基本コマンド
-    base_args = [
-        str(ffmpeg_path),
-        "-y",
-        "-hide_banner",
-        "-loglevel",
-        "error",
-        # 入力関係
-        "-f",
-        "rawvideo",
-        "-pix_fmt",
-        "rgb24",
-        "-s",
-        f"{head_even_width}x{head_even_height}",
-        "-r",
-        str(frame_rate),
-        "-i",
-        "pipe:0",
-        # 出力関係
-        "-pix_fmt",
-        "yuv420p",
-        "-movflags",
-        "+faststart",
-        "-an",  # 音声なし
-    ]
 
     # ffmpeg 実行
     last_error = None
