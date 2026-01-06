@@ -14,8 +14,6 @@ from PIL import Image
 
 # utils
 from utils.constants import FFMPEG_DIR_PATH, APP_NAME_EN
-from utils.ais_logging import write_log
-from utils.image import ContentsMetadata, smart_pil_save
 
 
 # ffmpeg のダウンロード先 URL
