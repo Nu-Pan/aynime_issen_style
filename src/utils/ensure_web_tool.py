@@ -88,10 +88,19 @@ def _extract_zip(zip_file_path: Path, dest_dir_path: Path):
                 shutil.copyfileobj(src, dst)
 
 
+# ファイル検索結果のキャッシュ
+_FILE_UNDER_DIR_CACHE: dict[str, Path] = dict()
+
+
 def _find_file_under_dir(dir_path: Path, file_name: str) -> Path | None:
     """
     dir_path 以下から再帰的に file_name を探す
     """
+    # キャッシュがあるならそれを使う
+    cache_key = str(dir_path / "**" / file_name)
+    if cache_key in _FILE_UNDER_DIR_CACHE:
+        return _FILE_UNDER_DIR_CACHE[cache_key]
+
     # 候補を列挙
     # NOTE
     #   bin 以下のファイルがあればそっちが優先
@@ -111,7 +120,9 @@ def _find_file_under_dir(dir_path: Path, file_name: str) -> Path | None:
 
     # 候補からスコアが最も低いものを選択
     candidates.sort(key=lambda x: x[0])
-    return candidates[0][1]
+    file_path = candidates[0][1]
+    _FILE_UNDER_DIR_CACHE[cache_key] = file_path
+    return file_path
 
 
 def _ensure_web_tool(web_zip_url: str, tool_file_name: str) -> Path:
