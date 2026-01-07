@@ -1226,7 +1226,7 @@ def smart_pil_save(
     if suffix == ".png" and isinstance(contents, Image.Image) and lossless:
         # still png
         png_info = PngInfo()
-        png_info.add_itxt(APP_NAME_EN, metadata.to_str, zip=False)
+        png_info.add_itxt(METADATA_KEY, metadata.to_str, zip=False)
         contents.save(
             str(file_path),
             optimize=True,
@@ -1236,7 +1236,7 @@ def smart_pil_save(
     elif suffix == ".png" and isinstance(contents, list) and lossless:
         # video png (Animated PNG)
         png_info = PngInfo()
-        png_info.add_itxt(APP_NAME_EN, metadata.to_str, zip=False)
+        png_info.add_itxt(METADATA_KEY, metadata.to_str, zip=False)
         contents[0].save(
             str(file_path),
             save_all=True,
@@ -1430,9 +1430,9 @@ def smart_pil_load(
             image_file_text = getattr(image_file, "text", None)
             itxt_body = None
             if itxt_body is None and isinstance(image_file_info, dict):
-                itxt_body = image_file_info.get(APP_NAME_EN)
+                itxt_body = image_file_info.get(METADATA_KEY)
             if itxt_body is None and isinstance(image_file_text, dict):
-                itxt_body = image_file_text.get(APP_NAME_EN)
+                itxt_body = image_file_text.get(METADATA_KEY)
             # メタデータへ
             if isinstance(itxt_body, (str, bytes, bytearray)):
                 return ContentsMetadata.from_str(itxt_body)

@@ -446,12 +446,20 @@ class ForeignExportFrame(AISFrame, TkinterDnD.DnDWrapper):
             if save_file_path.suffix in {".mp4"}:
                 # ffmpeg でエンコード
                 video_encode_h264(
-                    save_file_path, pil_frames, 1000 / model.duration_in_msec
+                    save_file_path,
+                    pil_frames,
+                    1000 / model.duration_in_msec,
+                    model.contents_metadata,
                 )
             elif file_suffix == ".gif":
                 # ffmpeg + gifsicle
                 video_encode_gif(
-                    save_file_path, pil_frames, 1000 / model.duration_in_msec, 64, 1
+                    save_file_path,
+                    pil_frames,
+                    1000 / model.duration_in_msec,
+                    model.contents_metadata,
+                    64,
+                    1,
                 )
             else:
                 # エンコード設定を解決

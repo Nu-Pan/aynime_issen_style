@@ -12,6 +12,8 @@ from PIL import Image
 
 # utils
 from utils.ensure_web_tool import ensure_ffmpeg, ensure_gifsicle
+from utils.constants import METADATA_KEY
+from utils.image import ContentsMetadata
 
 
 def _detect_h264_encoder(ffmpeg_path: Path) -> str:
@@ -53,7 +55,10 @@ def _detect_h264_encoder(ffmpeg_path: Path) -> str:
 
 
 def video_encode_h264(
-    dest_file_path: Path, frames: list[Image.Image], frame_rate: float
+    dest_file_path: Path,
+    frames: list[Image.Image],
+    frame_rate: float,
+    metadata: ContentsMetadata,
 ):
     """
     frames を h264 エンコードして dest_file_path に保存する。
@@ -111,7 +116,8 @@ def video_encode_h264(
         "-dn",
         # 出力関係
         "-pix_fmt", "yuv420p",
-        "-movflags", "+faststart",
+        "-movflags", "+faststart+use_metadata_tags",
+        "-metadata", f"{METADATA_KEY}={metadata.to_str}"
     ]
     # fmt: on
 
@@ -230,6 +236,7 @@ def video_encode_gif(
     dest_file_path: Path,
     frames: list[Image.Image],
     frame_rate: float,
+    metadata: ContentsMetadata,
     num_colors: int,
     bayer_scale: int,
 ):
@@ -324,13 +331,18 @@ def video_encode_gif(
     # fmt: on
 
     # gifsicle のコマンドを構築
+    # NOTE
+    #   --no-comments --comments の同時指定は「消して書く」という意味。
+    #   追記じゃないよということを明示しているだけ。
     # fmt: off
     gifsicle_cmd = [
         str(gifsicle_path),
-        "-O3",
         "--no-comments",
         "--no-names",
         "--no-extensions",
+        "--loopcount", # 無限ループ指定
+        "--comment", metadata.to_str,
+        "-O3",
         "-o", "-", # stdout
         "-", # stdin
         # "--lossy=80",
