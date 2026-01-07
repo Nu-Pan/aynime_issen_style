@@ -112,7 +112,7 @@ class AynimeIssenStyleApp(ctk.CTk, TkinterDnD.DnDWrapper):
             "K", lambda: self.tabview.set(VideoCaptureFrame.UI_TAB_NAME)
         )
 
-        #
+        # 後始末設定
         self.protocol("WM_DELETE_WINDOW", self._on_window_close)
 
     def close(self):

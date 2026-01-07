@@ -12,6 +12,7 @@ from utils.ctk import show_error_dialog
 from utils.ais_logging import setup_logging, setup_logging_ctk, write_log
 from utils.version_constants import COMMIT_HASH, BUILD_DATE
 from utils.video_encoder import ensure_ffmpeg, ensure_gifsicle
+from utils.user_properties import USER_PROPERTIES
 
 # gui
 from gui.aynime_issen_style_app import AynimeIssenStyleApp
@@ -70,6 +71,7 @@ def main():
         ais_app.mainloop()
     finally:
         ais_app.close()
+        USER_PROPERTIES.close()
 
 
 if __name__ == "__main__":

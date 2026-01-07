@@ -35,6 +35,7 @@ from utils.image import (
     AISImage,
 )
 from utils.video_encoder import video_encode_h264, video_encode_gif
+from utils.user_properties import USER_PROPERTIES
 
 # gui
 from gui.widgets.ais_frame import AISFrame
@@ -360,7 +361,7 @@ class ForeignExportFrame(AISFrame, TkinterDnD.DnDWrapper):
             raise ValueError(export_target)
 
         # 互換性設定をロード
-        compat = self._model.user_properties.get("smart_pil_save_compat", False)
+        compat = USER_PROPERTIES.get("smart_pil_save_compat", False)
 
         # 出力ファイルパスを構築
         save_file_path = (
@@ -415,7 +416,6 @@ class ForeignExportFrame(AISFrame, TkinterDnD.DnDWrapper):
                 lossless=lossless,
                 quality_ratio=quality_ratio,
                 encode_speed_ratio=encode_speed_ratio,
-                compat=compat,
             )
         else:
             # 動画フレームを解決
@@ -487,7 +487,6 @@ class ForeignExportFrame(AISFrame, TkinterDnD.DnDWrapper):
                     lossless=lossless,
                     quality_ratio=quality_ratio,
                     encode_speed_ratio=encode_speed_ratio,
-                    compat=compat,
                 )
 
         # クリップボードに転送

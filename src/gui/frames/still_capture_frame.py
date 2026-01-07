@@ -23,6 +23,7 @@ from utils.constants import (
     WIDGET_MIN_WIDTH,
     WIDGET_MIN_HEIGHT,
 )
+from utils.user_properties import USER_PROPERTIES
 
 # gui
 from gui.widgets.still_label import StillLabel
@@ -129,7 +130,7 @@ class StillCaptureFrame(AISFrame, TkinterDnD.DnDWrapper):
         )
         self.ais.grid_child(self._capture_timing_slider, 3, 0)
         self._capture_timing_slider.set_value(
-            self._model.user_properties.get("still_capture_timing", 0.1)
+            USER_PROPERTIES.get("still_capture_timing", 0.1)
         )
         self._capture_timing_slider.register_handler(
             self._on_capture_timing_slider_changed
@@ -242,7 +243,7 @@ class StillCaptureFrame(AISFrame, TkinterDnD.DnDWrapper):
         """
         キャプチャタイミングスライダーに変更があった時に呼び出されるハンドラ
         """
-        self._model.user_properties.set("still_capture_timing", value)
+        USER_PROPERTIES.set("still_capture_timing", value)
 
     def _on_save_button_clicked(self, update_timestamp: bool):
         """
@@ -261,12 +262,9 @@ class StillCaptureFrame(AISFrame, TkinterDnD.DnDWrapper):
             with ImageModelEditSession(model) as edit:
                 edit.set_time_stamp(None)
 
-        # 互換性設定をロード
-        compat = self._model.user_properties.get("save_content_model_compat", False)
-
         # キャプチャをローカルにファイルに保存する
         try:
-            nime_file_path = save_content_model(model, compat)
+            nime_file_path = save_content_model(model)
         except Exception as e:
             show_notify_label(self, "error", "画像ファイルの保存に失敗", exception=e)
             return

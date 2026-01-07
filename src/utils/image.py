@@ -1134,7 +1134,6 @@ def smart_pil_save(
     lossless: bool,
     quality_ratio: float,
     encode_speed_ratio: float,
-    compat: bool,
 ):
     """
     contents を file_path に保存する。
@@ -1169,9 +1168,6 @@ def smart_pil_save(
         エンコード速度
         [0.0, 1.0] で指定する
         大きいほど高速にエンコードできるが、圧縮率・画質が低下する
-
-    compat:
-        True なら互換性を優先して、画質・サイズが犠牲になる。
     """
 
     # duration 解決ヘルパ
@@ -1333,7 +1329,7 @@ def smart_pil_save(
             append_images=contents[1:],
             duration=_resolve_duration_in_msec(10),
             loop=0,
-            disposal=2 if compat else 1,
+            disposal=2,
             optimize=True,
             comment=metadata.to_str,
         )

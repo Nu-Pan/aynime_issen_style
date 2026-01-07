@@ -14,37 +14,43 @@ from PIL import Image
 
 # utils
 from utils.constants import TOOL_DIR_PATH, APP_NAME_EN
+from utils.user_properties import USER_PROPERTIES
+from utils.ais_logging import write_log
 
 
 def _download_file(url: str, dest_file_path: Path) -> None:
     """
     url から dest_dir_path にファイルをダウンロードする。
     """
-    # 定数
-    _TIMEOUT_IN_SEC = 10
-    _CHUNK_SIZE_IN_BYTES = 1024 * 1024
+    try:
+        # 定数
+        _TIMEOUT_IN_SEC = 10
+        _CHUNK_SIZE_IN_BYTES = 1024 * 1024
 
-    # ダウンロード先ディレクトリを作成
-    dest_file_path.parent.mkdir(parents=True, exist_ok=True)
+        # ダウンロード先ディレクトリを作成
+        dest_file_path.parent.mkdir(parents=True, exist_ok=True)
 
-    # リクエストを構築
-    req = urllib.request.Request(
-        url, headers={"User-Agent": f"{APP_NAME_EN}/ffmpeg-bootstrap (urllib)"}
-    )
+        # リクエストを構築
+        req = urllib.request.Request(
+            url, headers={"User-Agent": f"{APP_NAME_EN}/ensure-web-tool (urllib)"}
+        )
 
-    # ダウンロード
-    # NOTE
-    #   直接的なダウンロード先は .part ファイル
-    #   ダウンロード完了時にリネームする
-    with urllib.request.urlopen(req, timeout=_TIMEOUT_IN_SEC) as resp:
-        temp_file_path = dest_file_path.with_suffix(dest_file_path.suffix + ".part")
-        with temp_file_path.open("wb") as f:
-            while True:
-                chunk = resp.read(_CHUNK_SIZE_IN_BYTES)
-                if not chunk:
-                    break
-                f.write(chunk)
-        temp_file_path.replace(dest_file_path)
+        # ダウンロード
+        # NOTE
+        #   直接的なダウンロード先は .part ファイル
+        #   ダウンロード完了時にリネームする
+        with urllib.request.urlopen(req, timeout=_TIMEOUT_IN_SEC) as resp:
+            temp_file_path = dest_file_path.with_suffix(dest_file_path.suffix + ".part")
+            with temp_file_path.open("wb") as f:
+                while True:
+                    chunk = resp.read(_CHUNK_SIZE_IN_BYTES)
+                    if not chunk:
+                        break
+                    f.write(chunk)
+            temp_file_path.replace(dest_file_path)
+    except Exception as e:
+        write_log("error", f"Failed to download from {url} to {dest_file_path}")
+        raise
 
 
 def _extract_zip(zip_file_path: Path, dest_dir_path: Path):
@@ -158,11 +164,14 @@ def ensure_ffmpeg() -> Path:
     ffmpeg を呼び出し可能な状態にする
     ffmpeg.exe のパスを返す
     """
-    BTBN_LATEST_WIN64_LGPL_ZIP = (
+    # fmt: off
+    DEFAULT_FFMPEG_ZIP_URL = (
         "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/"
         "ffmpeg-master-latest-win64-lgpl.zip"
     )
-    return _ensure_web_tool(BTBN_LATEST_WIN64_LGPL_ZIP, "ffmpeg.exe")
+    ffmpeg_zip_url = USER_PROPERTIES.get("ffmpeg_zip_url", DEFAULT_FFMPEG_ZIP_URL)
+    return _ensure_web_tool(ffmpeg_zip_url, "ffmpeg.exe")
+    # fmt: on
 
 
 def ensure_gifsicle() -> Path:
@@ -171,9 +180,10 @@ def ensure_gifsicle() -> Path:
     gifsicle.exe のパスを返す
     """
     # fmt: off
-    GIFSCICLE_WIN64_ZIP = (
+    DEFAULT_GIFSCICLE_ZIP_URL = (
         "https://eternallybored.org/misc/gifsicle/releases/"
         "gifsicle-1.95-win64.zip"
     )
-    return _ensure_web_tool(GIFSCICLE_WIN64_ZIP, "gifsicle.exe")
+    gifscicle_zip_url = USER_PROPERTIES.get("gifscicle_zip_url", DEFAULT_GIFSCICLE_ZIP_URL)
+    return _ensure_web_tool(gifscicle_zip_url, "gifsicle.exe")
     # fmt: on
