@@ -1,13 +1,15 @@
 # std
 import sys
 import threading
+from inspect import cleandoc
 
 # Tk/CTk
 import customtkinter as ctk
+import tkinter.messagebox as mb
 
 # utils
 from utils.windows import SystemWideMutex
-from utils.constants import APP_NAME_EN
+from utils.constants import APP_NAME_EN, APP_NAME_JP
 from utils.ctk import show_error_dialog
 from utils.ais_logging import setup_logging, setup_logging_ctk, write_log
 from utils.version_constants import COMMIT_HASH, BUILD_DATE
@@ -18,6 +20,7 @@ from utils.user_properties import USER_PROPERTIES
 from gui.aynime_issen_style_app import AynimeIssenStyleApp
 from gui.splash_app import SplashWindow
 from gui.model.contents_cache import standardize_nime_raw_dile
+from gui.frames.status_frame import StatusFrame, LicenseFrame, SOFTWARE_LICENSE_ENTRIES
 
 
 def _startup_job():
@@ -26,7 +29,7 @@ def _startup_job():
     """
     # nime, raw を整理
     standardize_nime_raw_dile()
-    # ffmpeg をインストール
+    # 外部ツールをインストール
     ensure_ffmpeg()
     ensure_gifsicle()
 
@@ -53,6 +56,22 @@ def main():
     # バージョン情報をログにダンプ
     write_log("info", f"COMMIT_HASH = {COMMIT_HASH}")
     write_log("info", f"BUILD_DATE = {BUILD_DATE}")
+
+    # 外部ツール使用の通知を出す
+    if USER_PROPERTIES.get("show_web_tool_notice", True):
+        web_tools_str = ", ".join(
+            [k for k in SOFTWARE_LICENSE_ENTRIES if k != APP_NAME_JP]
+        )
+        # fmt: off
+        mb.showinfo(
+            APP_NAME_JP,
+            cleandoc(f"""
+            {APP_NAME_JP} は {web_tools_str} をダウンロードして使用します。
+            詳細は「{StatusFrame.UI_TAB_NAME} > {LicenseFrame.UI_TAB_NAME}」を参照。
+            """)
+        )
+        # fmt: on
+        USER_PROPERTIES.set("show_web_tool_notice", False)
 
     # 本体の CTk アプリを生成
     ais_app = AynimeIssenStyleApp()

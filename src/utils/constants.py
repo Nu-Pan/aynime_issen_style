@@ -39,6 +39,10 @@ VERSION_FILE_PATH = Path("src\\utils\\version_constants.py")
 # ユーザープロパティファイルのパス
 USER_PROPERTIES_FILE_PATH = Path.cwd() / "user_properties.json"
 
+# ライセンス関係のパス
+AIS_LICENSE_FILE_PATH = Path.cwd() / "LICENSE"
+LICENSES_DIR_PATH = Path.cwd() / "licenses"
+
 # キャプチャ保存先
 # NOTE
 #   nime はリサイズなどの処理適用済みの最終結果画像の保存先

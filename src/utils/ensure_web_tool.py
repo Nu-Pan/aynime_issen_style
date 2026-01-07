@@ -170,19 +170,29 @@ def _ensure_web_tool(web_zip_url: str, tool_file_name: str) -> Path:
         raise FileNotFoundError(f"{tool_file_name} not found under {tood_dir_path}")
 
 
+# fmt: off
+DEFAULT_FFMPEG_ZIP_URL = (
+    "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/"
+    "ffmpeg-master-latest-win64-gpl.zip"
+)
+# fmt: on
+
+
 def ensure_ffmpeg() -> Path:
     """
     ffmpeg を呼び出し可能な状態にする
     ffmpeg.exe のパスを返す
     """
-    # fmt: off
-    DEFAULT_FFMPEG_ZIP_URL = (
-        "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/"
-        "ffmpeg-master-latest-win64-lgpl.zip"
-    )
     ffmpeg_zip_url = USER_PROPERTIES.get("ffmpeg_zip_url", DEFAULT_FFMPEG_ZIP_URL)
     return _ensure_web_tool(ffmpeg_zip_url, "ffmpeg.exe")
-    # fmt: on
+
+
+# fmt: off
+DEFAULT_GIFSCICLE_ZIP_URL = (
+    "https://eternallybored.org/misc/gifsicle/releases/"
+    "gifsicle-1.95-win64.zip"
+)
+# fmt: on
 
 
 def ensure_gifsicle() -> Path:
@@ -190,11 +200,7 @@ def ensure_gifsicle() -> Path:
     gifsicle を呼び出し可能な状態にする
     gifsicle.exe のパスを返す
     """
-    # fmt: off
-    DEFAULT_GIFSCICLE_ZIP_URL = (
-        "https://eternallybored.org/misc/gifsicle/releases/"
-        "gifsicle-1.95-win64.zip"
+    gifscicle_zip_url = USER_PROPERTIES.get(
+        "gifscicle_zip_url", DEFAULT_GIFSCICLE_ZIP_URL
     )
-    gifscicle_zip_url = USER_PROPERTIES.get("gifscicle_zip_url", DEFAULT_GIFSCICLE_ZIP_URL)
     return _ensure_web_tool(gifscicle_zip_url, "gifsicle.exe")
-    # fmt: on

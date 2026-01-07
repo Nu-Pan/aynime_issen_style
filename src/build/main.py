@@ -6,12 +6,12 @@ from inspect import cleandoc
 from pathlib import Path
 import shutil
 
-from utils.constants import VERSION_FILE_PATH
-from utils.constants import APP_NAME_EN
+from utils.constants import VERSION_FILE_PATH, APP_NAME_EN, LICENSES_DIR_PATH
 
 # 設定
 DIST_DIR_PATH = Path(f"dist")
 DIST_APP_DIR_PATH = DIST_DIR_PATH / APP_NAME_EN
+DIST_APP_LICENSE_DIR_PATH = DIST_APP_DIR_PATH / "licenses"
 BUILD_DIR_PATH = Path("build")
 WORK_DIR_PATH = BUILD_DIR_PATH / "temp"
 SPEC_DIR_PATH = BUILD_DIR_PATH / "spec"
@@ -89,8 +89,11 @@ def put_files():
     """
     # ライセンスファイルを同梱
     shutil.copyfile(
-        LICENSE_FILE_ABS_PATH, DIST_APP_DIR_PATH / (LICENSE_FILE_ABS_PATH.stem + ".txt")
+        LICENSE_FILE_ABS_PATH, DIST_APP_DIR_PATH / LICENSE_FILE_ABS_PATH.name
     )
+    DIST_APP_LICENSE_DIR_PATH.mkdir(parents=True, exist_ok=True)
+    for p in LICENSES_DIR_PATH.glob("**/*.*"):
+        shutil.copyfile(p, DIST_APP_LICENSE_DIR_PATH / p.name)
 
 
 def zip_executable():

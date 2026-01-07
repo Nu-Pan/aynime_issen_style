@@ -4,19 +4,32 @@ import re
 import webbrowser
 import sys
 import os
+from dataclasses import dataclass
+from pathlib import Path
 
 # Tk/CTk
 import customtkinter as ctk
 
 # utils
 from utils.constants import (
+    APP_NAME_JP,
+    AIS_LICENSE_FILE_PATH,
+    LICENSES_DIR_PATH,
     DEFAULT_FONT_FAMILY,
     VERSION_FILE_PATH,
     WIDGET_MIN_WIDTH,
+    WIDGET_MIN_HEIGHT,
     NIME_DIR_PATH,
     TENSEI_DIR_PATH,
 )
+from utils.ais_logging import write_log
+from utils.user_properties import USER_PROPERTIES
+from utils.ensure_web_tool import DEFAULT_FFMPEG_ZIP_URL, DEFAULT_GIFSCICLE_ZIP_URL
+
+
+# gui
 from gui.widgets.ais_frame import AISFrame
+
 
 # バージョン情報のインポート
 # NOTE
@@ -32,10 +45,46 @@ if not hasattr(sys, "_MEIPASS") and not VERSION_FILE_PATH.exists():
 from utils.version_constants import COMMIT_HASH, BUILD_DATE
 
 
+class ShortcutFrame(AISFrame):
+    """
+    フォルダ開くボタンとか、そういう滅多に押さないウィジェットをまとめるフレーム
+    """
+
+    UI_TAB_NAME = "ショートカット"
+
+    def __init__(self, master, **kwargs):
+        """
+        コンストラクタ
+        """
+        super().__init__(master, **kwargs)
+
+        # NIME フォルダボタン
+        self._nime_button = ctk.CTkButton(
+            self,
+            text="OPEN NIME FOLDER",
+            width=3 * WIDGET_MIN_WIDTH,
+            height=WIDGET_MIN_HEIGHT,
+            command=lambda: os.startfile(NIME_DIR_PATH),
+        )
+        self.ais.grid_child(self._nime_button, 0, 0, sticky="")
+
+        # 転生フォルダボタン
+        self._tensei_button = ctk.CTkButton(
+            self,
+            text="OPEN TENSEI FOLDER",
+            width=3 * WIDGET_MIN_WIDTH,
+            height=WIDGET_MIN_HEIGHT,
+            command=lambda: os.startfile(TENSEI_DIR_PATH),
+        )
+        self.ais.grid_child(self._tensei_button, 1, 0, sticky="")
+
+
 class VersionFrame(AISFrame):
     """
     バージョン情報を表示するためだけのフレーム
     """
+
+    UI_TAB_NAME = "バージョン"
 
     def __init__(self, master, **kwargs):
         """
@@ -50,7 +99,7 @@ class VersionFrame(AISFrame):
         version_text = f"""
         Author
         \tNU-Pan
-
+        
         GitHub
         \thttps://github.com/Nu-Pan/aynime_issen_style
 
@@ -121,7 +170,151 @@ class VersionFrame(AISFrame):
         self.version_text_box.configure(state="disabled")
 
 
-class StatusFrame(AISFrame):
+@dataclass
+class SoftwareLicenseEntry:
+    """
+    ソフトウェアとそのライセンスにまつわる情報をまとめたクラス
+    """
+
+    message: str | None
+    official_url: str
+    download_url: str
+    license_name: str
+    license_file_path: Path
+
+
+SOFTWARE_LICENSE_ENTRIES = {
+    APP_NAME_JP: SoftwareLicenseEntry(
+        f"{APP_NAME_JP}は MIT ライセンスで公開しています",
+        "https://github.com/Nu-Pan/aynime_issen_style",
+        "https://github.com/Nu-Pan/aynime_issen_style/releases",
+        "MIT",
+        AIS_LICENSE_FILE_PATH,
+    ),
+    "FFmpeg": SoftwareLicenseEntry(
+        None,
+        "https://www.ffmpeg.org/",
+        USER_PROPERTIES.get("ffmpeg_zip_url", DEFAULT_FFMPEG_ZIP_URL),
+        "GPL-2.0-or-later",
+        LICENSES_DIR_PATH / "GPL-2.0.txt",
+    ),
+    "gifscile": SoftwareLicenseEntry(
+        None,
+        "https://www.lcdf.org/gifsicle/",
+        USER_PROPERTIES.get("gifscicle_zip_url", DEFAULT_GIFSCICLE_ZIP_URL),
+        "GPL-2.0-only",
+        LICENSES_DIR_PATH / "GPL-2.0.txt",
+    ),
+}
+
+
+def _set_readonly_text_box(widget: ctk.CTkTextbox, text: str):
+    """
+    編集不可テキストボックスに文字列を設定するヘルパ
+    """
+    widget.configure(state="normal")
+    widget.delete("1.0", "end")
+    widget.insert("1.0", text)
+    widget.configure(state="disabled")
+    widget.yview_moveto(0.0)
+
+
+class LicenseFrame(AISFrame):
+    """
+    ライセンス情報を表示するフレーム
+    """
+
+    UI_TAB_NAME = "ライセンス"
+
+    def __init__(self, master, **kwargs):
+        """
+        コンストラクタ
+        """
+        super().__init__(master, **kwargs)
+
+        # フォントを生成
+        default_font = ctk.CTkFont(DEFAULT_FONT_FAMILY)
+
+        # レイアウト
+        self.ais.columnconfigure(0, weight=1)
+
+        # ソフトウェア選択コンボボックス
+        self._software_combo_box = ctk.CTkComboBox(
+            self,
+            width=WIDGET_MIN_WIDTH,
+            height=WIDGET_MIN_HEIGHT,
+            values=[k for k in SOFTWARE_LICENSE_ENTRIES],
+            command=self._on_software_combo_box_changed,
+        )
+        self.ais.grid_child(self._software_combo_box, 0, 0)
+
+        # 説明ラベル
+        self._message_text_box = ctk.CTkTextbox(
+            self,
+            width=WIDGET_MIN_WIDTH,
+            height=3 * WIDGET_MIN_HEIGHT,
+            font=default_font,
+            wrap="word",
+            state="disabled",
+        )
+        self.ais.grid_child(self._message_text_box, 1, 0)
+
+        # ライセンス条文テキストボックス
+        self._license_text_box = ctk.CTkTextbox(
+            self,
+            width=WIDGET_MIN_WIDTH,
+            height=WIDGET_MIN_HEIGHT,
+            font=default_font,
+            wrap="word",
+            state="disabled",
+        )
+        self.ais.grid_child(self._license_text_box, 2, 0)
+        self.ais.rowconfigure(2, weight=1)
+
+        # 一閃流のライセンスをプリロード
+        self._on_software_combo_box_changed(APP_NAME_JP)
+
+    def _on_software_combo_box_changed(self, selected_name: str):
+        """
+        ソフトウェア選択コンボボックス変更ハンドラ
+        """
+        entry = SOFTWARE_LICENSE_ENTRIES.get(selected_name)
+        if entry is None:
+            _set_readonly_text_box(self._message_text_box, "")
+            _set_readonly_text_box(self._license_text_box, "")
+        else:
+            # メッセージを設定
+            if entry.message:
+                # fmt: off
+                msg = cleandoc(f"""
+                {entry.message}
+                公式: {entry.official_url}
+                ダウンロード: {entry.download_url}
+                ライセンス: {entry.license_name}
+                """)
+                # fmt: on
+            else:
+                # fmt: off
+                msg = cleandoc(f"""
+                {APP_NAME_JP}は {selected_name} をサブプロセスとして利用します。
+                公式: {entry.official_url}
+                ダウンロード: {entry.download_url}
+                ライセンス: {entry.license_name}
+                """)
+                # fmt: on
+            _set_readonly_text_box(self._message_text_box, msg)
+            # 条文を設定
+            license_str = ""
+            try:
+                with open(entry.license_file_path, "r", encoding="utf-8") as f:
+                    license_str = f.read()
+            except:
+                write_log("error", f"Failed to load {entry.license_file_path}")
+                pass
+            _set_readonly_text_box(self._license_text_box, license_str)
+
+
+class StatusFrame(ctk.CTkFrame):
     """
     ステータスフレーム
     その他いろいろを詰めるためのフレーム
@@ -132,34 +325,24 @@ class StatusFrame(AISFrame):
     def __init__(self, master, **kwargs):
         """
         コンストラクタ
-
-        Args:
-            master (_type_): 親ウィジェット
         """
         super().__init__(master, **kwargs)
 
-        # レイアウト
-        self.ais.columnconfigure(2, weight=1)
+        # タブビューを追加
+        self.tabview = ctk.CTkTabview(self, corner_radius=0, border_width=0)
+        self.tabview.pack(fill="both", expand=True)
 
-        # NIME フォルダボタン
-        self._nime_button = ctk.CTkButton(
-            self,
-            text="NIME FOLDER",
-            width=WIDGET_MIN_WIDTH,
-            command=lambda: os.startfile(NIME_DIR_PATH),
-        )
-        self.ais.grid_child(self._nime_button, 0, 0)
+        # ショートカットタブを追加
+        self.tabview.add(ShortcutFrame.UI_TAB_NAME)
+        self.shortcut_frame = ShortcutFrame(self.tabview.tab(ShortcutFrame.UI_TAB_NAME))
+        self.shortcut_frame.pack(fill="both", expand=True)
 
-        # 転生フォルダボタン
-        self._tensei_button = ctk.CTkButton(
-            self,
-            text="TENSEI FOLDER",
-            width=WIDGET_MIN_WIDTH,
-            command=lambda: os.startfile(TENSEI_DIR_PATH),
-        )
-        self.ais.grid_child(self._tensei_button, 0, 1)
+        # バージョンタブを追加
+        self.tabview.add(VersionFrame.UI_TAB_NAME)
+        self.version_frame = VersionFrame(self.tabview.tab(VersionFrame.UI_TAB_NAME))
+        self.version_frame.pack(fill="both", expand=True)
 
-        # バージョン情報フレーム
-        self._version_frame = VersionFrame(self)
-        self.ais.grid_child(self._version_frame, 1, 0, 1, 3)
-        self.ais.rowconfigure(1, weight=1)
+        # ライセンスタブを追加
+        self.tabview.add(LicenseFrame.UI_TAB_NAME)
+        self.license_frame = LicenseFrame(self.tabview.tab(LicenseFrame.UI_TAB_NAME))
+        self.license_frame.pack(fill="both", expand=True)
