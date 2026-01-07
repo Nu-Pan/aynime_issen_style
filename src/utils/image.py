@@ -1,16 +1,15 @@
 # std
-from typing import Any, cast, Self, Callable
+from typing import Any, cast
 from enum import Enum, auto
 from math import gcd
 from pathlib import Path
-import json, zlib, base64
 from xml.sax import saxutils
 from dataclasses import dataclass
 from zipfile import ZipFile
 import re
 
 # PIL
-from PIL import Image, ImageOps, ImageFile
+from PIL import Image, ImageFile
 from PIL.PngImagePlugin import PngInfo
 from PIL.ImageTk import PhotoImage
 
@@ -24,17 +23,8 @@ from skimage.metrics import structural_similarity as ssim
 from utils.constants import *
 from utils.duration_and_frame_rate import DFR_MAP
 from utils.ais_logging import write_log
-
-
-class AspectRatioPattern(Enum):
-    """
-    典型的なアスペクト比の列挙値
-    """
-
-    E_16_9 = "16:9"
-    E_4_3 = "4:3"
-    E_1_1 = "1:1"
-    E_RAW = "RAW"  # オリジナルのアスペクト比をそのまま使う
+from utils.metadata import AspectRatioPattern, ContentsMetadata, ResolutionPattern
+from utils.video_encoder import video_encode_h264, video_encode_gif
 
 
 class AspectRatio:
@@ -147,25 +137,6 @@ class AspectRatio:
             raise TypeError(f"other is not AspectRatio(other={other})")
 
 
-class ResolutionPattern(Enum):
-    """
-    典型的な解像度を定義する列挙型
-    横幅だけを定義する
-    """
-
-    E_DISCORD_EMOJI = "128"  # Dsicord 絵文字のサイズ
-    E_DISCORD_STAMP = "320"  # Discord スタンプのサイズ
-    E_512 = "512"  # 2000 年代 gif 職人的サイズ
-    E_VGA = "640"
-    E_QHD = "960"
-    E_HD = "1280"
-    E_FHD = "1920"
-    E_3K = "2880"
-    E_4K = "3840"
-    E_X_TWITTER_STILL_LIMIT = "4096"  # X(Twitter) の静止画の上限サイズ（長辺側）
-    E_RAW = "RAW"  # オリジナルの解像度をそのまま使う
-
-
 class Resolution:
     """
     解像度を表すクラス
@@ -196,8 +167,8 @@ class Resolution:
             return Resolution(128, None, "DISCORD EMOJI")
         elif pattern == ResolutionPattern.E_DISCORD_STAMP:
             return Resolution(320, None, "DISCORD STAMP")
-        elif pattern == ResolutionPattern.E_512:
-            return Resolution(512, None, "512")
+        elif pattern == ResolutionPattern.E_480:
+            return Resolution(480, None, "480")
         elif pattern == ResolutionPattern.E_VGA:
             return Resolution(640, None, "640")
         elif pattern == ResolutionPattern.E_QHD:
@@ -671,125 +642,6 @@ def calc_ssim(image_A: AISImage, image_B: AISImage) -> float:
     return score
 
 
-# 8x8 Bayer matrix (values 0..63)
-_BAYER_8 = np.array(
-    [
-        [0, 48, 12, 60, 3, 51, 15, 63],
-        [32, 16, 44, 28, 35, 19, 47, 31],
-        [8, 56, 4, 52, 11, 59, 7, 55],
-        [40, 24, 36, 20, 43, 27, 39, 23],
-        [2, 50, 14, 62, 1, 49, 13, 61],
-        [34, 18, 46, 30, 33, 17, 45, 29],
-        [10, 58, 6, 54, 9, 57, 5, 53],
-        [42, 26, 38, 22, 41, 25, 37, 21],
-    ],
-    dtype=np.float32,
-)
-
-# normalize to [-0.5, +0.5)
-_BAYER_8_NORM = (_BAYER_8 + 0.5) / 64.0 - 0.5
-
-
-def ordered_dither_rgb(pil_image: Image.Image, amplitude: float) -> Image.Image:
-    """
-    ベイヤーパターンに基づいたディザを適用する。
-    """
-    # RGB 化
-    if pil_image.mode != "RGB":
-        pil_image = pil_image.convert("RGB")
-
-    # numpy array 化
-    arr = np.asanyarray(pil_image, dtype=np.int16)  # (H, W, 3)
-    h, w = arr.shape[0], arr.shape[1]
-
-    # タイルマップを作成
-    yy = (np.arange(h) % 8)[:, None]
-    xx = (np.arange(w) % 8)[None, :]
-    t = _BAYER_8_NORM[yy, xx]  # (H, W) in [-0.5, 0.5)
-
-    # ディザを適用
-    # NOTE
-    #   Different phase per channel (still deterministic)
-    off0 = (t * amplitude).astype(np.int16)
-    off1 = (np.roll(t, shift=2, axis=1) * amplitude).astype(np.int16)
-    off2 = (np.roll(t, shift=4, axis=0) * amplitude).astype(np.int16)
-    arr[:, :, 0] += off0
-    arr[:, :, 1] += off1
-    arr[:, :, 2] += off2
-
-    # PIL 画像に戻して終了
-    arr = np.clip(arr, 0, 255).astype(np.uint8)
-    return Image.fromarray(arr, mode="RGB")
-
-
-def apply_color_palette(
-    pil_frames: list[Image.Image],
-    num_colors: int,
-    dither_amplitude: float,
-) -> list[Image.Image]:
-    """
-    pil_frames にカラーパレットを適用する
-    カラーパレットは pil_frames 全体から計算され、これが全フレームに適用される。
-
-    num_colors_ratio:
-        カラーパレットの色数の比率。
-        1.0 なら 256 色。
-        0.0 なら 0 色。
-
-    dither_amplitude:
-        ディザ強度の比率
-        今風の見た目重視なら強度 8 ~ 12 くらい。
-        00 年代狙いなら強度 16 ~ 24 くらい。
-    """
-    # フレームの横幅を解決
-    frame_width = {f.width for f in pil_frames}
-    if len(frame_width) == 1:
-        frame_width = frame_width.pop()
-    else:
-        raise ValueError("Multiple frame width contaminated.")
-
-    # フレームの高さを解決
-    frame_height = {f.height for f in pil_frames}
-    if len(frame_height) == 1:
-        frame_height = frame_height.pop()
-    else:
-        raise ValueError("Multiple frame height contaminated.")
-
-    # すべての NIME フレームを１つの atlas 画像に結合
-    # NOTE
-    #   オリジナルのサイズのままだとパレット計算が重すぎるので、
-    #   適当なサイズまで縮小する。
-    ATLAS_SIZE = min(256, frame_width, frame_height)
-    nime_atlas = Image.new(
-        "RGB", (ATLAS_SIZE, ATLAS_SIZE * len(pil_frames)), color=None
-    )
-    for frame_index, nime_frame in enumerate(pil_frames):
-        nime_atlas.paste(
-            nime_frame.resize((ATLAS_SIZE, ATLAS_SIZE), Image.Resampling.BOX),
-            (0, frame_index * ATLAS_SIZE),
-        )
-
-    # atlas 画像からグローバルパレットを計算
-    # NOTE
-    #   昔はちらつき対策として 6bit 量子化をやってたが、パレット色数可変になったのでやめた
-    #   メディアンフィルタは輪郭線がちらつく原因になるので却下
-    #   FASTOCTREE はフリッカーが出やすい傾向があったので却下
-    #   kmeans は品質と速度の兼ね合いで 2 にした
-    # NOTE
-    #   quantize で mode="P" になる
-    nime_atlas = nime_atlas.quantize(colors=num_colors, kmeans=2)
-
-    # グローバルパレットを全フレームに適用
-    out_pil_frames: list[Image.Image] = []
-    for f in pil_frames:
-        f = ordered_dither_rgb(f, dither_amplitude)
-        f = f.quantize(palette=nime_atlas, dither=Image.Dither.NONE)
-        out_pil_frames.append(f)
-
-    # 正常終了
-    return out_pil_frames
-
-
 def is_video_file(file_path: Path) -> bool:
     """
     file_path がビデオなら True を返す
@@ -811,12 +663,6 @@ def is_video_file(file_path: Path) -> bool:
         )
 
 
-class PlaybackMode(Enum):
-    FORWARD = "FORWARD"
-    BACKWARD = "BACKWARD"
-    REFLECT = "REFLECT"
-
-
 class ExportTarget(Enum):
     UNKNOWN = "Unknown"
     DISCORD_POST = "Discord Post"
@@ -824,305 +670,6 @@ class ExportTarget(Enum):
     DISCORD_STAMP = "Discord Stamp"
     X_TWITTER = "X(Twitter)"
     GABIGABI = "'00s"
-
-
-class ContentsMetadata:
-    """
-    一閃流が出力するスチル・ビデオファイルに格納されるメタデータ
-    シリアライズ・デシリアライズの挙動をこのクラスで記述する
-    """
-
-    _PREFIX = f"aismeta1:zlib+b64:"
-    _XMP_NAME_SPACE = "ais"
-    _XMP_PROPERTY_PATH = f"{_XMP_NAME_SPACE}:metadata_body"
-    _XMP_PROPERTY_RE = re.compile(_XMP_PROPERTY_PATH + r'="([^"]*)"')
-
-    def __init__(
-        self,
-        *,
-        _overlay_nime_name: Any = None,
-        _crop_params: Any = None,
-        _resize_aspect_ratio_pattern: Any = None,
-        _resize_resolution_pattern: Any = None,
-        _playback_mode: Any = None,
-        _disabled_frame_indices: Any = None,
-        **_ignored: Any,
-    ):
-        """
-        コンストラクタ
-
-        NOTE
-            ファイルから読み出されたメタデータ dict がそのまま渡されることを想定している
-            キーが足りてなければ、デフォルト値にフォールバックする
-            値が合法でなければ、デフォルト値にフォールバックする
-        """
-        # NIME 名オーバーレイ表示可否
-        if isinstance(_overlay_nime_name, bool):
-            self._overlay_nime_name = _overlay_nime_name
-        else:
-            self._overlay_nime_name = None
-
-        # 正方形切り出し設定
-        # NOTE
-        #   pylance が型情報をうまく拾ってくれないので cast でダメ押し
-        if (
-            isinstance(_crop_params, list)
-            and len(_crop_params) == 3
-            and all(isinstance(x, float) or x is None for x in _crop_params)
-        ):
-            self._crop_params = cast(
-                tuple[float | None, float | None, float | None], tuple(_crop_params)
-            )
-        else:
-            self._crop_params = None
-
-        # リサイズアス比
-        try:
-            self._resize_aspect_ratio_pattern = AspectRatioPattern(
-                _resize_aspect_ratio_pattern
-            )
-        except:
-            self._resize_aspect_ratio_pattern = None
-
-        # リサイズ解像度
-        try:
-            self._resize_resolution_pattern = ResolutionPattern(
-                _resize_resolution_pattern
-            )
-        except:
-            self._resize_resolution_pattern = None
-
-        # 再生モード
-        try:
-            self._playback_mode = PlaybackMode(_playback_mode)
-        except:
-            self._playback_mode = None
-
-        # フレーム個別無効化
-        if isinstance(_disabled_frame_indices, set) and all(
-            isinstance(x, int) for x in _disabled_frame_indices
-        ):
-            self._disabled_frame_indices = _disabled_frame_indices
-        else:
-            self._disabled_frame_indices = None
-
-        # TODO _ignored がある場合は警告出す
-
-    @property
-    def overlay_nime_name(self) -> bool | None:
-        return self._overlay_nime_name
-
-    def set_overlay_nime_name(self, overlay_nime_name: bool | None) -> Self:
-        self._overlay_nime_name = overlay_nime_name
-        return self
-
-    @property
-    def crop_params(self) -> tuple[float | None, float | None, float | None] | None:
-        return self._crop_params
-
-    def set_crop_params(
-        self, crop_params: tuple[float | None, float | None, float | None] | None
-    ) -> Self:
-        self._crop_params = crop_params
-        return self
-
-    @property
-    def resize_aspect_ratio_pattern(self) -> AspectRatioPattern | None:
-        return self._resize_aspect_ratio_pattern
-
-    def set_resize_aspect_ratio_pattern(
-        self, resize_aspect_ratio_pattern: AspectRatioPattern | None
-    ) -> Self:
-        self._resize_aspect_ratio_pattern = resize_aspect_ratio_pattern
-        return self
-
-    @property
-    def resize_resolution_pattern(self) -> ResolutionPattern | None:
-        return self._resize_resolution_pattern
-
-    def set_resize_resolution_pattern(
-        self, resize_resolution_pattern: ResolutionPattern | None
-    ) -> Self:
-        self._resize_resolution_pattern = resize_resolution_pattern
-        return self
-
-    @property
-    def playback_mode(self) -> PlaybackMode | None:
-        return self._playback_mode
-
-    def set_playback_mode(self, playback_mode: PlaybackMode | None) -> Self:
-        self._playback_mode = playback_mode
-        return self
-
-    @property
-    def disable_frame_indices_is_none(self) -> bool:
-        return self._disabled_frame_indices is None
-
-    def is_frame_enable(self, frame_index: int) -> bool:
-        if self._disabled_frame_indices is None:
-            return True
-        else:
-            return frame_index not in self._disabled_frame_indices
-
-    def set_frame_enable(self, frame_index: int, frame_enable: bool) -> Self:
-        # 無効化フレーム集合がある状態にする
-        if self._disabled_frame_indices is None:
-            self._disabled_frame_indices = set()
-        # 集合を編集
-        if frame_enable:
-            if frame_index in self._disabled_frame_indices:
-                self._disabled_frame_indices.remove(frame_index)
-        else:
-            self._disabled_frame_indices.add(frame_index)
-        # 正常終了
-        return self
-
-    def erase_frame_enable(self):
-        self._disabled_frame_indices = None
-
-    @property
-    def to_str(self) -> str:
-        """
-        str にシリアライズする
-        """
-
-        # 型変換ヘルパー
-        def _sanitize_vars(
-            d: dict[str, Any],
-            k: str,
-            c: Callable[
-                [
-                    Any,
-                ],
-                Any,
-            ],
-        ) -> None:
-            if k in d and d[k] is not None:
-                d[k] = c(d[k])
-
-        # メンバーを dict 化
-        # NOTE
-        #   値は json シリアライズ可能な型に変換する
-        metadata_dict = dict(vars(self))
-        _sanitize_vars(metadata_dict, "_resize_aspect_ratio_pattern", lambda v: v.value)
-        _sanitize_vars(metadata_dict, "_resize_resolution_pattern", lambda v: v.value)
-        _sanitize_vars(metadata_dict, "_playback_mode", lambda v: v.value)
-        _sanitize_vars(metadata_dict, "_disabled_frame_indices", lambda v: list(v))
-
-        # 　シリアライズ
-        # NOTE
-        #   要件としては…
-        #   - 文字コード関連のトラブルを避けたいので base64 エンコードしたい
-        #   - ファイルサイズ増大を避けたいから zip 圧縮したい
-        #   で、結果的に、
-        #   dict --> str(json) --> bytes(zip) --> str(base64)
-        #   という流れに落ち着いた。
-        metadata_body = json.dumps(
-            metadata_dict,
-            ensure_ascii=False,
-            sort_keys=True,
-            separators=(",", ":"),
-            allow_nan=False,
-        )
-        metadata_body = metadata_body.encode("utf-8")
-        metadata_body = zlib.compress(metadata_body, level=9)
-        metadata_body = ContentsMetadata._PREFIX + base64.b64encode(
-            metadata_body
-        ).decode("ascii")
-        # 正常終了
-        return metadata_body
-
-    @property
-    def to_xmp(self) -> bytes:
-        """
-        xmp 用にシリアライズする
-        """
-        # NOTE
-        #   namespace 内にプロパティが１つあるだけの簡単な構造
-        #   プロパティの中身は to_str をそのまま使う
-        #   to_str が返すのは base64 エンコード済みなので XMP エスケープは不要
-        xmp_body = (
-            f"""<rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">"""
-            f"""<rdf:Description xmlns:{ContentsMetadata._XMP_NAME_SPACE}="https://example.com/aynime/1.0/" {ContentsMetadata._XMP_PROPERTY_PATH}="{self.to_str}" />"""
-            f"""</rdf:RDF>"""
-        )
-        return xmp_body.encode("utf-8")
-
-    @classmethod
-    def from_str(cls, body: str | bytes | bytearray) -> "ContentsMetadata":
-        """
-        str からデシリアライズする
-        途中失敗した場合はデフォルト値でフォールバック
-        """
-        # 入力を str に統一
-        if isinstance(body, str):
-            body_str = body
-        elif isinstance(body, (bytes, bytearray)):
-            body_str = body.decode("ascii", errors="strict")
-        else:
-            raise TypeError(f"Invalid type of body ({type(body)})")
-
-        # プリフィックスが想定通りかチェック
-        actual_prefix = body_str[: len(ContentsMetadata._PREFIX)]
-        if actual_prefix != ContentsMetadata._PREFIX:
-            # NOTE
-            #   外部画像をロードした場合、 一閃流と関係ないコメントが入ってくる可能性がある。
-            #   普通にありえる話なので、正常系とみなしてログは出さない。
-            return ContentsMetadata()
-
-        # デシリアライズ
-        try:
-            result = body_str[len(ContentsMetadata._PREFIX) :]
-            result = base64.b64decode(result)
-            result = zlib.decompress(result).decode("utf-8")
-            result = json.loads(result)
-        except:
-            write_log(
-                "warning",
-                f"Failed to deserialize contents metadata (body_str={body_str})",
-            )
-            return ContentsMetadata()
-
-        # メンバー復元ヘルパー
-        def _restore_vars(d: dict[str, Any], k: str, c: Callable[[Any], Any]) -> None:
-            if k in d and d[k] is not None:
-                d[k] = c(d[k])
-
-        # json の都合で無毒化されているメンバを復元する
-        _restore_vars(
-            result, "_resize_aspect_ratio_pattern", lambda v: AspectRatioPattern(v)
-        )
-        _restore_vars(
-            result, "_resize_resolution_pattern", lambda v: ResolutionPattern(v)
-        )
-        _restore_vars(result, "_playback_mode", lambda v: PlaybackMode(v))
-        _restore_vars(result, "_disabled_frame_indices", lambda v: set(v))
-
-        # 正常終了
-        return ContentsMetadata(**result)
-
-    @classmethod
-    def from_xmp(cls, body: bytes | bytearray) -> "ContentsMetadata":
-        """
-        xmp からデシリアライズする
-        """
-        # str にデコード
-        try:
-            body_str = body.decode("utf-8", errors="replace")
-        except:
-            write_log("warning", f"Failed to decode contents metadata bytes")
-            return ContentsMetadata()
-
-        # 正規表現でパース
-        property_match = ContentsMetadata._XMP_PROPERTY_RE.search(body_str)
-        if not property_match:
-            # NOTE
-            #   外部画像をロードした場合、 一閃流と関係ない XMP が入ってくる可能性がある。
-            #   普通にありえる話なので、正常系とみなしてログは出さない。
-            return ContentsMetadata()
-
-        # comment 版に転送
-        return ContentsMetadata.from_str(property_match.group(1))
 
 
 def smart_pil_save(
@@ -1134,7 +681,6 @@ def smart_pil_save(
     lossless: bool,
     quality_ratio: float,
     encode_speed_ratio: float,
-    gabigabi: bool = False,
 ):
     """
     contents を file_path に保存する。
@@ -1165,7 +711,7 @@ def smart_pil_save(
             [0.0, 1.0] で指定する
             大きいほど高圧縮
 
-    encode_speed_ratio: float
+    encode_speed_ratio:
         エンコード速度
         [0.0, 1.0] で指定する
         大きいほど高速にエンコードできるが、圧縮率・画質が低下する
@@ -1211,19 +757,21 @@ def smart_pil_save(
     #   スチル・ビデオで共通なので if の外で計算する
     #   gif 以外だと無駄処理だけど、コスト極小なので気にしない
     # NOTE
-    #   色数は 64 ... 256
-    #   ディザ強度は 24 ... 8
-    num_colors = (256 - 64) * quality_ratio + 64
-    num_colors = max(0, min(256, round(num_colors)))
-    dither_amplitude = (24.0 - 8.0) * (1.0 - quality_ratio) + 8.0
-    dither_amplitude = max(0, min(256, dither_amplitude))
+    #   bayer_scale は 0 ... 5 が合法だが、
+    #   quality_ratio からの計算としては 1 ... 5 にマップする
+    MIN_NUM_COLORS, MAX_NUM_COLORS = 64, 256
+    num_colors = (MAX_NUM_COLORS - MIN_NUM_COLORS) * quality_ratio + MIN_NUM_COLORS
+    num_colors = max(MIN_NUM_COLORS, min(MAX_NUM_COLORS, round(num_colors)))
+    MIN_BAYER_SCALE, MAX_BAYER_SCALE = 1, 5
+    bayer_scale = (MAX_BAYER_SCALE - MIN_BAYER_SCALE) * quality_ratio + MIN_BAYER_SCALE
+    bayer_scale = max(MIN_BAYER_SCALE, min(MAX_BAYER_SCALE, round(bayer_scale)))
 
     # 引数の指定内容で分岐
     suffix = file_path.suffix
     if suffix == ".png" and isinstance(contents, Image.Image) and lossless:
         # still png
         png_info = PngInfo()
-        png_info.add_itxt(APP_NAME_EN, metadata.to_str, zip=False)
+        png_info.add_itxt(METADATA_KEY, metadata.to_str, zip=False)
         contents.save(
             str(file_path),
             optimize=True,
@@ -1233,7 +781,7 @@ def smart_pil_save(
     elif suffix == ".png" and isinstance(contents, list) and lossless:
         # video png (Animated PNG)
         png_info = PngInfo()
-        png_info.add_itxt(APP_NAME_EN, metadata.to_str, zip=False)
+        png_info.add_itxt(METADATA_KEY, metadata.to_str, zip=False)
         contents[0].save(
             str(file_path),
             save_all=True,
@@ -1311,28 +859,24 @@ def smart_pil_save(
         and isinstance(contents, Image.Image)
         and not lossless
     ):
-        # gif
-        contents = apply_color_palette([contents], num_colors, dither_amplitude)[0]
-        contents.save(
-            str(file_path),
-            optimize=False,
-            comment=metadata.to_str,
-        )
-    elif file_path.suffix == ".gif" and isinstance(contents, list) and not lossless:
-        # gif
+        # gif (still)
         # NOTE
-        #   gif の仕様として更新周期の分解能は 10 msec
-        #   チラつき防止のため、全フレームで共通のパレットを使う
-        contents = apply_color_palette(contents, num_colors, dither_amplitude)
-        contents[0].save(
-            str(file_path),
-            save_all=True,
-            append_images=contents[1:],
-            duration=_resolve_duration_in_msec(10),
-            loop=0,
-            disposal=0,
-            optimize=False,
-            comment=metadata.to_str,
+        #   スチルなのでフレームレートは適当な値で埋めている
+        video_encode_gif(file_path, [contents], 1.0, metadata, num_colors, bayer_scale)
+    elif file_path.suffix == ".gif" and isinstance(contents, list) and not lossless:
+        # gif (video)
+        video_encode_gif(
+            file_path,
+            contents,
+            1000 / _resolve_duration_in_msec(10),
+            metadata,
+            num_colors,
+            bayer_scale,
+        )
+    elif file_path.suffix == ".mp4" and isinstance(contents, list) and not lossless:
+        # mp4
+        video_encode_h264(
+            file_path, contents, 1000 / _resolve_duration_in_msec(1), metadata
         )
     else:
         raise ValueError(
@@ -1427,9 +971,9 @@ def smart_pil_load(
             image_file_text = getattr(image_file, "text", None)
             itxt_body = None
             if itxt_body is None and isinstance(image_file_info, dict):
-                itxt_body = image_file_info.get(APP_NAME_EN)
+                itxt_body = image_file_info.get(METADATA_KEY)
             if itxt_body is None and isinstance(image_file_text, dict):
-                itxt_body = image_file_text.get(APP_NAME_EN)
+                itxt_body = image_file_text.get(METADATA_KEY)
             # メタデータへ
             if isinstance(itxt_body, (str, bytes, bytearray)):
                 return ContentsMetadata.from_str(itxt_body)

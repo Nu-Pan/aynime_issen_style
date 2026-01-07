@@ -3,11 +3,13 @@ from time import sleep
 
 # utils
 from utils.constants import CAPTURE_FRAME_BUFFER_DURATION_IN_SEC
-from utils.image import AISImage, AspectRatio, AspectRatioPattern, ResolutionPattern
+from utils.image import AISImage, AspectRatio
 from utils.capture.target import WindowHandle, get_nime_window_text
 
 # ayc
 import aynime_capture as ayc
+
+from utils.metadata import AspectRatioPattern, ResolutionPattern
 
 
 class CaptureStream:

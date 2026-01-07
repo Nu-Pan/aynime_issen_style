@@ -39,6 +39,10 @@ VERSION_FILE_PATH = Path("src\\utils\\version_constants.py")
 # ユーザープロパティファイルのパス
 USER_PROPERTIES_FILE_PATH = Path.cwd() / "user_properties.json"
 
+# ライセンス関係のパス
+AIS_LICENSE_FILE_PATH = Path.cwd() / "LICENSE"
+LICENSES_DIR_PATH = Path.cwd() / "licenses"
+
 # キャプチャ保存先
 # NOTE
 #   nime はリサイズなどの処理適用済みの最終結果画像の保存先
@@ -47,7 +51,7 @@ NIME_DIR_PATH = Path.cwd() / "nime"
 TENSEI_DIR_PATH = Path.cwd() / "tensei"
 RAW_DIR_PATH = Path.cwd() / "raw"
 LOG_DIR_PATH = Path.cwd() / "log"
-FFMPEG_DIR_PATH = Path.cwd() / "ffmpeg"
+TOOL_DIR_PATH = Path.cwd() / "tools"
 
 # サムネイルの高さ方向のサイズ
 THUMBNAIL_HEIGHT = 120
@@ -81,3 +85,9 @@ RAW_CONTENT_INOUT_SUFFIXES = RAW_STILL_INOUT_SUFFIXES | RAW_VIDEO_INOUT_SUFFIXES
 ALL_STILL_INOUT_SUFFIXES = NIME_STILL_INOUT_SUFFIXES | RAW_STILL_INOUT_SUFFIXES
 ALL_VIDEO_INOUT_SUFFIXES = NIME_VIDEO_INOUT_SUFFIXES | RAW_VIDEO_INOUT_SUFFIXES
 ALL_CONTENT_INOUT_SUFFIXES = ALL_STILL_INOUT_SUFFIXES | ALL_VIDEO_INOUT_SUFFIXES
+
+# メディアファイルに持たせるメタデータのキー
+# NOTE
+#   ファイルへのメタデータの読み書きに使用するので、キーの変更＝破壊的変更。
+#   基本的には変更不可能。
+METADATA_KEY = "aynime_issen_style"

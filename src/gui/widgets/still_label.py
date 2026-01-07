@@ -4,10 +4,11 @@ import customtkinter as ctk
 # utils
 from utils.constants import DEFAULT_FONT_FAMILY
 from utils.ctk import silent_configure, configure_presence
-from utils.image import ResizeDesc, AspectRatioPattern, Resolution, AISImage
+from utils.image import ResizeDesc, Resolution, AISImage
 
 # model
 from gui.model.contents_cache import ImageModel, ImageLayer, ImageModelEditSession
+from utils.metadata import AspectRatioPattern
 
 
 class StillLabel(ctk.CTkLabel):

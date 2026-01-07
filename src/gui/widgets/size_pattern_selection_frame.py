@@ -6,11 +6,13 @@ import customtkinter as ctk
 
 # utils
 from utils.constants import WIDGET_MIN_WIDTH, WIDGET_MIN_HEIGHT, DEFAULT_FONT_FAMILY
-from utils.image import AspectRatioPattern, ResolutionPattern, Resolution
+from utils.image import Resolution
+from utils.ais_logging import write_log
 
 # gui
 from gui.widgets.ais_frame import AISFrame
 from gui.model.aynime_issen_style import AynimeIssenStyleModel
+from utils.metadata import AspectRatioPattern, ResolutionPattern
 
 
 class AspectRatioSelectionFrame(AISFrame):
@@ -39,6 +41,9 @@ class AspectRatioSelectionFrame(AISFrame):
 
         # レイアウト
         self.ais.rowconfigure(0, weight=1)
+
+        # 合法な値セット
+        self._valid_values = set(shown_aspect_raios)
 
         # アス比選択ラジオボタン変数
         self._aspect_ratio_var = ctk.StringVar(value=initial_aspect_ratio.value)
@@ -71,7 +76,13 @@ class AspectRatioSelectionFrame(AISFrame):
         値を設定
         """
         if value is not None and self._aspect_ratio_var.get() != value.value:
-            self._aspect_ratio_var.set(value.value)
+            if value in self._valid_values:
+                self._aspect_ratio_var.set(value.value)
+            else:
+                write_log(
+                    "warning",
+                    f"{value.value} not in valid value set {[v.value for v in self._valid_values]}.",
+                )
 
 
 class ResolutionSelectionFrame(AISFrame):
@@ -100,6 +111,9 @@ class ResolutionSelectionFrame(AISFrame):
 
         # レイアウト
         self.ais.rowconfigure(0, weight=1)
+
+        # 合法な値セット
+        self._valid_values = set(shown_resolutions)
 
         # 解像度選択ラジオボタン変数
         self._resolution_var = ctk.StringVar(value=initial_resolution.value)
@@ -132,7 +146,13 @@ class ResolutionSelectionFrame(AISFrame):
         値を設定
         """
         if value is not None and self._resolution_var.get() != value.value:
-            self._resolution_var.set(value.value)
+            if value in self._valid_values:
+                self._resolution_var.set(value.value)
+            else:
+                write_log(
+                    "warning",
+                    f"{value.value} not in valid value set {[v.value for v in self._valid_values]}.",
+                )
 
 
 class SizePatternSlectionFrame(AISFrame):

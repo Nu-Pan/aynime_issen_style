@@ -11,13 +11,11 @@ from tkinterdnd2.TkinterDnD import DnDEvent
 # utils
 from utils.image import (
     AspectRatio,
-    AspectRatioPattern,
-    PlaybackMode,
-    ResolutionPattern,
     ResizeDesc,
     ResizeMode,
 )
 from utils.image import ExportTarget
+from utils.metadata import AspectRatioPattern, PlaybackMode, ResolutionPattern
 from utils.windows import file_to_clipboard
 from utils.ctk import show_notify_label, show_error_dialog
 from utils.capture import *
@@ -34,7 +32,7 @@ from utils.image import (
     smart_pil_save,
     AISImage,
 )
-from utils.ffmpeg import ffmpeg_encode_h264
+from utils.user_properties import USER_PROPERTIES
 
 # gui
 from gui.widgets.ais_frame import AISFrame
@@ -282,7 +280,7 @@ class ForeignExportFrame(AISFrame, TkinterDnD.DnDWrapper):
             # NOTE
             #   2000 年代初頭っぽくしたいので 512 までガッツリ落とす
             nime_resize_desc = ResizeDesc(
-                AspectRatioPattern.E_RAW, ResolutionPattern.E_512
+                AspectRatioPattern.E_RAW, ResolutionPattern.E_480
             )
         else:
             raise ValueError("Invalid ExportTarget")
@@ -435,42 +433,32 @@ class ForeignExportFrame(AISFrame, TkinterDnD.DnDWrapper):
                 case _:
                     raise ValueError(f"Invalid PlaybaclMode ({model.playback_mode})")
 
-            # 出力 API を呼び出す
-            # NOTE
-            #   動画コンテナ系は PIL 出力できないので ffmpeg を使う。
-            #   それ以外は PIL を使う。
-            if save_file_path.suffix in {".mp4"}:
-                # ffmpeg でエンコード
-                ffmpeg_encode_h264(
-                    save_file_path, pil_frames, 1000 / model.duration_in_msec
-                )
+            # エンコード設定を解決
+            if file_suffix == ".avif":
+                lossless = False
+                quality_ratio = 0.6
+                encode_speed_ratio = 0.2
+            elif file_suffix == ".gif":
+                lossless = False
+                quality_ratio = 0.0 if gabigabi else 1.0
+                encode_speed_ratio = 0.0
+            elif file_suffix == ".mp4":
+                lossless = False
+                quality_ratio = 0.0 if gabigabi else 1.0
+                encode_speed_ratio = 0.0
             else:
-                # エンコード設定を解決
-                if file_suffix == ".avif":
-                    lossless = False
-                    quality_ratio = 0.6
-                    encode_speed_ratio = 0.2
-                elif file_suffix == ".apng":
-                    lossless = True
-                    quality_ratio = 1.0
-                    encode_speed_ratio = 0.0
-                elif file_suffix == ".gif":
-                    lossless = False
-                    quality_ratio = 0.0 if gabigabi else 1.0
-                    encode_speed_ratio = 0.0
-                else:
-                    raise ValueError(f"Invalid video file_suffix ({file_suffix})")
+                raise ValueError(f"Invalid video file_suffix ({file_suffix})")
 
-                # PIL でファイル出力
-                smart_pil_save(
-                    save_file_path,
-                    pil_frames,
-                    duration_in_msec=model.duration_in_msec,
-                    metadata=model.contents_metadata,
-                    lossless=lossless,
-                    quality_ratio=quality_ratio,
-                    encode_speed_ratio=encode_speed_ratio,
-                )
+            # PIL でファイル出力
+            smart_pil_save(
+                save_file_path,
+                pil_frames,
+                duration_in_msec=model.duration_in_msec,
+                metadata=model.contents_metadata,
+                lossless=lossless,
+                quality_ratio=quality_ratio,
+                encode_speed_ratio=encode_speed_ratio,
+            )
 
         # クリップボードに転送
         file_to_clipboard(save_file_path)

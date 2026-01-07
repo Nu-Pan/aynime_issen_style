@@ -9,12 +9,13 @@ from tkinterdnd2.TkinterDnD import DnDEvent
 from tkinter import Event
 
 # utils
-from utils.image import AspectRatioPattern, ResolutionPattern, ResizeDesc
+from utils.image import ResizeDesc
 from gui.model.contents_cache import (
     save_content_model,
     load_content_model,
     ImageModelEditSession,
 )
+from utils.metadata import AspectRatioPattern, ResolutionPattern
 from utils.windows import file_to_clipboard
 from utils.ctk import show_notify_label, show_error_dialog
 from utils.capture import *
@@ -23,6 +24,7 @@ from utils.constants import (
     WIDGET_MIN_WIDTH,
     WIDGET_MIN_HEIGHT,
 )
+from utils.user_properties import USER_PROPERTIES
 
 # gui
 from gui.widgets.still_label import StillLabel
@@ -129,7 +131,7 @@ class StillCaptureFrame(AISFrame, TkinterDnD.DnDWrapper):
         )
         self.ais.grid_child(self._capture_timing_slider, 3, 0)
         self._capture_timing_slider.set_value(
-            self._model.user_properties.get("still_capture_timing", 0.1)
+            USER_PROPERTIES.get("still_capture_timing", 0.1)
         )
         self._capture_timing_slider.register_handler(
             self._on_capture_timing_slider_changed
@@ -242,7 +244,7 @@ class StillCaptureFrame(AISFrame, TkinterDnD.DnDWrapper):
         """
         キャプチャタイミングスライダーに変更があった時に呼び出されるハンドラ
         """
-        self._model.user_properties.set("still_capture_timing", value)
+        USER_PROPERTIES.set("still_capture_timing", value)
 
     def _on_save_button_clicked(self, update_timestamp: bool):
         """
