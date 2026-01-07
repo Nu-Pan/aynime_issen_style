@@ -5,16 +5,16 @@ import customtkinter as ctk
 # utils
 from utils.constants import DEFAULT_FONT_FAMILY
 from utils.ctk import configure_presence
-from utils.image import AISImage, ResolutionPattern, Resolution
+from utils.image import AISImage, Resolution
 
 # gui
 from gui.model.contents_cache import (
     ResizeDesc,
     ImageLayer,
-    AspectRatioPattern,
     VideoModelEditSession,
 )
 from gui.model.aynime_issen_style import AynimeIssenStyleModel
+from utils.metadata import AspectRatioPattern, ResolutionPattern
 
 
 THUMBNAIL_KIND_PADDING = 1

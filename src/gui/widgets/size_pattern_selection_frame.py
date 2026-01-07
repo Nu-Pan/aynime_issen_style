@@ -6,12 +6,13 @@ import customtkinter as ctk
 
 # utils
 from utils.constants import WIDGET_MIN_WIDTH, WIDGET_MIN_HEIGHT, DEFAULT_FONT_FAMILY
-from utils.image import AspectRatioPattern, ResolutionPattern, Resolution
+from utils.image import Resolution
 from utils.ais_logging import write_log
 
 # gui
 from gui.widgets.ais_frame import AISFrame
 from gui.model.aynime_issen_style import AynimeIssenStyleModel
+from utils.metadata import AspectRatioPattern, ResolutionPattern
 
 
 class AspectRatioSelectionFrame(AISFrame):

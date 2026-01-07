@@ -4,9 +4,7 @@ import customtkinter as ctk
 # utils
 from utils.ctk import configure_presence
 from utils.image import (
-    PlaybackMode,
     ResizeDesc,
-    AspectRatioPattern,
     Resolution,
     AISImage,
 )
@@ -18,6 +16,7 @@ from gui.model.contents_cache import (
     VideoModel,
     VideoModelEditSession,
 )
+from utils.metadata import AspectRatioPattern, PlaybackMode
 
 
 class VideoLabel(ctk.CTkLabel):

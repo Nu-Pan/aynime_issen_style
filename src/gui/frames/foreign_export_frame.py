@@ -11,13 +11,11 @@ from tkinterdnd2.TkinterDnD import DnDEvent
 # utils
 from utils.image import (
     AspectRatio,
-    AspectRatioPattern,
-    PlaybackMode,
-    ResolutionPattern,
     ResizeDesc,
     ResizeMode,
 )
 from utils.image import ExportTarget
+from utils.metadata import AspectRatioPattern, PlaybackMode, ResolutionPattern
 from utils.windows import file_to_clipboard
 from utils.ctk import show_notify_label, show_error_dialog
 from utils.capture import *
@@ -34,7 +32,6 @@ from utils.image import (
     smart_pil_save,
     AISImage,
 )
-from utils.video_encoder import video_encode_h264, video_encode_gif
 from utils.user_properties import USER_PROPERTIES
 
 # gui
@@ -360,9 +357,6 @@ class ForeignExportFrame(AISFrame, TkinterDnD.DnDWrapper):
         else:
             raise ValueError(export_target)
 
-        # 互換性設定をロード
-        compat = USER_PROPERTIES.get("smart_pil_save_compat", False)
-
         # 出力ファイルパスを構築
         save_file_path = (
             TENSEI_DIR_PATH
@@ -439,55 +433,32 @@ class ForeignExportFrame(AISFrame, TkinterDnD.DnDWrapper):
                 case _:
                     raise ValueError(f"Invalid PlaybaclMode ({model.playback_mode})")
 
-            # 出力 API を呼び出す
-            # NOTE
-            #   動画コンテナ系は PIL 出力できないので ffmpeg を使う。
-            #   それ以外は PIL を使う。
-            if save_file_path.suffix in {".mp4"}:
-                # ffmpeg でエンコード
-                video_encode_h264(
-                    save_file_path,
-                    pil_frames,
-                    1000 / model.duration_in_msec,
-                    model.contents_metadata,
-                )
+            # エンコード設定を解決
+            if file_suffix == ".avif":
+                lossless = False
+                quality_ratio = 0.6
+                encode_speed_ratio = 0.2
             elif file_suffix == ".gif":
-                # ffmpeg + gifsicle
-                video_encode_gif(
-                    save_file_path,
-                    pil_frames,
-                    1000 / model.duration_in_msec,
-                    model.contents_metadata,
-                    64,
-                    1,
-                )
+                lossless = False
+                quality_ratio = 0.0 if gabigabi else 1.0
+                encode_speed_ratio = 0.0
+            elif file_suffix == ".mp4":
+                lossless = False
+                quality_ratio = 0.0 if gabigabi else 1.0
+                encode_speed_ratio = 0.0
             else:
-                # エンコード設定を解決
-                if file_suffix == ".avif":
-                    lossless = False
-                    quality_ratio = 0.6
-                    encode_speed_ratio = 0.2
-                elif file_suffix == ".apng":
-                    lossless = True
-                    quality_ratio = 1.0
-                    encode_speed_ratio = 0.0
-                elif file_suffix == ".gif":
-                    lossless = False
-                    quality_ratio = 0.0 if gabigabi else 1.0
-                    encode_speed_ratio = 0.0
-                else:
-                    raise ValueError(f"Invalid video file_suffix ({file_suffix})")
+                raise ValueError(f"Invalid video file_suffix ({file_suffix})")
 
-                # PIL でファイル出力
-                smart_pil_save(
-                    save_file_path,
-                    pil_frames,
-                    duration_in_msec=model.duration_in_msec,
-                    metadata=model.contents_metadata,
-                    lossless=lossless,
-                    quality_ratio=quality_ratio,
-                    encode_speed_ratio=encode_speed_ratio,
-                )
+            # PIL でファイル出力
+            smart_pil_save(
+                save_file_path,
+                pil_frames,
+                duration_in_msec=model.duration_in_msec,
+                metadata=model.contents_metadata,
+                lossless=lossless,
+                quality_ratio=quality_ratio,
+                encode_speed_ratio=encode_speed_ratio,
+            )
 
         # クリップボードに転送
         file_to_clipboard(save_file_path)

@@ -10,9 +10,6 @@ from tkinterdnd2.TkinterDnD import DnDEvent
 # utils
 from utils.constants import WIDGET_MIN_WIDTH, WIDGET_MIN_HEIGHT, DEFAULT_FONT_FAMILY
 from utils.image import (
-    AspectRatioPattern,
-    PlaybackMode,
-    ResolutionPattern,
     ResizeDesc,
     calc_ssim,
     ExportTarget,
@@ -24,6 +21,7 @@ from utils.duration_and_frame_rate import (
     DFR_MAP,
 )
 from utils.constants import THUMBNAIL_HEIGHT, CAPTURE_FRAME_BUFFER_DURATION_IN_SEC
+from utils.metadata import AspectRatioPattern, PlaybackMode, ResolutionPattern
 from utils.windows import file_to_clipboard
 from utils.ctk import show_notify_label, show_error_dialog
 from utils.capture import *

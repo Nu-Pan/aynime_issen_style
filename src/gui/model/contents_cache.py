@@ -30,20 +30,18 @@ from PIL import (
 
 # utils
 from utils.image import (
-    AspectRatioPattern,
-    ResolutionPattern,
     ResizeDesc,
     ResizeMode,
     AISImage,
     is_video_file,
-    ContentsMetadata,
     smart_pil_save,
     smart_pil_load,
     ExportTarget,
 )
 from utils.duration_and_frame_rate import DFR_MAP
 from utils.constants import *
-from utils.image import PlaybackMode, ContentsMetadata
+from utils.metadata import PlaybackMode, ResolutionPattern
+from utils.metadata import AspectRatioPattern, ContentsMetadata
 from utils.windows import sanitize_text
 from utils.ais_logging import write_log, PerfLogger
 

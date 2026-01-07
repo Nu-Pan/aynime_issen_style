@@ -13,7 +13,7 @@ from PIL import Image
 # utils
 from utils.ensure_web_tool import ensure_ffmpeg, ensure_gifsicle
 from utils.constants import METADATA_KEY
-from utils.image import ContentsMetadata
+from utils.metadata import ContentsMetadata
 
 
 def _detect_h264_encoder(ffmpeg_path: Path) -> str:

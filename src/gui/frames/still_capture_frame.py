@@ -9,12 +9,13 @@ from tkinterdnd2.TkinterDnD import DnDEvent
 from tkinter import Event
 
 # utils
-from utils.image import AspectRatioPattern, ResolutionPattern, ResizeDesc
+from utils.image import ResizeDesc
 from gui.model.contents_cache import (
     save_content_model,
     load_content_model,
     ImageModelEditSession,
 )
+from utils.metadata import AspectRatioPattern, ResolutionPattern
 from utils.windows import file_to_clipboard
 from utils.ctk import show_notify_label, show_error_dialog
 from utils.capture import *
