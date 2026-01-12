@@ -13,10 +13,14 @@ from pathlib import Path
 import os
 import traceback
 import inspect
+import msvcrt
 
 # tk
 import tkinter.messagebox
 import customtkinter as ctk
+
+# aynime_capture
+import aynime_capture as ayc
 
 # utils
 from utils.constants import LOG_DIR_PATH
@@ -190,6 +194,15 @@ class TkInterExceptionHandler:
             pass
 
 
+def _pipe_forwarder(read_pipe_fd: int):
+    """
+    read_pipe_fd から logging へ文字列を転送する
+    """
+    with os.fdopen(read_pipe_fd, "rb", closefd=True) as raw:
+        for line in io.TextIOWrapper(raw, encoding="utf-8", errors="replace"):
+            logging.getLogger("aynime_capture").info(line.rstrip("\r\n"))
+
+
 def setup_logging():
     """
     ログ周りのセットアップを行う
@@ -259,6 +272,11 @@ def setup_logging():
         asyncio.get_event_loop().set_exception_handler(_asyncio_exception_handler)
     except Exception:
         pass
+
+    # aynime_capture ロギング設定
+    read_pipe_fd, write_pipe_fd = os.pipe()
+    ayc.set_log_handle(msvcrt.get_osfhandle(write_pipe_fd))
+    threading.Thread(target=_pipe_forwarder, args=(read_pipe_fd,), daemon=True).start()
 
     # ログ関係の初期化完了をログに流す
     write_log("info", f"Logging initialized. file={LOG_DIR_PATH}")
