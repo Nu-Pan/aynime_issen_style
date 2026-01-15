@@ -5,6 +5,7 @@ from time import sleep
 from utils.constants import CAPTURE_FRAME_BUFFER_DURATION_IN_SEC
 from utils.image import AISImage, AspectRatio
 from utils.capture.target import WindowHandle, get_nime_window_text
+from utils.user_properties import USER_PROPERTIES
 
 # ayc
 import aynime_capture as ayc
@@ -23,9 +24,16 @@ class CaptureStream:
         コンストラクタ
         """
         self._window_handle = None
-        self._max_width = None
-        self._max_height = None
-        self._max_size_dict: dict[str, tuple[int | None, int | None]] = dict()
+        # NOTE
+        #   RAW 保存解像度の最低保証値としてフル HD をプリロードしていることに相当する
+        self._max_width = USER_PROPERTIES.get(
+            "capture_stream_preload_max_width",
+            1920,
+        )
+        self._max_height = USER_PROPERTIES.get(
+            "capture_stream_preload_max_height",
+            1080,
+        )
         self._session = None
 
     def restart_session(self) -> None:
@@ -57,46 +65,33 @@ class CaptureStream:
             self.restart_session()
 
     def set_max_size(
-        self, key: str, max_width: int | None, max_height: int | None
+        self,
+        max_width: int | None,
+        max_height: int | None,
     ) -> None:
         """
         キャプチャの最大サイズを変更する
         複数箇所で異なる最大サイズを要求されるはずなので、それらを key で区別して個別に保持する。
         それらの中でもっとも大きいサイズが要求として選択される。
         """
-        # 最大サイズ辞書を更新
-        self._max_size_dict[key] = (max_width, max_height)
-
-        # 最大サイズ情報をマージ
+        # 最大サイズ情報を更新
         # NOTE
-        #   None は制限無しなので最大とみなす。
-        #   mmw = merged_max_width
-        #   mmh = merged_min_height
-        #   len(_max_size_dict) > 0 なので、
-        #   mmw, mmh が 0 から更新されないパターンは考えなくて良い。
-        mmw, mmh = (0, 0)
-        for w, h in self._max_size_dict.values():
-            if w is None:
-                mmw = None
-            elif mmw is None:
-                pass
-            elif w > mmw:
-                mmw = w
-            if h is None:
-                mmh = None
-            elif mmh is None:
-                pass
-            elif h > mmh:
-                mmh = h
+        #   None は無指定とみなして無視
+        #   プリロードされている値があるはずなので、単純な比較で良い
+        does_restart = False
+        if max_width is not None and max_width > self._max_width:
+            self._max_width = max_width
+            does_restart = True
+        if max_height is not None and max_height > self._max_height:
+            self._max_height = max_height
+            does_restart = True
 
         # セッションリスタート
-        self._max_width = mmw
-        self._max_height = mmh
-        self.restart_session()
+        if does_restart:
+            self.restart_session()
 
     def set_max_size_pattern(
         self,
-        key: str,
         aspect_ratio_pattern: AspectRatioPattern,
         resize_desc_patetrn: ResolutionPattern,
     ) -> None:
@@ -126,7 +121,7 @@ class CaptureStream:
             max_height = round(max_width * arh / arw)
 
         # 通常版を呼び出す
-        self.set_max_size(key, max_width, max_height)
+        self.set_max_size(max_width, max_height)
 
     @property
     def capture_window(self) -> WindowHandle | None:

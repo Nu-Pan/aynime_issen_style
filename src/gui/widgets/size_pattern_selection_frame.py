@@ -212,6 +212,13 @@ class SizePatternSlectionFrame(AISFrame):
         # 初期状態を通知
         self.after("idle", self._on_radio_change)
 
+        # あり得る全てのパターンをモデルに通知
+        # NOTE
+        #   「UI 上設定しうる中で最も大きいサイズ」が AynimeCapture 上限サイズとして設定される。
+        for ar_pat in shown_aspect_ratios:
+            for res_pat in shown_resolutions:
+                self._model.stream.set_max_size_pattern(ar_pat, res_pat)
+
     def _on_radio_change(self):
         """
         ラジオボタンに変化が合った時に呼び出されるハンドラ
@@ -219,11 +226,6 @@ class SizePatternSlectionFrame(AISFrame):
         # 状態を取得
         aspect_raio_pat = self._aspect_ratio_frame.value
         resize_desc_pat = self._resolution_frame.value
-
-        # モデルに反映
-        self._model.stream.set_max_size_pattern(
-            str(id(self)), aspect_raio_pat, resize_desc_pat
-        )
 
         # コールバック
         self._aux_on_radio_change(aspect_raio_pat, resize_desc_pat)
