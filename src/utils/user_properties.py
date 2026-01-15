@@ -113,7 +113,7 @@ class UserProperties:
             # ロックの外でファイルに書き出す
             if snapshot is not None:
                 with open(USER_PROPERTIES_FILE_PATH, "w", encoding="utf-8") as f:
-                    json.dump(snapshot, f, ensure_ascii=False)
+                    json.dump(snapshot, f, ensure_ascii=False, indent=4)
             # スレッド終了
             # NOTE 「ファイルに書き出しつつスレッド停止」をサポートしたいのでこの書き方になっている
             if does_thread_stop:
