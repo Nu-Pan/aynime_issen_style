@@ -1,7 +1,7 @@
 # std
 from typing import cast, Callable
 from pathlib import Path
-
+import math
 
 # Tk/CTk
 import customtkinter as ctk
@@ -333,6 +333,7 @@ class ForeignExportFrame(AISFrame, TkinterDnD.DnDWrapper):
             else:
                 file_suffix = ".avif"
             gabigabi = False
+            min_length_in_sec = 0.0
         elif export_target == ExportTarget.DISCORD_STAMP:
             subdir_name = "discord_stamp"
             if is_still:
@@ -340,6 +341,7 @@ class ForeignExportFrame(AISFrame, TkinterDnD.DnDWrapper):
             else:
                 file_suffix = ".gif"
             gabigabi = False
+            min_length_in_sec = 0.0
         elif export_target == ExportTarget.X_TWITTER:
             subdir_name = "x_twitter"
             if is_still:
@@ -347,6 +349,9 @@ class ForeignExportFrame(AISFrame, TkinterDnD.DnDWrapper):
             else:
                 file_suffix = ".mp4"
             gabigabi = False
+            min_length_in_sec = (
+                0.6  # NOTE 厳密には 0.5 sec らしいのだが 0.1 sec の余裕を付けている
+            )
         elif export_target == ExportTarget.GABIGABI:
             subdir_name = "'00s"
             if is_still:
@@ -354,6 +359,7 @@ class ForeignExportFrame(AISFrame, TkinterDnD.DnDWrapper):
             else:
                 file_suffix = ".gif"
             gabigabi = True
+            min_length_in_sec = 0.0
         else:
             raise ValueError(export_target)
 
@@ -432,6 +438,13 @@ class ForeignExportFrame(AISFrame, TkinterDnD.DnDWrapper):
                         )
                 case _:
                     raise ValueError(f"Invalid PlaybaclMode ({model.playback_mode})")
+
+            # 最低秒数を満たすようにループ
+            duration_in_sec = model.duration_in_msec / 1000
+            original_length_in_sec = duration_in_sec * len(pil_frames)
+            num_loop = math.ceil(min_length_in_sec / original_length_in_sec)
+            if num_loop >= 2:
+                pil_frames = num_loop * pil_frames
 
             # エンコード設定を解決
             if file_suffix == ".avif":
