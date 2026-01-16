@@ -210,7 +210,7 @@ def video_encode_h264(
                 cmd,
                 stdin=subprocess.PIPE,
                 stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
                 bufsize=1024 * 1024,
                 creationflags=subprocess.CREATE_NO_WINDOW,
             )
@@ -229,28 +229,19 @@ def video_encode_h264(
                 write_log("error", "Failed to feed frames into stdin.", exception=e)
             proc.stdin.close()
             # 実行結果を処理
-            out, err = proc.communicate()
+            out, _ = proc.communicate()
             out_str = out.decode("utf-8", "replace")
-            err_str = err.decode("utf-8", "replace")
-
             if proc.returncode != 0:
-                raise RuntimeError(
-                    f"ffmpeg failed (return code={proc.returncode})\n"
-                    f"stdout:\n{out_str}\n"
-                    f"stderr:\n{err_str}"
-                )
+                raise RuntimeError(out_str)
             # 正常終了
             write_log(
-                "info",
-                f"Succeded to ffmpeg encode with {ea}\n"
-                f"out_str:\n{out_str}\n"
-                f"err_str:\n{err_str}\n",
+                "info", f"Succeded to ffmpeg encode with {ea}\nout_str:\n{out_str}"
             )
             return
         except Exception as e:
             write_log(
                 "warning",
-                f"Failed to ffmpeg encode with {ea}, fallback to next setting.",
+                f"video_encode_h264: fallback to next setting.",
                 exception=e,
             )
             last_error = e
