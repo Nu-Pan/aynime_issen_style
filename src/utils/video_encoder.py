@@ -1,6 +1,5 @@
 # std
 from pathlib import Path
-from typing import Any
 import subprocess
 import re
 from copy import copy
@@ -14,13 +13,25 @@ from PIL import Image
 from utils.ensure_web_tool import ensure_ffmpeg, ensure_gifsicle
 from utils.constants import METADATA_KEY
 from utils.metadata import ContentsMetadata
+from utils.user_properties import USER_PROPERTIES
+from utils.ais_logging import write_log
 
 
-def _detect_h264_encoder(ffmpeg_path: Path) -> str:
+_H264_ENCODERS_CACHE: set[str] = set()
+
+
+def _enumerate_encoders(ffmpeg_path: Path) -> set[str]:
     """
-    ffmpeg で使用可能な H.264 エンコーダを検出する。
-    優先順位は NVENC > QSV > AMF
+    ffmpeg で使用可能なエンコーダを列挙する。
     """
+    # ユーザープロパティで指定があればそれをロード
+    override = USER_PROPERTIES.get("h264_encoder", [])
+    if override:
+        return set(override)
+    # キャッシュがあればそれを使う
+    global _H264_ENCODERS_CACHE
+    if _H264_ENCODERS_CACHE:
+        return _H264_ENCODERS_CACHE
     # ffmpeg にエンコーダを問い合わせ
     cp = subprocess.run(
         [str(ffmpeg_path), "-hide_banner", "-encoders"],
@@ -33,25 +44,17 @@ def _detect_h264_encoder(ffmpeg_path: Path) -> str:
         creationflags=subprocess.CREATE_NO_WINDOW,
     )
     encoders_str = cp.stdout + "\n" + cp.stderr
-
     # 問い合わせ結果をパース
     encoders: set[str] = set()
+    pat = re.compile(r"([VAS\.])[F\.][S\.][X\.][B\.][D\.]\s+(\w+)")
     for line in encoders_str.splitlines():
-        m = re.search(r"\b(h264_\w+)\b", line)
-        if m:
-            encoders.add(m.group(1))
-
-    # 候補とヒットしたらそれを返す
-    CANDIDATES = ("h264_nvenc", "h264_qsv", "h264_amf")
-    for cand in CANDIDATES:
-        if cand in encoders:
-            return cand
-
-    # 見つからなかったら例外
-    raise RuntimeError(
-        f"H.264 hardware encoder not found {CANDIDATES}. "
-        f"This BTBN lgpl build does not include libx264, so software H.264 may be unavailable."
-    )
+        m = pat.search(line)
+        if m and m.group(1) == "V":
+            encoders.add(m.group(2))
+    # キャッシュに保存
+    _H264_ENCODERS_CACHE = encoders
+    # 正常終了
+    return encoders
 
 
 def video_encode_h264(
@@ -95,7 +98,7 @@ def video_encode_h264(
     ffmpeg_path = ensure_ffmpeg()
 
     # エンコーダーを決定
-    encoder = _detect_h264_encoder(ffmpeg_path)
+    encoders = _enumerate_encoders(ffmpeg_path)
 
     # 基本コマンド
     # fmt: off
@@ -123,58 +126,84 @@ def video_encode_h264(
 
     # 試行する引数を展開
     # NOTE
-    #   環境依存で合法な引数が変わるので、最初はリッチに、ダメなら最小構成で。
+    #   エンコード速度の観点で x264 は対象外としたので LGPL 版 ffmpeg でも動く。
+    #   優先順位は、ディスクリート GPU へのオフロードを期待できる順にして、
+    #    h264_nvenc(nvidia) > h264_amf(AMD) > h264_qsv(Intel)
+    #   とした。
+    # NOTE
+    #   環境依存で合法な引数が変わるので、最初は細かく指定をしたリッチな引数を試す。
+    #   リッチ引数が全滅したら、エンコーダだけを指定した最小構成でリトライする。
+    #   最小構成も全部失敗したら、関数として完全に失敗。
+    # NOTE
+    #   基本方針は「低速エンコード、高画質、可変ビットレート」
+    #   その心は、
+    #   - ハードウェア支援を受けられるから、重たい設定でも比較的高速にエンコードされるはず
+    #   - ストリーミングじゃないので、ビットレートを一定にする意味はない
+    #   - ごく短い動画の出力を想定していて、投稿先サービスのサイズ上限に引っかかることはまず無いだろうから、ファイルサイズは多少膨らんでも良い
     # fmt: off
-    QUALITY = 24
-    if encoder == "h264_nvenc":
-        extra_args = [
-            # 推奨（CQベースのVBR）
-            [
-                "-c:v", "h264_nvenc",
-                "-rc", "vbr",
-                "-cq", str(QUALITY),
-                "-b:v", "0",
-                "-preset", "p5",
-            ],
-            # 最低限
-            [
-                "-c:v", "h264_nvenc"
-            ],
-        ]
-    elif encoder == "h264_qsv":
-        extra_args = [
-            # QSV は -global_quality が通りやすい（値は概ね“品質パラメータ”）
-            [
-                "-c:v", "h264_qsv",
-                "-global_quality", str(QUALITY),
-                "-preset", "medium",
-            ],
-            [
-                "-c:v", "h264_qsv"
-            ],
-        ]
-    elif encoder == "h264_amf":
-        extra_args = [
-            # AMF は rc/qp 系が環境差大きいので、まずはCQP寄せ
-            [
-                "-c:v", "h264_amf",
-                "-rc", "cqp",
-                "-qp_i", str(QUALITY),
-                "-qp_p", str(QUALITY),
-                "-quality", "speed",
-            ],
-            [
-                "-c:v", "h264_amf"
-            ],
-        ]
-    else:
-        raise ValueError(f"Unexpected encoder ({encoder})")
+    detailed_extra_args: list[list[str]] = []
+    compat_extra_args: list[list[str]] = []
+    if "h264_nvenc" in encoders:
+        # NVIDIA NVENC
+        # NOTE
+        #   NVENC は個別パラメータ設定がちゃんと聞く
+        detailed_extra_args.append([
+            "-c:v", "h264_nvenc",
+            "-preset", "p7",
+            "-profile", "main", # 互換性重視
+            "-multipass", "fullres",
+            "-rc", "vbr_hq",
+            "-cq", "19", # 低いほうが画質が良い
+            "-b:v", "0",
+            "-rc-lookahead", "20", # 推奨レンジ 10 ~ 20　で、めいいっぱい攻めても 32 くらい
+            "-spatial-aq", "1",
+            "-aq-strength", "10", # 値域は 1 ~ 15
+            "-temporal-aq", "1",
+            "-bf", "4" # 値域は -1 ~ 16 で、lookahead 有効なら 4 が推奨
+        ])
+        compat_extra_args.append([
+            "-c:v", "h264_nvenc"
+        ])
+    if "h264_amf" in encoders:
+        # AMD AMF
+        # NOTE
+        #   AMF は個別パラメータ指定を無視されやすい。
+        #   細かいチューンは不毛なので、全面的にプリセットに任せる。
+        #   なお、このプリセット設定も本当に効いてるかどうか分からない。
+        detailed_extra_args.append([
+            "-c:v", "h264_amf",
+            "-usage", "high_quality",
+            "-profile", "main", # 互換性重視
+            "-quality", "quality",
+            "-preset", "quality",
+        ])
+        compat_extra_args.append([
+            "-c:v", "h264_amf"
+        ])
+    if "h264_qsv" in encoders:
+        # INTEL QVS
+        # NOTE
+        #   ハードがないのでテストしてない。
+        #   だれか助けて。
+        detailed_extra_args.append([
+            "-c:v", "h264_qsv",
+            "-preset", "veryslow",
+            "-global_quality", "19"
+        ])
+        compat_extra_args.append([
+            "-c:v", "h264_qsv"
+        ])
     # fmt: on
+
+    # 試行引数リストを結合
+    extra_args = detailed_extra_args + compat_extra_args
+    if not extra_args:
+        raise RuntimeError("h264 HW encoder is not available in this machine.")
 
     # ffmpeg 実行
     last_error = None
-    for extra_args in extra_args:
-        cmd = base_args + extra_args + [dest_file_path]
+    for ea in extra_args:
+        cmd = base_args + ea + [dest_file_path]
         try:
             # プロセス起動
             proc = subprocess.Popen(
@@ -188,25 +217,47 @@ def video_encode_h264(
             if proc.stdin is None:
                 raise ValueError("subprocess stdin is None")
             # フレームをパイプに流し込む
-            for frame in frames:
-                proc.stdin.write(frame.tobytes())
+            # NOTE
+            #   ffmpeg 側で何か失敗があったら、途中でパイプが壊れることもある。
+            #   ので stdin への流し込み中のエラーはすべて飲み込む。
+            try:
+                for frame in frames:
+                    if proc.returncode is not None:
+                        raise RuntimeError("Cancel to feed frames into stdin")
+                    proc.stdin.write(frame.tobytes())
+            except Exception as e:
+                write_log("error", "Failed to feed frames into stdin.", exception=e)
             proc.stdin.close()
             # 実行結果を処理
-            _, err = proc.communicate()
+            out, err = proc.communicate()
+            out_str = out.decode("utf-8", "replace")
             err_str = err.decode("utf-8", "replace")
+
             if proc.returncode != 0:
                 raise RuntimeError(
                     f"ffmpeg failed (return code={proc.returncode})\n"
+                    f"stdout:\n{out_str}\n"
                     f"stderr:\n{err_str}"
                 )
             # 正常終了
+            write_log(
+                "info",
+                f"Succeded to ffmpeg encode with {ea}\n"
+                f"out_str:\n{out_str}\n"
+                f"err_str:\n{err_str}\n",
+            )
             return
         except Exception as e:
+            write_log(
+                "warning",
+                f"Failed to ffmpeg encode with {ea}, fallback to next setting.",
+                exception=e,
+            )
             last_error = e
             continue
 
     # 全部失敗
-    raise RuntimeError(f"ffmpeg encode failed with encoder={encoder}") from last_error
+    raise RuntimeError(f"ffmpeg encode failed with all candidated") from last_error
 
 
 def _collect_stderr(
