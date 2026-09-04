@@ -74,7 +74,8 @@ class StillCaptureFrame(AISFrame, TkinterDnD.DnDWrapper):
         # NOTE
         #   I は「一閃」の頭文字
         self._model.global_hotkey.register(
-            "I", lambda: self._on_preview_label_click(None)
+            USER_PROPERTIES.get("global_hot_key_issen", "I"),
+            lambda: self._on_preview_label_click(None),
         )
 
         # アニメ名テキストボックス

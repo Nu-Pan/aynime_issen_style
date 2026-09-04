@@ -386,7 +386,8 @@ class VideoCaptureFrame(AISFrame, TkinterDnD.DnDWrapper):
         # NOTE
         #   K はキンキン！　の頭文字
         self._model.global_hotkey.register(
-            "K", lambda: self._on_record_button_clicked()
+            USER_PROPERTIES.get("global_hot_key_kinkin", "K"),
+            lambda: self._on_record_button_clicked(),
         )
 
         # ファイルドロップ関係

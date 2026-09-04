@@ -17,6 +17,9 @@ import ctypes
 from ctypes import wintypes
 import win32con, win32gui, win32api, win32event, winerror, win32clipboard
 
+# utils
+from utils.ais_logging import write_log
+
 
 def file_to_clipboard(file_path: Path) -> None:
     """
@@ -146,16 +149,26 @@ class GlobalHotkey:
             self._key_handler_map[key_ch].append(handler)
             return
 
+        # ホットキーを登録
+        # NOTE
+        #   既に他のアプリケーションが登録している場合、登録に失敗する
+        #   e.g. Ctrl + Alt + K は Kindle の起動ショートカットキー
+        #   普通にありえる話なので、登録失敗時は無視して続行する
+        try:
+            win32gui.RegisterHotKey(
+                self._msg_hwnd,
+                GlobalHotkey.HOTKEY_ID,
+                GlobalHotkey.MOD,
+                vk_code,
+            )
+        except Exception as e:
+            write_log(
+                "warning", f"Failed to reginster global hotkey Ctrl + Alt + {key_ch}"
+            )
+            return
+
         # キー・ハンドラーマップに登録
         self._key_handler_map[key_ch] = [handler]
-
-        # ホットキーを登録
-        win32gui.RegisterHotKey(
-            self._msg_hwnd,
-            GlobalHotkey.HOTKEY_ID,
-            GlobalHotkey.MOD,
-            vk_code,
-        )
 
 
 class SystemWideMutex:

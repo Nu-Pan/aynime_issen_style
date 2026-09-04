@@ -14,6 +14,7 @@ from utils.constants import (
 from utils.pyinstaller import resource_path
 from utils.capture import *
 from utils.ctk import place_window_to_display_center
+from utils.user_properties import USER_PROPERTIES
 
 # gui
 from gui.frames.window_selection_frame import WindowSelectionFrame
@@ -21,8 +22,6 @@ from gui.frames.still_capture_frame import StillCaptureFrame
 from gui.frames.video_capture_frame import VideoCaptureFrame
 from gui.frames.foreign_export_frame import ForeignExportFrame
 from gui.frames.status_frame import StatusFrame
-
-# local
 from gui.model.aynime_issen_style import AynimeIssenStyleModel
 
 
@@ -106,10 +105,12 @@ class AynimeIssenStyleApp(ctk.CTk, TkinterDnD.DnDWrapper):
 
         # グローバルホットキーを設定
         self.model.global_hotkey.register(
-            "I", lambda: self.tabview.set(StillCaptureFrame.UI_TAB_NAME)
+            USER_PROPERTIES.get("global_hot_key_issen", "I"),
+            lambda: self.tabview.set(StillCaptureFrame.UI_TAB_NAME),
         )
         self.model.global_hotkey.register(
-            "K", lambda: self.tabview.set(VideoCaptureFrame.UI_TAB_NAME)
+            USER_PROPERTIES.get("global_hot_key_kinkin", "K"),
+            lambda: self.tabview.set(VideoCaptureFrame.UI_TAB_NAME),
         )
 
         # 後始末設定
