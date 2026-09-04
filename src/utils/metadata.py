@@ -6,7 +6,6 @@ import re
 import zlib
 from typing import Any, Callable, Self, cast
 
-
 # utils
 from utils.ais_logging import write_log
 
@@ -67,6 +66,8 @@ class ContentsMetadata:
         _resize_resolution_pattern: Any = None,
         _playback_mode: Any = None,
         _disabled_frame_indices: Any = None,
+        _source_nime_name: Any = None,
+        _override_nime_name: Any = None,
         **_ignored: Any,
     ):
         """
@@ -127,7 +128,22 @@ class ContentsMetadata:
         else:
             self._disabled_frame_indices = None
 
-        # TODO _ignored がある場合は警告出す
+        # ウィンドウから解決した元々の NIME 名
+        if isinstance(_source_nime_name, str):
+            self._source_nime_name = _source_nime_name
+        else:
+            self._source_nime_name = None
+
+        # ユーザーの手入力で書き込まれた NIME 名
+        if isinstance(_override_nime_name, str):
+            self._override_nime_name = _override_nime_name
+        else:
+            self._override_nime_name = None
+
+        # _ignored がある場合は警告出す
+        write_log(
+            "warning", f"ContentsMetadata recieves _ignored parameter ({_ignored})"
+        )
 
     @property
     def overlay_nime_name(self) -> bool | None:
@@ -202,6 +218,22 @@ class ContentsMetadata:
         self._disabled_frame_indices = None
 
     @property
+    def source_nime_name(self) -> str | None:
+        return self._source_nime_name
+
+    def set_source_nime_name(self, source_nime_name: str) -> Self:
+        self._source_nime_name = source_nime_name
+        return self
+
+    @property
+    def override_nime_name(self) -> str | None:
+        return self._override_nime_name
+
+    def set_override_nime_name(self, override_nime_name: str) -> Self:
+        self._override_nime_name = override_nime_name
+        return self
+
+    @property
     def to_str(self) -> str:
         """
         str にシリアライズする
@@ -229,6 +261,8 @@ class ContentsMetadata:
         _sanitize_vars(metadata_dict, "_resize_resolution_pattern", lambda v: v.value)
         _sanitize_vars(metadata_dict, "_playback_mode", lambda v: v.value)
         _sanitize_vars(metadata_dict, "_disabled_frame_indices", lambda v: list(v))
+        _sanitize_vars(metadata_dict, "_source_nime_name", lambda v: v.value)
+        _sanitize_vars(metadata_dict, "_override_nime_name", lambda v: v.value)
 
         # 　シリアライズ
         # NOTE
@@ -318,6 +352,8 @@ class ContentsMetadata:
         )
         _restore_vars(result, "_playback_mode", lambda v: PlaybackMode(v))
         _restore_vars(result, "_disabled_frame_indices", lambda v: set(v))
+        _restore_vars(result, "_source_nime_name", lambda v: str(v))
+        _restore_vars(result, "_override_nime_name", lambda v: str(v))
 
         # 正常終了
         return ContentsMetadata(**result)

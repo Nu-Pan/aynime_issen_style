@@ -48,7 +48,6 @@ from gui.model.contents_cache import (
     load_content_model,
 )
 
-
 type NotifyHandler = Callable[[], None]
 
 
@@ -367,7 +366,7 @@ class ForeignExportFrame(AISFrame, TkinterDnD.DnDWrapper):
         save_file_path = (
             TENSEI_DIR_PATH
             / subdir_name
-            / f"{model.nime_name}__{model.time_stamp}{file_suffix}"
+            / f"{model.final_nime_name}__{model.time_stamp}{file_suffix}"
         )
 
         # エクスポート処理実行

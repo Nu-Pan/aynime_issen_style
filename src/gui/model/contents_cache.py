@@ -8,9 +8,6 @@ from typing import (
     Iterable,
 )
 from pathlib import Path
-from datetime import datetime
-from zipfile import ZipFile, ZIP_STORED
-from io import BytesIO
 import re
 from abc import ABC, abstractmethod
 from enum import Enum
@@ -36,7 +33,10 @@ from utils.image import (
     is_video_file,
     smart_pil_save,
     smart_pil_load,
-    ExportTarget,
+)
+from utils.time_stamp import (
+    is_time_stamp,
+    current_time_stamp,
 )
 from utils.duration_and_frame_rate import DFR_MAP
 from utils.constants import *
@@ -44,7 +44,6 @@ from utils.metadata import PlaybackMode, ResolutionPattern
 from utils.metadata import AspectRatioPattern, ContentsMetadata
 from utils.windows import sanitize_text
 from utils.ais_logging import write_log, PerfLogger
-
 
 type AuxProcess = Callable[[AISImage], AISImage]
 type NotifyHandler = Callable[[], None]
@@ -65,59 +64,6 @@ class FontCache:
             new_font = ImageFont.truetype(OVERLAY_FONT_PATH, size=font_size)
             cls._cache[font_size] = new_font
             return new_font
-
-
-_TIMESTAMP_FORMAT = "%Y-%m-%d_%H-%M-%S"
-
-
-def current_time_stamp() -> str:
-    """
-    現在時刻からタイムスタンプ文字列を生成（ミリ秒3桁）
-    """
-    now = datetime.now()
-    ms = now.microsecond // 1000  # 0〜999
-    return f"{now.strftime(_TIMESTAMP_FORMAT)}_{ms:03d}"
-
-
-def is_time_stamp(text: str) -> bool:
-    """
-    text が旧フォーマット or 新フォーマットのタイムスタンプ文字列なら True
-    """
-    # 新フォーマット（ミリ秒あり）
-    m_new = re.fullmatch(r"\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}_\d{3}", text)
-    if m_new:
-        return True
-
-    # 旧フォーマット（秒まで）
-    m_old = re.fullmatch(r"\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}", text)
-    if m_old:
-        return True
-
-    # どちらでもない
-    return False
-
-
-def parse_nime_file_stem(stem: str) -> tuple[str | None, str | None]:
-    """
-    stem をパースして (アニメ名, タイムスタンプ) を返す。
-    NOTE
-        最初は新形式を仮定してパースして、ダメだった場合は旧形式を仮定する。
-        パースに失敗した要素は None を返す。
-    """
-    file_stem_match = re.match("(.+)__(.+)", stem)
-    if file_stem_match is None:
-        nime_name = None
-        if is_time_stamp(stem):
-            time_stamp = stem
-        else:
-            time_stamp = None
-    else:
-        nime_name = file_stem_match.group(1)
-        if is_time_stamp(file_stem_match.group(2)):
-            time_stamp = file_stem_match.group(2)
-        else:
-            time_stamp = None
-    return nime_name, time_stamp
 
 
 class CachedContent(ABC):
@@ -750,7 +696,8 @@ class ImageModel:
     def __init__(
         self,
         raw_image: AISImage | None = None,
-        nime_name: str | None = None,
+        source_nime_name: str | None = None,
+        override_nime_name: str | None = None,
         time_stamp: str | None = None,
         enable: bool = True,
         nime_resize_mode: ResizeMode | None = None,
@@ -786,17 +733,35 @@ class ImageModel:
 
         # 初期設定
         self._raw_image.set_source(raw_image)
-        self._nime_name = nime_name
+        self._source_nime_name = source_nime_name
+        self._override_nime_name = override_nime_name
         self._overlay_nime_name = True
         self._time_stamp = time_stamp
         self._enable = enable
 
     @property
-    def nime_name(self) -> str | None:
+    def source_nime_name(self) -> str | None:
         """
-        アニメ名を取得する
+        ウィンドウから取った元々のアニメ名を取得する
         """
-        return self._nime_name
+        return self._source_nime_name
+
+    @property
+    def override_nime_name(self) -> str | None:
+        """
+        ユーザーの手入力で書き込まれたアニメ名を取得する
+        """
+        return self._override_nime_name
+
+    @property
+    def final_nime_name(self) -> str | None:
+        """
+        source_nime_name, override_nime_name を考慮した最終的なアニメ名を取得する
+        """
+        if isinstance(self._override_nime_name, str):
+            return self._override_nime_name
+        else:
+            return self._source_nime_name
 
     @property
     def overlay_nime_name(self) -> bool:
@@ -896,6 +861,8 @@ class ImageModel:
             _resize_resolution_pattern=nime_resize_desc.resolution,
             _playback_mode=None,
             _disabled_frame_indices=None,
+            _source_nime_name=self.source_nime_name,
+            _override_nime_name=self.override_nime_name,
         )
 
     def register_layer_changed_handler(
@@ -912,7 +879,7 @@ class ImageModel:
         NIME 用の外部プロセス
         """
         if self._overlay_nime_name:
-            return overlay_nime_name(source_image, self._nime_name)
+            return overlay_nime_name(source_image, self._source_nime_name)
         else:
             return source_image
 
@@ -1000,19 +967,37 @@ class ImageModelEditSession:
         # 正常終了
         return self
 
-    def set_nime_name(self, nime_name: str | None) -> Self:
+    def set_source_nime_name(self, source_nime_name: str | None) -> Self:
         """
-        アニメ名を設定する。
+        ウィンドウから取った元々のアニメ名を設定する。
         NIME 画像が影響を受ける。
         """
         # サニタイズ
-        if nime_name is not None:
-            nime_name = sanitize_text(nime_name)
+        if source_nime_name is not None:
+            source_nime_name = sanitize_text(source_nime_name)
 
         # アニメ名更新・通知
         model = self._model
-        if model._nime_name != nime_name:
-            model._nime_name = nime_name
+        if model._source_nime_name != source_nime_name:
+            model._source_nime_name = source_nime_name
+            model._nime_image.mark_dirty()
+
+        # 正常終了
+        return self
+
+    def set_override_nime_name(self, override_nime_name: str | None) -> Self:
+        """
+        ユーザーの手入力で書き込まれたアニメ名を設定する。
+        NIME 画像が影響を受ける。
+        """
+        # サニタイズ
+        if override_nime_name is not None:
+            override_nime_name = sanitize_text(override_nime_name)
+
+        # アニメ名更新・通知
+        model = self._model
+        if model._override_nime_name != override_nime_name:
+            model._override_nime_name = override_nime_name
             model._nime_image.mark_dirty()
 
         # 正常終了
@@ -1020,7 +1005,7 @@ class ImageModelEditSession:
 
     def set_overlay_nime_name(self, overlay_nime_name: bool) -> Self:
         """
-        アニメ名オーバーレイの有効・無効を設定するする。
+        アニメ名オーバーレイの有効・無効を設定する。
         NIME 画像が影響を受ける。
         """
         # アニメ名更新・通知
@@ -1195,7 +1180,8 @@ class ImageModelEditSession:
         # NOTE
         #   set_contents_metadata も同じコピー系で、書き込み対象が被ってるので呼ばなくて良い。
         self.set_raw_image(raw_image)
-        self.set_nime_name(other.nime_name)
+        self.set_source_nime_name(other.source_nime_name)
+        self.set_override_nime_name(other.override_nime_name)
         self.set_overlay_nime_name(other.overlay_nime_name)
         self.set_time_stamp(other.time_stamp)
         self.set_enable(enable)
@@ -1236,11 +1222,25 @@ class VideoModel:
         self._playback_mode_change_handlers: list[NotifyHandler] = []
 
     @property
-    def nime_name(self) -> str | None:
+    def source_nime_name(self) -> str | None:
         """
-        アニメ名
+        ウィンドウから取った元々のアニメ名
         """
-        return self._global_model.nime_name
+        return self._global_model.source_nime_name
+
+    @property
+    def override_nime_name(self) -> str | None:
+        """
+        ユーザーの手入力で書き込まれたアニメ名
+        """
+        return self._global_model.override_nime_name
+
+    @property
+    def final_nime_name(self) -> str | None:
+        """
+        source_nime_name, override_nime_name を考慮した最終的なアニメ名
+        """
+        return self._global_model.final_nime_name
 
     @property
     def overlay_nime_name(self) -> bool:
@@ -1447,9 +1447,9 @@ class VideoModelEditSession:
         # 正常終了
         return self
 
-    def set_nime_name(self, nime_name: str | None) -> Self:
+    def set_source_nime_name(self, source_nime_name: str | None) -> Self:
         """
-        アニメ名を設定する。
+        ウィンドウから取った元々のアニメ名
         """
         # エイリアス
         model = self._model
@@ -1457,11 +1457,30 @@ class VideoModelEditSession:
         # 各フレーム
         for frame in model._frames:
             with ImageModelEditSession(frame, _does_notify=False) as e:
-                e.set_nime_name(nime_name)
+                e.set_source_nime_name(source_nime_name)
 
         # グローバル
         with ImageModelEditSession(model._global_model, _does_notify=False) as e:
-            e.set_nime_name(nime_name)
+            e.set_source_nime_name(source_nime_name)
+
+        # 正常終了
+        return self
+
+    def set_override_nime_name(self, override_nime_name: str | None) -> Self:
+        """
+        ウィンドウから取った元々のアニメ名
+        """
+        # エイリアス
+        model = self._model
+
+        # 各フレーム
+        for frame in model._frames:
+            with ImageModelEditSession(frame, _does_notify=False) as e:
+                e.set_override_nime_name(override_nime_name)
+
+        # グローバル
+        with ImageModelEditSession(model._global_model, _does_notify=False) as e:
+            e.set_override_nime_name(override_nime_name)
 
         # 正常終了
         return self
@@ -1651,7 +1670,8 @@ class VideoModelEditSession:
                             layer, model._global_model.get_resize_mode(layer)
                         )
                 e.set_time_stamp(model._global_model.time_stamp)
-                e.set_nime_name(model._global_model.nime_name)
+                e.set_source_nime_name(model._global_model.source_nime_name)
+                e.set_override_nime_name(model._global_model.override_nime_name)
                 model._frames.append(new_obj)
         else:
             # ImageModel ではない場合、 ImageModel の呼び出しに変換
@@ -1737,7 +1757,7 @@ class VideoModelEditSession:
 
     def set_contents_metadata(self, contents_metadata: ContentsMetadata) -> Self:
         """
-        メタデータをm元に内部状態を設定する
+        メタデータを元に内部状態を設定する
         """
         # エイリアス
         model = self._model
@@ -1785,7 +1805,8 @@ class VideoModelEditSession:
         # NOTE
         #   set_enable, set_enable_batch は呼ばなくて良い（append_frame で状態コピーされるので）
         #   set_contents_metadata も呼ばなくて良い（他の set_* を呼ぶのと同じことなので）
-        self.set_nime_name(other.nime_name)
+        self.set_source_nime_name(other.source_nime_name)
+        self.set_override_nime_name(other.override_nime_name)
         self.set_overlay_nime_name(other.overlay_nime_name)
         self.set_time_stamp(other.time_stamp)
         self.set_crop_params(*other.crop_params)
@@ -1832,7 +1853,7 @@ def save_content_model(model: ImageModel | VideoModel) -> Path:
         #   よって、ローカルにファイルが無い場合だけ保存する。
         raw_file_path = (
             RAW_DIR_PATH
-            / f"{model.nime_name}__{model.time_stamp}{RAW_STILL_OUT_SUFFIX}"
+            / f"{model.final_nime_name}__{model.time_stamp}{RAW_STILL_OUT_SUFFIX}"
         )
         smart_pil_save(
             raw_file_path,
@@ -1849,7 +1870,7 @@ def save_content_model(model: ImageModel | VideoModel) -> Path:
         #   NIME 画像はサイズ変更がかかっている可能性があるので、必ず保存処理を通す。
         still_file_path = (
             NIME_DIR_PATH
-            / f"{model.nime_name}__{model.time_stamp}{NIME_STILL_OUT_SUFFIX}"
+            / f"{model.final_nime_name}__{model.time_stamp}{NIME_STILL_OUT_SUFFIX}"
         )
         smart_pil_save(
             still_file_path,
@@ -1883,7 +1904,7 @@ def save_content_model(model: ImageModel | VideoModel) -> Path:
             #   エンコード時間を短縮したいので、圧縮率は最大限妥協している。
             raw_file_path = (
                 RAW_DIR_PATH
-                / f"{model.nime_name}__{model.time_stamp}{RAW_VIDEO_OUT_SUFFIX}"
+                / f"{model.final_nime_name}__{model.time_stamp}{RAW_VIDEO_OUT_SUFFIX}"
             )
             smart_pil_save(
                 raw_file_path,
@@ -1921,7 +1942,7 @@ def save_content_model(model: ImageModel | VideoModel) -> Path:
             # nime ディレクトリに動画ファイルを保存
             nime_file_path = (
                 NIME_DIR_PATH
-                / f"{model.nime_name}__{model.time_stamp}{NIME_VIDEO_OUT_SUFFIX}"
+                / f"{model.final_nime_name}__{model.time_stamp}{NIME_VIDEO_OUT_SUFFIX}"
             )
             smart_pil_save(
                 nime_file_path,
@@ -2004,11 +2025,6 @@ def load_content_model(file_path: Path) -> ImageModel | VideoModel:
         show_location=True,
     )
 
-    # 使用する NIME 名・タイムスタンプを解決
-    nime_name, time_stamp = parse_nime_file_stem(actual_file_path.stem)
-    if time_stamp is None:
-        time_stamp = current_time_stamp()
-
     # コンテンツをロード
     if is_video:
         # 動画ファイルをロード
@@ -2018,10 +2034,15 @@ def load_content_model(file_path: Path) -> ImageModel | VideoModel:
         # モデルを構築
         contents_model = VideoModel()
         with VideoModelEditSession(contents_model) as edit:
-            edit.set_nime_name(nime_name)
-            edit.set_time_stamp(time_stamp)
+            edit.set_source_nime_name(load_result.metadata.source_nime_name)
+            edit.set_override_nime_name(load_result.metadata.override_nime_name)
+            edit.set_time_stamp(load_result.time_stamp)
             edit.append_frames(
-                ImageModel(AISImage(pil_image), nime_name, time_stamp)
+                ImageModel(
+                    AISImage(pil_image),
+                    load_result.metadata.source_nime_name,
+                    load_result.time_stamp,
+                )
                 for pil_image in load_result.contents
             )
             if load_result.duration_in_msec is not None:
@@ -2034,7 +2055,10 @@ def load_content_model(file_path: Path) -> ImageModel | VideoModel:
             raise ValueError(f"'{actual_file_path}' is NOT still file")
         # モデルを構築
         contents_model = ImageModel(
-            AISImage(load_result.contents), nime_name, time_stamp
+            AISImage(load_result.contents),
+            load_result.metadata.source_nime_name,
+            load_result.metadata.override_nime_name,
+            load_result.time_stamp,
         )
         with ImageModelEditSession(contents_model) as edit:
             edit.set_contents_metadata(load_result.metadata)
