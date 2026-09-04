@@ -3,7 +3,6 @@ from typing import Any, cast
 from enum import Enum, auto
 from math import gcd
 from pathlib import Path
-from xml.sax import saxutils
 from dataclasses import dataclass
 from zipfile import ZipFile
 import re
@@ -20,6 +19,7 @@ import numpy as np
 from skimage.metrics import structural_similarity as ssim
 
 # utils
+from utils.time_stamp import is_time_stamp, current_time_stamp
 from utils.constants import *
 from utils.duration_and_frame_rate import DFR_MAP
 from utils.ais_logging import write_log
@@ -663,6 +663,35 @@ def is_video_file(file_path: Path) -> bool:
         )
 
 
+def parse_nime_file_stem(stem: str) -> tuple[str | None, str]:
+    """
+    stem をパースして (アニメ名, タイムスタンプ) を返す。
+
+    旧形式・新形式共に対応。
+    アニメ名のパースに失敗した場合は None を返す。
+    タイムスタンプのパースに失敗した場合は現在時刻で代用する。
+    """
+    # NOTE
+    #     最初は新形式を仮定してパースして、ダメだった場合は旧形式を仮定する。
+    #     パースに失敗した要素は None を返す。
+    file_stem_match = re.match("(.+)__(.+)", stem)
+    if file_stem_match is None:
+        # 旧形式 (タイムスタンプのみ)
+        nime_name = None
+        if is_time_stamp(stem):
+            time_stamp = stem
+        else:
+            time_stamp = current_time_stamp()
+    else:
+        # 新形式 (NIME 名＋タイムスタンプ)
+        nime_name = file_stem_match.group(1)
+        if is_time_stamp(file_stem_match.group(2)):
+            time_stamp = file_stem_match.group(2)
+        else:
+            time_stamp = current_time_stamp()
+    return nime_name, time_stamp
+
+
 class ExportTarget(Enum):
     UNKNOWN = "Unknown"
     DISCORD_POST = "Discord Post"
@@ -889,6 +918,7 @@ class SmartPILLoadResult:
     contents: Image.Image | list[Image.Image]
     duration_in_msec: int | None
     metadata: ContentsMetadata
+    time_stamp: str
 
 
 def smart_pil_load(
@@ -905,9 +935,9 @@ def smart_pil_load(
     if file_path.suffix == ".zip":
         # zip をパースして画像を取得
         pil_frames: list[Image.Image] = []
-        frame_enable_list: list[bool] = []
+        disabled_frame_indices: list[int] = []
         with ZipFile(file_path, "r") as zip_file:
-            for file_name in zip_file.namelist():
+            for frame_index, file_name in enumerate(zip_file.namelist()):
                 # ステムを抽出
                 # NOTE
                 #   拡張子が想定通りじゃない場合はスキップ
@@ -929,12 +959,19 @@ def smart_pil_load(
                         frame_enable = True
                 # パース結果を保存
                 pil_frames.append(Image.open(zip_file.open(file_name.name)).copy())
-                frame_enable_list.append(frame_enable)
+                if not frame_enable:
+                    disabled_frame_indices.append(frame_index)
+        # zip ファイル名からタイムスタンプを取得
+        nime_name_from_stem, time_stamp_from_stem = parse_nime_file_stem(file_path.stem)
         # 結果を返す
         return SmartPILLoadResult(
             pil_frames,
             DFR_MAP.default_entry.duration_in_msec,
-            ContentsMetadata(frame_enable=frame_enable_list),
+            ContentsMetadata(
+                _disabled_frame_indices=disabled_frame_indices,
+                _source_nime_name=nime_name_from_stem,
+            ),
+            time_stamp_from_stem,
         )
 
     # メタデータロードヘルパ
@@ -1022,5 +1059,15 @@ def smart_pil_load(
             avg_delay = None
             metadata = _load_metadata(image_file)
 
+    # NIME 名、タイムスタンプの整合性を取る
+    # NOTE
+    #   NIME 名はメタデータが優先。
+    #   メタデータからの NIME 名パースに失敗した場合、stem からパースした NIME 名を代わりに使う。
+    # NOTE
+    #   タイムスタンプは stem が唯一の正本。
+    nime_name_from_stem, time_stamp_from_stem = parse_nime_file_stem(file_path.stem)
+    if metadata.source_nime_name is None and nime_name_from_stem is not None:
+        metadata.set_source_nime_name(nime_name_from_stem)
+
     # 正常終了
-    return SmartPILLoadResult(contents, avg_delay, metadata)
+    return SmartPILLoadResult(contents, avg_delay, metadata, time_stamp_from_stem)

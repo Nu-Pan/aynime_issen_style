@@ -169,7 +169,7 @@ class StillCaptureFrame(AISFrame, TkinterDnD.DnDWrapper):
         # エイリアス
         model = self._model.still
 
-        # 設定変更を各 UI に反映
+        # サイズ設定を反映
         resize_desc = model.get_size(ImageLayer.NIME)
         if (
             self._size_pattern_selection_frame.aspect_ratio != resize_desc.aspect_ratio
@@ -179,6 +179,14 @@ class StillCaptureFrame(AISFrame, TkinterDnD.DnDWrapper):
                 aspect_ratio=resize_desc.aspect_ratio.pattern,
                 resolution=resize_desc.resolution.pattern,
             )
+
+        # 上書きアニメ名の設定を反映
+        override_nime_name_before = self._nime_name_entry.text
+        override_nime_name_after = model.override_nime_name or ""
+        if override_nime_name_before != override_nime_name_after:
+            self._nime_name_entry.delete(0, "end")
+            if override_nime_name_after:
+                self._nime_name_entry.insert(0, override_nime_name_after)
 
     def _on_preview_label_click(self, event: Event | None) -> None:
         """
@@ -202,16 +210,17 @@ class StillCaptureFrame(AISFrame, TkinterDnD.DnDWrapper):
             )
             return
 
-        # アニメ名を解決
-        if self._nime_name_entry.text != "":
-            actual_nime_name = self._nime_name_entry.text
+        # 上書きアニメ名を解決
+        if self._nime_name_entry.text:
+            override_nime_name = self._nime_name_entry.text
         else:
-            actual_nime_name = self._model.stream.nime_window_text
+            override_nime_name = None
 
         # モデルに反映
         with ImageModelEditSession(self._model.still) as edit:
             edit.set_raw_image(pil_raw_capture_image)
-            edit.set_nime_name(actual_nime_name)
+            edit.set_source_nime_name(self._model.stream.nime_window_text)
+            edit.set_override_nime_name(override_nime_name)
             edit.set_time_stamp(None)
 
         # エクスポート
@@ -223,9 +232,9 @@ class StillCaptureFrame(AISFrame, TkinterDnD.DnDWrapper):
         """
         with ImageModelEditSession(self._model.still) as edit:
             if text != "":
-                edit.set_nime_name(text)
+                edit.set_override_nime_name(text)
             else:
-                edit.set_nime_name(self._model.stream.nime_window_text)
+                edit.set_override_nime_name(None)
 
     def _on_resolution_changes(
         self, aspect_ratio: AspectRatioPattern, resolution: ResolutionPattern
@@ -312,5 +321,3 @@ class StillCaptureFrame(AISFrame, TkinterDnD.DnDWrapper):
         # AIS モデルに設定
         with ImageModelEditSession(self._model.still) as edit:
             edit.set_model(new_model)
-            if self._nime_name_entry.text != "":
-                edit.set_nime_name(self._nime_name_entry.text)
