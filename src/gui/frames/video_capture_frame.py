@@ -399,10 +399,10 @@ class VideoCaptureFrame(AISFrame, TkinterDnD.DnDWrapper):
         アニメ名テキストボックスが変更されたときに呼び出される
         """
         with VideoModelEditSession(self._model.video) as edit:
-            if text:
-                edit.set_source_nime_name(text)
+            if text != "":
+                edit.set_override_nime_name(text)
             else:
-                edit.set_source_nime_name(None)
+                edit.set_override_nime_name(None)
 
     def _on_resolution_changes(
         self, aspect_ratio: AspectRatioPattern, resolution: ResolutionPattern

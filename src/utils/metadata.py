@@ -141,9 +141,10 @@ class ContentsMetadata:
             self._override_nime_name = None
 
         # _ignored がある場合は警告出す
-        write_log(
-            "warning", f"ContentsMetadata recieves _ignored parameter ({_ignored})"
-        )
+        if _ignored:
+            write_log(
+                "warning", f"ContentsMetadata recieves _ignored parameter ({_ignored})"
+            )
 
     @property
     def overlay_nime_name(self) -> bool | None:
@@ -261,8 +262,8 @@ class ContentsMetadata:
         _sanitize_vars(metadata_dict, "_resize_resolution_pattern", lambda v: v.value)
         _sanitize_vars(metadata_dict, "_playback_mode", lambda v: v.value)
         _sanitize_vars(metadata_dict, "_disabled_frame_indices", lambda v: list(v))
-        _sanitize_vars(metadata_dict, "_source_nime_name", lambda v: v.value)
-        _sanitize_vars(metadata_dict, "_override_nime_name", lambda v: v.value)
+        _sanitize_vars(metadata_dict, "_source_nime_name", lambda v: v)
+        _sanitize_vars(metadata_dict, "_override_nime_name", lambda v: v)
 
         # 　シリアライズ
         # NOTE

@@ -879,7 +879,7 @@ class ImageModel:
         NIME 用の外部プロセス
         """
         if self._overlay_nime_name:
-            return overlay_nime_name(source_image, self._source_nime_name)
+            return overlay_nime_name(source_image, self.final_nime_name)
         else:
             return source_image
 
